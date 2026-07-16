@@ -12,32 +12,35 @@ sends grams to Spoolman's `/api/v1/spool/{id}/measure` endpoint.
 
 ## Normal scan
 
-Scan either of these Spoolman formats:
+Turn on the scale, put the spool on it, wait for the displayed weight to settle,
+and scan either of these Spoolman formats:
 
 - `web+spoolman:s-123`
 - A URL containing `/spool/show/123`
 
-The spool ID is sent to both printers. A successful scan plays the success cue.
+Every valid spool scan checks the scale automatically. If it reports a stable
+weight over 50 g, that gross weight is converted to grams and saved in Spoolman.
+If the scale is off, disconnected, unstable, empty, or reports 50 g or less, the
+Spoolman weight is left unchanged. In either case, the spool ID is sent to both
+printers. No trigger QR or timeout window is used.
 
-## Weigh and scan
+The weighing cue plays when a qualifying scale reading is found. A success cue
+confirms the completed scan; an error cue means Spoolman or a printer update
+failed.
 
-1. Put the spool on the scale and wait for its display to settle.
-2. Scan [weigh-spool-trigger.svg](weigh-spool-trigger.svg). This QR contains the
-    text `afc-weigh-spool` and starts a five-second window.
-3. The start cue sounds. Scan the spool's normal Spoolman QR within five seconds.
-4. The gross weight is read, converted to grams if needed, and sent to Spoolman.
-    The same spool ID is then sent to both printers.
-5. A success cue confirms completion. A low timeout cue sounds if no spool QR is
-    completed within five seconds; an error cue means an update failed.
+## Components
 
-A spool QR scanned after a timeout still sets the next spool on both printers,
-but it does not alter its Spoolman weight.
+Scale support is isolated from the QR scanner:
 
-Print the supplied SVG or display it near the scale. To generate a replacement:
+- [usb-qr-scanner-read.sh](usb-qr-scanner-read.sh) reads QR input, invokes the
+  scale updater, sends the spool ID to Moonraker, and selects audible cues.
+- [spool-scale-update.sh](spool-scale-update.sh) owns the automatic scale
+  threshold and Spoolman measurement update. It returns `0` when a weight was
+  saved, `2` when weighing was safely skipped, and `1` on an actual error.
+- [dymo-scale-read.py](dymo-scale-read.py) owns all DYMO USB HID discovery,
+  report decoding, unit detection, stability checks, and conversion to grams.
 
-```bash
-qrencode -t SVG -l H -m 4 -o weigh-spool-trigger.svg 'afc-weigh-spool'
-```
+This keeps DYMO protocol and scale policy code out of the QR event loop.
 
 ## Requirements
 
@@ -51,7 +54,7 @@ Install packages and grant scanner access:
 
 ```bash
 sudo apt update
-sudo apt install evtest curl alsa-utils qrencode
+sudo apt install evtest curl alsa-utils
 sudo usermod -aG input "$(whoami)"
 ```
 
@@ -115,19 +118,17 @@ by this simple GPIO backend. Set `AUDIO_BACKEND="none"` to disable all cues.
 
 ## Configuration
 
-Defaults are at the top of [usb-qr-scanner-read.sh](usb-qr-scanner-read.sh).
-Copy [config.env.example](config.env.example) to `config.env` to override them
-without editing the script. Important settings include:
+Defaults are defined in the module that uses each setting. Copy
+[config.env.example](config.env.example) to `config.env` to override them from
+one shared configuration file without editing the scripts. Important settings
+include:
 
 - `EVENT_DEV`: stable `/dev/input/by-id` path for the QR scanner
 - `MOONRAKER_HOSTS`: comma-separated Moonraker host names
 - `SPOOLMAN_URL`: local Spoolman REST API base URL
-- `WEIGH_TRIGGER_CODE` and `WEIGH_WINDOW_SECONDS`
 - `SCALE_VENDOR_ID` and comma-separated `SCALE_PRODUCT_IDS`
+- `SCALE_MINIMUM_WEIGHT_GRAMS`: weight must be greater than this value to update
 - `AUDIO_BACKEND` and `BUZZER_GPIO_PIN`
-
-If `WEIGH_TRIGGER_CODE` changes, regenerate the trigger QR with the exact new
-text.
 
 ## User service
 
@@ -150,4 +151,13 @@ View activity and errors:
 
 ```bash
 journalctl --user -u usb-qr-scanner.service -f
+```
+
+The log reports Spoolman and each Moonraker printer separately. An error cue can
+therefore mean that the weight was saved successfully but one or both printers
+were powered off or their `.local` names could not be resolved. Check Spoolman
+itself with:
+
+```bash
+curl http://127.0.0.1:7912/api/v1/health
 ```

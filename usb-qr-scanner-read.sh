@@ -8,13 +8,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 EVENT_DEV="${EVENT_DEV:-/dev/input/by-id/usb-TMS_HIDKeyBoard_1234567890abcd-event-kbd}"
 MOONRAKER_HOSTS="${MOONRAKER_HOSTS:-kilo.local,yankee.local}"
 MOONRAKER_PORT="${MOONRAKER_PORT:-7125}"
-SPOOLMAN_URL="${SPOOLMAN_URL:-http://127.0.0.1:7912/api/v1}"
 SPOOLMAN_PREFIX="${SPOOLMAN_PREFIX:-web+spoolman:s-}"
-WEIGH_TRIGGER_CODE="${WEIGH_TRIGGER_CODE:-afc-weigh-spool}"
-WEIGH_WINDOW_SECONDS="${WEIGH_WINDOW_SECONDS:-5}"
-SCALE_VENDOR_ID="${SCALE_VENDOR_ID:-0922}"
-SCALE_PRODUCT_IDS="${SCALE_PRODUCT_IDS:-8003}"
-SCALE_READ_TIMEOUT_SECONDS="${SCALE_READ_TIMEOUT_SECONDS:-2}"
 AUDIO_BACKEND="${AUDIO_BACKEND:-auto}"
 AUDIO_DEVICE="${AUDIO_DEVICE:-}"
 BUZZER_GPIO_PIN="${BUZZER_GPIO_PIN:-}"
@@ -56,6 +50,35 @@ if [[ ! -e "$EVENT_DEV" ]]; then
     exit 1
 fi
 
+if [[ ! -x "$SCRIPT_DIR/spool-scale-update.sh" ]]; then
+    log "Error: scale module $SCRIPT_DIR/spool-scale-update.sh is missing or not executable."
+    exit 1
+fi
+
+send_to_moonraker() {
+    local host="$1"
+    local spool_id="$2"
+    local error_file
+    local error_message
+
+    error_file="$(mktemp)"
+    if curl --fail --silent --show-error \
+        --connect-timeout 2 --max-time 5 --retry 1 --retry-all-errors \
+        -X POST "http://${host}:${MOONRAKER_PORT}/printer/gcode/script" \
+        -H "Content-Type: application/json" \
+        -d "{\"script\":\"SET_NEXT_SPOOL_ID SPOOL_ID=${spool_id}\"}" \
+        >/dev/null 2>"$error_file"; then
+        rm -f "$error_file"
+        log "Moonraker on $host accepted next spool $spool_id."
+        return 0
+    fi
+
+    error_message="$(tr '\n' ' ' <"$error_file")"
+    rm -f "$error_file"
+    log "Error: Moonraker on $host did not respond: $error_message"
+    return 1
+}
+
 post_next_spool_id() {
     local spool_id="$1"
     local host
@@ -68,12 +91,7 @@ post_next_spool_id() {
         host="${host//[[:space:]]/}"
         [[ -z "$host" ]] && continue
         log "Setting next spool $spool_id on $host."
-        curl --fail --silent --show-error \
-            --connect-timeout 2 --max-time 5 \
-            -X POST "http://${host}:${MOONRAKER_PORT}/printer/gcode/script" \
-            -H "Content-Type: application/json" \
-            -d "{\"script\":\"SET_NEXT_SPOOL_ID SPOOL_ID=${spool_id}\"}" \
-            >/dev/null &
+        send_to_moonraker "$host" "$spool_id" &
         pids+=("$!")
     done
 
@@ -81,33 +99,6 @@ post_next_spool_id() {
         wait "$pid" || failed=1
     done
     return "$failed"
-}
-
-update_spool_weight() {
-    local spool_id="$1"
-    local error_file
-    local weight
-
-    error_file="$(mktemp)"
-    if ! weight=$("$SCRIPT_DIR/dymo-scale-read.py" \
-        --timeout "$SCALE_READ_TIMEOUT_SECONDS" \
-        --vendor-id "$SCALE_VENDOR_ID" \
-        --product-ids "$SCALE_PRODUCT_IDS" 2>"$error_file"); then
-        log "$(<"$error_file")"
-        rm -f "$error_file"
-        return 1
-    fi
-    rm -f "$error_file"
-
-    log "Updating Spoolman spool $spool_id with gross weight ${weight} g."
-    if ! curl --fail --silent --show-error \
-        --connect-timeout 2 --max-time 5 \
-        -X PUT "$SPOOLMAN_URL/spool/$spool_id/measure" \
-        -H "Content-Type: application/json" \
-        -d "{\"weight\":${weight}}" >/dev/null; then
-        log "Error: Spoolman rejected the weight for spool $spool_id."
-        return 1
-    fi
 }
 
 extract_spool_id() {
@@ -127,51 +118,25 @@ extract_spool_id() {
     return 1
 }
 
-now_ms() {
-    date +%s%3N
-}
-
-weigh_mode=0
-weigh_deadline_ms=0
-
-expire_weigh_mode() {
-    weigh_mode=0
-    weigh_deadline_ms=0
-    log "The weighing scan window timed out; the next spool will not be weighed."
-    play_cue timeout
-}
-
 process_scan() {
     local code="$1"
     local spool_id
     local failed=0
-    local current_ms
+    local scale_status
 
     log "Scanned code: $code"
-    if [[ "$code" == "$WEIGH_TRIGGER_CODE" ]]; then
-        weigh_mode=1
-        weigh_deadline_ms=$(( $(now_ms) + WEIGH_WINDOW_SECONDS * 1000 ))
-        log "Weighing mode active: scan a Spoolman spool within $WEIGH_WINDOW_SECONDS seconds."
-        play_cue weigh
-        return
-    fi
-
     if ! spool_id="$(extract_spool_id "$code")"; then
         log "Ignored unrecognized QR code."
         return
     fi
 
-    if (( weigh_mode )); then
-        current_ms="$(now_ms)"
-        if (( current_ms >= weigh_deadline_ms )); then
-            expire_weigh_mode
-        else
-            weigh_mode=0
-            weigh_deadline_ms=0
-            update_spool_weight "$spool_id" || failed=1
-        fi
-    fi
-
+    "$SCRIPT_DIR/spool-scale-update.sh" "$spool_id"
+    scale_status=$?
+    case "$scale_status" in
+        0) play_cue weigh ;;
+        2) ;;
+        *) failed=1 ;;
+    esac
     post_next_spool_id "$spool_id" || failed=1
     if (( failed )); then
         log "Spool $spool_id was scanned, but one or more updates failed."
@@ -235,33 +200,14 @@ handle_input_event() {
 }
 
 log "Reading QR codes from $EVENT_DEV."
-log "Weighing trigger QR contents: $WEIGH_TRIGGER_CODE"
+log "Automatic weighing is handled by $SCRIPT_DIR/spool-scale-update.sh."
 
 buffer=""
 shift_active=0
 
 exec {evtest_fd}< <(evtest "$EVENT_DEV" 2>/dev/null)
 while true; do
-    if (( weigh_mode )); then
-        current_ms="$(now_ms)"
-        if (( current_ms >= weigh_deadline_ms )); then
-            expire_weigh_mode
-            continue
-        fi
-        remaining_ms=$(( weigh_deadline_ms - current_ms ))
-        printf -v read_timeout '%d.%03d' $(( remaining_ms / 1000 )) $(( remaining_ms % 1000 ))
-        if IFS= read -r -t "$read_timeout" -u "$evtest_fd" line; then
-            handle_input_event "$line"
-        else
-            read_status=$?
-            if (( read_status > 128 )); then
-                expire_weigh_mode
-            else
-                log "Error: evtest stopped reading the QR scanner."
-                exit 1
-            fi
-        fi
-    elif IFS= read -r -u "$evtest_fd" line; then
+    if IFS= read -r -u "$evtest_fd" line; then
         handle_input_event "$line"
     else
         log "Error: evtest stopped reading the QR scanner."
