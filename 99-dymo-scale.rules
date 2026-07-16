@@ -1,0 +1,2 @@
+# Allow members of the input group to read DYMO M5/M10 postal-scale HID reports.
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0922", ATTRS{idProduct}=="8003", GROUP="input", MODE="0660", TAG+="uaccess"

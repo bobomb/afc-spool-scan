@@ -4,7 +4,10 @@ Description=USB QR Scanner Service
 [Service]
 Type=simple
 ExecStart=%h/afc-spool-scan/usb-qr-scanner-read.sh
-Restart=on-failure
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=default.target
