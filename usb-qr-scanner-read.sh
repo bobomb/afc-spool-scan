@@ -103,11 +103,13 @@ post_next_spool_id() {
 
 extract_spool_id() {
     local code="$1"
+    local normalized_code="${code,,}"
+    local normalized_prefix="${SPOOLMAN_PREFIX,,}"
     local spool_id=""
 
-    if [[ "$code" == "$SPOOLMAN_PREFIX"* ]]; then
-        spool_id="${code#"$SPOOLMAN_PREFIX"}"
-    elif [[ "$code" =~ /spool/show/([0-9]+)([/\?\#]|$) ]]; then
+    if [[ "$normalized_code" == "$normalized_prefix"* ]]; then
+        spool_id="${code:${#SPOOLMAN_PREFIX}}"
+    elif [[ "$normalized_code" =~ /spool/show/([0-9]+)([/\?\#]|$) ]]; then
         spool_id="${BASH_REMATCH[1]}"
     fi
 

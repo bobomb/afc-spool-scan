@@ -18,6 +18,9 @@ and scan either of these Spoolman formats:
 - `web+spoolman:s-123`
 - A URL containing `/spool/show/123`
 
+The Spoolman prefix and URL path are matched case-insensitively, so scanners
+that emit `WEB+SPOOLMAN:S-123` are also supported.
+
 Every valid spool scan checks the scale automatically. If it reports a stable
 weight over 50 g, that gross weight is converted to grams and saved in Spoolman.
 If the scale is off, disconnected, unstable, empty, or reports 50 g or less, the
@@ -124,7 +127,8 @@ one shared configuration file without editing the scripts. Important settings
 include:
 
 - `EVENT_DEV`: stable `/dev/input/by-id` path for the QR scanner
-- `MOONRAKER_HOSTS`: comma-separated Moonraker host names
+- `MOONRAKER_HOSTS`: comma-separated Moonraker host names or LAN IP addresses;
+  use reserved IP addresses if `.local`/mDNS resolution is unreliable
 - `SPOOLMAN_URL`: local Spoolman REST API base URL
 - `SCALE_VENDOR_ID` and comma-separated `SCALE_PRODUCT_IDS`
 - `SCALE_MINIMUM_WEIGHT_GRAMS`: weight must be greater than this value to update
@@ -147,11 +151,39 @@ After changing code or configuration:
 systemctl --user restart usb-qr-scanner.service
 ```
 
-View activity and errors:
+## Logs
+
+The QR scanner and scale updater both write to the `usb-qr-scanner` user
+service journal. On this Raspberry Pi, query user-service records from the
+system journal with `--user-unit`:
 
 ```bash
-journalctl --user -u usb-qr-scanner.service -f
+journalctl --user-unit=usb-qr-scanner.service -f
 ```
+
+Spoolman writes its application log to `~/spoolman/data/spoolman.log` and its
+console/API access log to Docker. Follow the complete Docker log with:
+
+```bash
+docker compose -f ~/spoolman/docker-compose.yml logs -f --tail=50 spoolman
+```
+
+Or follow only Spoolman's application log file with:
+
+```bash
+tail -F ~/spoolman/data/spoolman.log
+```
+
+To follow scanner, scale, and Spoolman output together, use the supplied helper:
+
+```bash
+cd ~/afc-spool-scan
+./tail-logs.sh
+```
+
+It prints `[scanner-scale]` and `[spoolman]` prefixes. Pass a number to change
+how many existing lines are shown before following, for example
+`./tail-logs.sh 100`. Press Ctrl+C to stop.
 
 The log reports Spoolman and each Moonraker printer separately. An error cue can
 therefore mean that the weight was saved successfully but one or both printers
