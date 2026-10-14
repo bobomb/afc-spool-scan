@@ -267,6 +267,31 @@ async def test_settings_and_activity_persist(station: Station, tmp_path) -> None
     assert (tmp_path / "activity.jsonl").read_text(encoding="utf-8").count("\n") == 1
 
 
+async def test_default_paths_only_set_next_spool(station: Station) -> None:
+    await set_scale(station, 640.0)
+    await act(station, "weigh_load", spool_id=97)
+    await act(station, "load", spool_id=90)
+    await act(station, "clear_pending", printer="kilo")
+    expected = len(station.store.activity)
+    for mode in ("immediate", "countdown"):
+        await act(station, "set_setting", key="scan_mode", value=mode)
+        await act(station, "sim.scan", code="web+spoolman:s-84")
+        expected += 1
+        await wait_until(lambda: len(station.store.activity) == expected)
+    lookups = lambda: sum(path == "/api/v1/spool/84" for _, path, _ in station.sim_spoolman.requests)  # noqa: E731
+    before = lookups()
+    await act(station, "set_setting", key="scan_mode", value="fill")
+    await act(station, "sim.scan", code="web+spoolman:s-84")
+    await wait_until(lambda: lookups() > before)
+    await asyncio.sleep(0.05)
+    assert station.store.activity[0]["action"] == "scan"
+    for key in ("kilo", "yankee"):
+        log = sim_printer(station, key).gcode_log
+        assert log and all(line.startswith("SET_NEXT_SPOOL_ID") for line in log), log
+    await act(station, "assign_lane", spool_id=97, printer="kilo", lane="lane4")
+    assert sim_printer(station, "kilo").gcode_log[-1] == "SET_SPOOL_ID LANE=lane4 SPOOL_ID=97"
+
+
 async def test_undo_with_writes_off_is_a_dry_run(station: Station) -> None:
     await set_scale(station, 640.0)
     result = await act(station, "weigh", spool_id=97)

@@ -140,6 +140,12 @@ Rules carried over from the current scanner behaviour:
   **> 50 g** (`SCALE_MINIMUM_WEIGHT_GRAMS`).
 - "Load" means *tag the next lane inserted* on the printer
   (`SET_NEXT_SPOOL_ID`), not physical loading.
+- **Decided (2026-10-14):** setting the next loaded spool
+  (`SET_NEXT_SPOOL_ID`) is the default assignment, as in the current scripts.
+  Scans, Weigh + Load and Load only ever use it. Assigning a spool to a
+  specific lane (`SET_SPOOL_ID`, #3) happens only when explicitly chosen:
+  **Assign lane…** on the main screen, or tapping a lane on the Printers
+  screen, and in both cases confirming with **Assign** in the dialog.
 - QR prefixes/URLs are matched case-insensitively.
 
 ### 4.2 Additional functions — **Decided** (accepted 2026-10-13)
@@ -148,7 +154,7 @@ Rules carried over from the current scanner behaviour:
 |---|---|---|
 | 1 | **Target printer selection** | Kilo / Yankee / Both. Show the pending next-spool per printer and allow **Clear pending**. Fixes stale pending IDs left on the printer not loaded. |
 | 2 | **Look up (no action)** | Enter/scan ID → show vendor, filament name, material, color, remaining, spool weight, location, last used. |
-| 3 | **Assign to specific lane** | `SET_SPOOL_ID LANE=laneN SPOOL_ID=X` on a chosen printer/lane; for lanes tagged wrongly or loaded without a scan. |
+| 3 | **Assign to specific lane** | `SET_SPOOL_ID LANE=laneN SPOOL_ID=X` on a chosen printer/lane; for lanes tagged wrongly or loaded without a scan. Only when explicitly chosen (§4.1: the default is next-spool). |
 | 5 | **Record empty spool** | Weigh the empty core, store it as the spool's `spool_weight` (tare), then archive the spool. |
 | 6 | **Weight sanity check** | Before saving, show gross, tare, net and the delta from Spoolman's expected weight; warn above a threshold (likely wrong spool or missing tare). |
 | 7 | **Undo and recent activity** | Activity list of recent actions; undo restores previous Spoolman values / lane assignment / pending spool. |
@@ -194,7 +200,8 @@ Two cards (Kilo, Yankee). Each shows:
 - Pending next spool (tracked by the service) with **Clear**.
 - Lanes 1–4: color swatch, material, spool ID, remaining g (bar), tool map
   (T0–T3), `filament_status`, loaded lane highlighted, low-stock highlight.
-- Tapping a lane opens **Assign to lane** with the current spool ID.
+- Tapping a lane opens **Assign to lane** with the current spool ID; nothing
+  is sent until **Assign** is tapped (§4.1).
 
 ### 5.3 Log
 
@@ -344,3 +351,4 @@ Detailed tasks: dev plan §8.
 | 2026-10-13 | Display: Hosyond 7" DSI IPS, 800×480 capacitive (FT5x06); UI targets 800×480 landscape. |
 | 2026-10-13 | Panel bring-up deferred; develop software first on Windows with simulated hardware and the LVGL Windows simulator; deliver via fork branch `touch-ui`. |
 | 2026-10-13 | UI language changed from C to C++20 (LVGL v9.6 C API, nlohmann/json); Rust bindings considered and not chosen (no maintained LVGL 9.6 binding). |
+| 2026-10-14 | Default assignment is the next loaded spool (`SET_NEXT_SPOOL_ID`), as the scripts do; lane assignment (`SET_SPOOL_ID`) only when explicitly chosen and confirmed in the Assign dialog. |
