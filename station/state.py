@@ -123,6 +123,7 @@ class ServiceInfo:
     printers: str
     spoolman: str
     writes: bool
+    dry_run: bool = False
 
 
 def to_data(value: Any) -> Any:
