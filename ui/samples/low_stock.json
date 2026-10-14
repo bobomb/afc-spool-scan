@@ -51,7 +51,7 @@
       "used_weight_g": 545.3,
       "tare_source": "spool",
       "location": "Kilo",
-      "last_used": "2026-10-14T03:53:07Z",
+      "last_used": "2026-10-14T04:33:09Z",
       "archived": false,
       "low_stock": true,
       "message": null
@@ -249,7 +249,7 @@
           "Kilo"
         ],
         "ok": true,
-        "message": "Undid weigh load of spool 97",
+        "message": "Undid weigh + load of spool 97",
         "code": null,
         "dry_run": false,
         "undone": false,

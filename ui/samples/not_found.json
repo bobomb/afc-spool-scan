@@ -235,7 +235,7 @@
           "Kilo"
         ],
         "ok": true,
-        "message": "Undid weigh load of spool 97",
+        "message": "Undid weigh + load of spool 97",
         "code": null,
         "dry_run": false,
         "undone": false,
