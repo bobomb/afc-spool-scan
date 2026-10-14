@@ -88,9 +88,9 @@ afc-spool-scan/
 │  ├─ sim/fixtures/*.json      captured from the real printers/Spoolman
 │  └─ simctl.py                python -m station.simctl (drive simulation)
 ├─ tests/                      pytest
-├─ ui/                         LVGL C application
+├─ ui/                         LVGL C++ application
 │  ├─ CMakeLists.txt, CMakePresets.json, lv_conf.h
-│  └─ src/{main.c, platform_*.c, ipc_client.c, model.c, theme.c, screens/, widgets/}
+│  └─ src/{main.cpp, platform_*.cpp, ipc_client.cpp, model.cpp, theme.cpp, screens/, widgets/}
 ├─ scripts/{capture-fixtures.py, install-spoolpi.sh, deploy-spoolpi.ps1}
 ├─ systemd/{spool-station.service, spool-station-ui.service}
 ├─ pyproject.toml
@@ -286,8 +286,8 @@ settings so they can change without code edits:
 
 ## 7. UI design notes
 
-- C11, LVGL **v9.6.0** pinned via CMake `FetchContent`; cJSON pinned the same
-  way. Use v9 APIs only.
+- C++20 on LVGL's C API, LVGL **v9.6.0** pinned via CMake `FetchContent`;
+  nlohmann/json and doctest pinned the same way. Use LVGL v9 APIs only.
 - Backends chosen by `-DSTATION_UI_BACKEND=`:
   - `windows`: LVGL Windows driver (`LV_USE_WINDOWS`,
     `lv_windows_create_display`, `lv_windows_acquire_pointer_indev`) — no SDL
@@ -367,8 +367,8 @@ within a phase unless noted. Each task ends with tests/build passing.
 ### U — UI
 
 - [ ] **U1** `ui/` CMake project, `CMakePresets.json` (`windows`, `sdl`, `pi`),
-  LVGL v9.6.0 + cJSON via FetchContent, `lv_conf.h`, `platform_windows.c`;
-  800×480 window opens. Build:
+  LVGL v9.6.0 + nlohmann/json + doctest via FetchContent, `lv_conf.h`,
+  `platform_windows.cpp`; 800×480 window opens. Build:
   `cmake --preset windows` then `cmake --build --preset windows`.
 - [ ] **U2** `theme.c`: dark theme (light variant behind a setting), fonts,
   shared styles.

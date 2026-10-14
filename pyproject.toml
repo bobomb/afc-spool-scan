@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spool-station"
+version = "0.1.0"
+description = "AFC spool station service: scale, QR scanner, Spoolman and Moonraker for the touch UI"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["aiohttp>=3.9"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+linux = ["evdev>=1.6"]
+
+[project.scripts]
+spool-station = "station.__main__:main"
+spool-station-simctl = "station.simctl:main"
+
+[tool.setuptools.packages.find]
+include = ["station*"]
+
+[tool.setuptools.package-data]
+"station.sim" = ["fixtures/*.json", "fixtures/*/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["e2e: runs the built touch UI binary against the simulated service"]

@@ -17,7 +17,7 @@ silently change a **Decided** item.
 
 - `station/` (Python, asyncio) owns all hardware and integrations: scale,
   QR scanner, Spoolman, Moonraker WebSockets, actions, activity/undo, audio.
-- `ui/` (C11, LVGL v9.6) is a thin client over TCP `127.0.0.1:7913`
+- `ui/` (C++20, LVGL v9.6) is a thin client over TCP `127.0.0.1:7913`
   newline-delimited JSON (dev plan §5). It holds no business logic and makes
   no network calls other than the IPC connection.
 - Existing bash/Python scripts in the repo root are in production on spoolpi;
@@ -48,7 +48,7 @@ cmake --preset windows; cmake --build --preset windows
   `station/sim/fixtures`. Do not send G-code or Spoolman writes unless the
   user explicitly asks to run with `--writes on`.
 - Python 3.13, type hints, `aiohttp`, `pytest` + `pytest-asyncio`.
-- C: LVGL v9 APIs only (no v8 names such as `lv_disp_*` or
+- C++: LVGL v9 APIs only (no v8 names such as `lv_disp_*` or
   `lv_obj_set_style_local_*`); one source file per screen or widget.
 - Line endings are LF (see `.gitattributes`); scripts run on Linux.
 - Never commit `config.env` (machine-specific). Add new keys to

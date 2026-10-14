@@ -70,7 +70,7 @@ Notes:
 flowchart LR
   QR[USB QR scanner] --> S[spool-station service<br/>Python]
   SC[DYMO scale] --> S
-  S <-->|local IPC| UI[LVGL touch UI<br/>C, DRM/KMS + evdev]
+  S <-->|local IPC| UI[LVGL touch UI<br/>C++, DRM/KMS + evdev]
   S <--> SM[Spoolman]
   S <-->|WebSocket subscribe| K[Kilo Moonraker]
   S <-->|WebSocket subscribe| Y[Yankee Moonraker]
@@ -85,9 +85,10 @@ flowchart LR
 - Existing scripts (`dymo-scale-read.py`, `audible-cue.py`) are reused as
   modules; the shell scripts remain as a CLI fallback.
 
-### 3.1 UI technology — **Decided: LVGL**
+### 3.1 UI technology — **Decided: LVGL, C++**
 
-- LVGL v9.x (v9.6 current at time of decision), written in C.
+- LVGL v9.x (v9.6 current at time of decision). The UI is written in C++20
+  on top of LVGL's C API (decided 2026-10-13; originally C).
 - Renders directly via DRM/KMS with evdev/libinput touch; no compositor or
   browser required.
 - Development via the LVGL Windows simulator driver on a Windows PC; same code
@@ -107,7 +108,7 @@ WPE WebKit (`cog`), Qt/QML (PySide6), Kivy, extending KlipperScreen.
   (scale, printer, spool lookup, action result, activity).
 - UI → service: action requests with a request ID; service replies with
   result and pushes resulting state changes.
-- C side JSON parsing via cJSON.
+- UI side JSON parsing via nlohmann/json (C++).
 - Message definitions: dev plan §5.
 
 ### 3.3 Development workflow — **Decided**
@@ -233,11 +234,15 @@ Commands (via `POST /printer/gcode/script`):
 |---|---|
 | Queue spool for next load | `SET_NEXT_SPOOL_ID SPOOL_ID=<id>` |
 | Assign spool to lane | `SET_SPOOL_ID LANE=<lane> SPOOL_ID=<id>` |
-| Clear pending next spool | **Open:** verify AFC syntax for clearing |
+| Clear pending next spool | `SET_NEXT_SPOOL_ID` (no `SPOOL_ID`; verified in AFC v1.1.0 `AFC_spool.py`) |
 
 AFC status does **not** expose the pending next-spool ID. The service tracks
-what it sent and confirms via `/server/gcode_store` (response
-`Spool ID set for next load: '<id>'`).
+what it sent and confirms from `notify_gcode_response` lines
+`Spool ID set for next load: '<id>'` or
+`Spool ID '<old>' being overwritten for next load: '<id>'` (`'None'` means
+cleared). AFC consumes the pending ID when a lane loads. `SET_SPOOL_ID`
+refuses a spool already assigned to another lane and reports errors as
+`!! …` responses, not as G-code errors.
 
 ### 6.2 Spoolman
 
@@ -318,7 +323,8 @@ Detailed tasks: dev plan §8.
 6. Allow lane motion commands from the UI?
 7. Button labels ("Load" vs "Queue").
 8. IPC transport: TCP localhost NDJSON proposed (§3.2); confirm.
-9. AFC command for clearing a pending next spool.
+9. ~~AFC command for clearing a pending next spool.~~ Resolved:
+   `SET_NEXT_SPOOL_ID` without `SPOOL_ID` (§6.1).
 10. Does the panel expose software backlight control? (verify in Phase 0;
     affects brightness setting and idle dimming)
 11. Mounting orientation (landscape assumed).
@@ -335,3 +341,4 @@ Detailed tasks: dev plan §8.
 | 2026-10-13 | Excluded: #4 unload and return to shelf. |
 | 2026-10-13 | Display: Hosyond 7" DSI IPS, 800×480 capacitive (FT5x06); UI targets 800×480 landscape. |
 | 2026-10-13 | Panel bring-up deferred; develop software first on Windows with simulated hardware and the LVGL Windows simulator; deliver via fork branch `touch-ui`. |
+| 2026-10-13 | UI language changed from C to C++20 (LVGL v9.6 C API, nlohmann/json); Rust bindings considered and not chosen (no maintained LVGL 9.6 binding). |
