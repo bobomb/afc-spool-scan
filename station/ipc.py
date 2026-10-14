@@ -29,7 +29,6 @@ class _Client:
         self.reader = reader
         self.writer = writer
         self.queue: asyncio.Queue[bytes | None] = asyncio.Queue(QUEUE_LIMIT)
-        self.tasks: set[asyncio.Task[None]] = set()
         self.closed = False
         peer = writer.get_extra_info("peername")
         self.name = f"{peer[0]}:{peer[1]}" if isinstance(peer, tuple) else str(peer)
@@ -81,6 +80,9 @@ class IpcServer:
         self.requested_port = port
         self.hello_extra = dict(hello_extra or {})
         self.clients: set[_Client] = set()
+        # Actions belong to the server: a client disconnecting must not cancel a
+        # half-done write (its result is simply dropped).
+        self._tasks: set[asyncio.Task[None]] = set()
         self._server: asyncio.Server | None = None
         self._unsubscribe: Callable[[], None] | None = None
 
@@ -100,9 +102,9 @@ class IpcServer:
         if self._unsubscribe:
             self._unsubscribe()
             self._unsubscribe = None
+        for task in list(self._tasks):
+            task.cancel()
         for client in list(self.clients):
-            for task in client.tasks:
-                task.cancel()
             client.close()
         if self._server is not None:
             self._server.close()
@@ -138,8 +140,6 @@ class IpcServer:
             pass
         finally:
             self.clients.discard(client)
-            for task in client.tasks:
-                task.cancel()
             client.close()
             try:
                 await asyncio.wait_for(writer_task, 2)
@@ -176,8 +176,8 @@ class IpcServer:
             client.send(encode(self._error(request_id, "request needs an action and object args")))
             return
         task = asyncio.create_task(self._run(client, request_id, action, args))
-        client.tasks.add(task)
-        task.add_done_callback(client.tasks.discard)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def _run(self, client: _Client, request_id: Any, action: str, args: dict[str, Any]) -> None:
         try:

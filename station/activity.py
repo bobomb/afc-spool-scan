@@ -50,6 +50,7 @@ class ActivityEntry:
     dry_run: bool = False
     undone: bool = False
     undo: list[UndoStep] = field(default_factory=list)
+    mode: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ActivityEntry:
@@ -66,6 +67,7 @@ class ActivityEntry:
             dry_run=bool(data.get("dry_run", False)),
             undone=bool(data.get("undone", False)),
             undo=steps,
+            mode=data.get("mode"),
         )
 
 
@@ -75,10 +77,14 @@ class ActivityLog:
         path: Path | None,
         undo_depth: int = 20,
         clock: Callable[[], str] = utc_now_iso,
+        mode: str | None = None,
     ) -> None:
+        """`mode` identifies where writes go (sim/live, writes on/off); entries
+        recorded under another mode are never undoable."""
         self.path = path
         self.undo_depth = undo_depth
         self.clock = clock
+        self.mode = mode
         self.entries: list[ActivityEntry] = []
         self._next = 1
 
@@ -126,6 +132,7 @@ class ActivityLog:
             code=code,
             dry_run=dry_run,
             undo=list(undo or []),
+            mode=self.mode,
         )
         self._next += 1
         self.entries.insert(0, entry)
@@ -137,7 +144,9 @@ class ActivityLog:
         return next((entry for entry in self.entries if entry.id == activity_id), None)
 
     def _undoable_ids(self) -> set[str]:
-        candidates = [entry for entry in self.entries if entry.undo and not entry.dry_run]
+        candidates = [
+            entry for entry in self.entries if entry.undo and not entry.dry_run and entry.mode == self.mode
+        ]
         return {entry.id for entry in candidates[: self.undo_depth] if not entry.undone}
 
     def is_undoable(self, entry: ActivityEntry) -> bool:

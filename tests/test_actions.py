@@ -267,6 +267,77 @@ async def test_settings_and_activity_persist(station: Station, tmp_path) -> None
     assert (tmp_path / "activity.jsonl").read_text(encoding="utf-8").count("\n") == 1
 
 
+async def test_undo_with_writes_off_is_a_dry_run(station: Station) -> None:
+    await set_scale(station, 640.0)
+    result = await act(station, "weigh", spool_id=97)
+    station.spoolman.writes = False
+    undo = await act(station, "undo", activity_id=result["activity_id"])
+    assert undo["ok"] is True and undo["dry_run"] is True
+    assert undo["message"] == "Dry run: would undo weigh"
+    assert sim_spool(station, 97)["remaining_weight"] == pytest.approx(460.0)
+    assert station.actions.activity.get(result["activity_id"]).undone is False
+    station.spoolman.writes = True
+    assert (await act(station, "undo", activity_id=result["activity_id"]))["ok"] is True
+    assert sim_spool(station, 97)["used_weight"] == pytest.approx(545.3)
+
+
+async def test_entries_from_another_mode_are_not_undoable(station: Station) -> None:
+    await set_scale(station, 640.0)
+    result = await act(station, "weigh", spool_id=97)
+    log = station.actions.activity
+    entry = log.get(result["activity_id"])
+    assert entry.mode == log.mode and log.is_undoable(entry)
+    entry.mode = "printers=live:w,spoolman=live:w"
+    assert not log.is_undoable(entry)
+    assert (await act(station, "undo", activity_id=entry.id))["code"] == "invalid_args"
+    assert sim_spool(station, 97)["remaining_weight"] == pytest.approx(460.0)
+
+
+async def test_printer_timeouts_are_recorded_with_undo(station: Station, monkeypatch: pytest.MonkeyPatch) -> None:
+    kilo = station.printers.get("kilo")
+
+    async def no_reply(*args: Any, **kwargs: Any) -> Any:
+        raise asyncio.TimeoutError
+
+    await act(station, "load", spool_id=97, target="kilo")
+    monkeypatch.setattr(kilo, "call", no_reply)
+    cleared = await act(station, "clear_pending", printer="kilo")
+    assert cleared["ok"] is False and cleared["code"] == "printer_error"
+    assert "may still apply" in cleared["message"]
+    assert station.store.activity[0]["undoable"]
+    assigned = await act(station, "assign_lane", spool_id=97, printer="kilo", lane="lane4")
+    assert assigned["code"] == "printer_error" and assigned["activity_id"]
+    assert station.store.activity[0]["action"] == "assign_lane" and station.store.activity[0]["undoable"]
+    loaded = await act(station, "load", spool_id=90, target="kilo")
+    assert loaded["code"] == "printer_error" and station.store.activity[0]["undoable"]
+
+
+async def test_disconnecting_client_does_not_abort_a_write(station: Station,
+                                                           monkeypatch: pytest.MonkeyPatch) -> None:
+    import json
+
+    kilo = station.printers.get("kilo")
+    original = kilo.set_next_spool
+
+    async def slow(spool_id: int | None) -> Any:
+        await asyncio.sleep(0.3)
+        return await original(spool_id)
+
+    monkeypatch.setattr(kilo, "set_next_spool", slow)
+    await set_scale(station, 640.0)
+    reader, writer = await asyncio.open_connection("127.0.0.1", station.ipc_port)
+    await reader.readline()
+    await reader.readline()
+    request = {"type": "request", "id": "x", "action": "weigh_load", "args": {"spool_id": 97, "target": "kilo"}}
+    writer.write((json.dumps(request) + "\n").encode())
+    await writer.drain()
+    await asyncio.sleep(0.1)
+    writer.close()
+    await wait_until(lambda: bool(station.store.activity))
+    assert station.store.activity[0]["action"] == "weigh_load" and station.store.activity[0]["ok"]
+    assert sim_printer(station, "kilo").next_spool_id == 97
+
+
 async def test_sim_actions_validate(station: Station) -> None:
     assert (await act(station, "sim.scale", grams="heavy"))["code"] == "invalid_args"
     assert (await act(station, "sim.scale", status="wobbly"))["code"] == "invalid_args"

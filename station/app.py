@@ -56,7 +56,9 @@ class Station:
             spoolman=config.spoolman_mode, writes=config.writes, dry_run=dry_run,
         ))
         self.settings = Settings(config.state_dir / "settings.json", [p.key for p in config.printers])
-        self.activity = ActivityLog(config.state_dir / "activity.jsonl")
+        mode = (f"printers={config.printers_mode}:{'w' if config.writes_enabled('printers') else 'ro'},"
+                f"spoolman={config.spoolman_mode}:{'w' if config.writes_enabled('spoolman') else 'ro'}")
+        self.activity = ActivityLog(config.state_dir / "activity.jsonl", mode=mode)
         self.session: aiohttp.ClientSession | None = None
         self.sim_spoolman: SimSpoolman | None = None
         self.sim_printers: SimPrinterServer | None = None

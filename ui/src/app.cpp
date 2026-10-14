@@ -401,6 +401,9 @@ void App::entry_submit()
 
 void App::handle_key(const std::string& key)
 {
+    if (confirm_->open() || assign_->open()) {
+        return;
+    }
     if (key.size() == 1 && key[0] >= '0' && key[0] <= '9') {
         if (screen_ != ScreenId::Main) show(ScreenId::Main);
         entry_digit(key[0]);
@@ -498,10 +501,15 @@ void App::weigh(bool confirm)
 {
     const auto id = spool_id();
     if (!id) return;
-    banner({BannerMessage::Kind::Info, "Weighing spool #" + std::to_string(*id) + "...", ""});
-    request("weigh", {{"spool_id", *id}, {"confirm", confirm}}, [this](const Result& result) {
+    send_weigh(*id, confirm);
+}
+
+void App::send_weigh(int spool, bool confirm)
+{
+    banner({BannerMessage::Kind::Info, "Weighing spool #" + std::to_string(spool) + "...", ""});
+    request("weigh", {{"spool_id", spool}, {"confirm", confirm}}, [this, spool](const Result& result) {
         if (result.code == "needs_confirm") {
-            confirm_weight(result, [this] { weigh(true); });
+            confirm_weight(result, [this, spool] { send_weigh(spool, true); });
         } else {
             show_result(result);
         }
@@ -512,14 +520,20 @@ void App::weigh_load(bool confirm)
 {
     const auto id = spool_id();
     if (!id) return;
-    banner({BannerMessage::Kind::Info, "Weighing and loading spool #" + std::to_string(*id) + "...", ""});
-    request("weigh_load", {{"spool_id", *id}, {"confirm", confirm}}, [this](const Result& result) {
-        if (result.code == "needs_confirm") {
-            confirm_weight(result, [this] { weigh_load(true); });
-        } else {
-            show_result(result);
-        }
-    });
+    send_weigh_load(*id, state().settings.target, confirm);
+}
+
+void App::send_weigh_load(int spool, const std::string& target, bool confirm)
+{
+    banner({BannerMessage::Kind::Info, "Weighing and loading spool #" + std::to_string(spool) + "...", ""});
+    request("weigh_load", {{"spool_id", spool}, {"target", target}, {"confirm", confirm}},
+            [this, spool, target](const Result& result) {
+                if (result.code == "needs_confirm") {
+                    confirm_weight(result, [this, spool, target] { send_weigh_load(spool, target, true); });
+                } else {
+                    show_result(result);
+                }
+            });
 }
 
 void App::load()

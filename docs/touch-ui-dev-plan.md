@@ -327,7 +327,8 @@ clients.
 - Undo records store previous values: `used_weight` (and `initial_weight` when
   Spoolman reset it) for weigh, previous lane `spool_id` (assign), previous
   pending ID (load/clear), previous `spool_weight`, `used_weight` and
-  `archived` (empty spool). Undo runs the inverse steps newest first.
+  `archived` (empty spool). Undo runs the inverse steps newest first. Only
+  entries recorded under the current write mode can be undone.
 - Scan handling by `scan_mode`:
   - `immediate`: today's behaviour — weigh if a qualifying weight is present,
     then load to the target.
@@ -583,10 +584,19 @@ Append dated notes here (verified API details, gotchas, measurements).
   v9.6.0 tarball (111 MB), nlohmann/json v3.12.0, doctest v2.5.3. A clean
   configure verified the downloads. Full Windows build of LVGL + UI takes a few
   minutes with MSVC; the UI compiles warning-free at `/W4`.
-- 2026-10-13: Verified on Windows with simulated everything: 165 pytest tests
+- 2026-10-13: Verified on Windows with simulated everything: 171 pytest tests
   (service, sims, IPC, scan modes, undo, simctl, capture script, UI
   end-to-end), 13 CTest tests (unit + snapshot of every sample), the Windows
   simulator window (800×480 client area; mouse and keyboard checked by posting
   window messages), and the scripted tour `ui/scripts/tour.script` against
   `python -m station --hardware sim --printers sim --spoolman sim`. No live
   Moonraker or Spoolman calls were made and nothing on spoolpi was changed.
+- 2026-10-13 (code review fixes): IPC request tasks belong to the server, so a
+  UI disconnect or restart never aborts a half-done write (the result is just
+  dropped). Activity entries record the write mode
+  (`printers=<sim|live>:<w|ro>,spoolman=…`); entries from another mode are not
+  undoable, and an undo whose steps were dry runs is reported as a dry run and
+  does not mark the entry undone. G-code timeouts (10 s, e.g. while Klipper
+  heats) are `printer_error` "may still apply" results that are recorded with
+  their undo step. The UI's "Save anyway" re-sends the original spool ID and
+  target, and keys are ignored while a dialog is open.

@@ -28,6 +28,8 @@ from .state import Prompt, SpoolInfo, Store
 
 log = logging.getLogger(__name__)
 
+NO_REPLY = "no reply in time; the command may still apply"
+
 UNDO_LABELS = {
     "weigh_load": "weigh + load",
     "assign_lane": "lane assignment",
@@ -254,7 +256,9 @@ class Actions:
                 result = await client.set_next_spool(spool_id)
             except PrinterOffline:
                 return client, "offline", False, previous
-            except (PrinterCommandError, asyncio.TimeoutError) as error:
+            except asyncio.TimeoutError:
+                return client, NO_REPLY, False, previous
+            except PrinterCommandError as error:
                 return client, str(error) or "command failed", False, previous
             return client, None, result.dry_run, previous
 
@@ -265,7 +269,7 @@ class Actions:
         undo = [
             UndoStep(kind="pending", printer=c.key, spool_id=previous)
             for c, error, dry, previous in outcomes
-            if error is None and not dry
+            if (error is None and not dry) or error == NO_REPLY
         ]
         parts = []
         if done:
@@ -397,6 +401,13 @@ class Actions:
             except PrinterCommandError as error:
                 self.cues.play("error")
                 raise ActionError("printer_error", str(error)) from error
+            except asyncio.TimeoutError as error:
+                self.cues.play("error")
+                undo = [] if previous is None else [UndoStep(kind="pending", printer=client.key, spool_id=previous)]
+                step = StepResult(f"Clear on {client.printer.name}: {NO_REPLY}", ok=False, code="printer_error",
+                                  printers=[client.printer.name], undo=undo)
+                activity_id = self._record("clear_pending", previous, step)
+                return Outcome(False, step.message, code=step.code, activity_id=activity_id)
             undo = [] if result.dry_run or previous is None else [
                 UndoStep(kind="pending", printer=client.key, spool_id=previous)
             ]
@@ -436,6 +447,15 @@ class Actions:
                                   printers=[client.printer.name])
                 self._record("assign_lane", spool_id, step)
                 raise ActionError("printer_error", step.message) from error
+            except asyncio.TimeoutError:
+                self.cues.play("error")
+                step = StepResult(
+                    f"Assign spool {spool_id} to {client.printer.name} {lane.lane}: {NO_REPLY}", ok=False,
+                    code="printer_error", printers=[client.printer.name],
+                    undo=[UndoStep(kind="lane", printer=client.key, lane=lane.lane, spool_id=previous)],
+                )
+                activity_id = self._record("assign_lane", spool_id, step)
+                return Outcome(False, step.message, code=step.code, activity_id=activity_id)
             prefix = "Dry run: would assign" if result.dry_run else "Assigned"
             undo = [] if result.dry_run else [
                 UndoStep(kind="lane", printer=client.key, lane=lane.lane, spool_id=previous)
@@ -483,18 +503,19 @@ class Actions:
             activity_id = self._record("empty_spool", spool_id, step)
             return Outcome(True, f"Spool {spool_id}: {step.message}", activity_id=activity_id, dry_run=step.dry_run)
 
-    async def _apply_undo(self, step: UndoStep) -> None:
+    async def _apply_undo(self, step: UndoStep) -> bool:
+        """Apply one inverse step; returns True when it was only a dry run."""
         if step.kind == "spool_patch":
             assert step.spool_id is not None
             result = await self.spoolman.patch(step.spool_id, dict(step.fields or {}))
             if result.spool is not None and self.store.spool is not None and self.store.spool.id == step.spool_id:
                 self._publish_spool(result.spool)
-        elif step.kind == "pending":
-            await self.printers.get(step.printer or "").set_next_spool(step.spool_id)
-        elif step.kind == "lane":
-            await self.printers.get(step.printer or "").set_lane_spool(step.lane or "", step.spool_id)
-        else:
-            raise ActionError("invalid_args", f"unknown undo step {step.kind!r}")
+            return result.dry_run
+        if step.kind == "pending":
+            return (await self.printers.get(step.printer or "").set_next_spool(step.spool_id)).dry_run
+        if step.kind == "lane":
+            return (await self.printers.get(step.printer or "").set_lane_spool(step.lane or "", step.spool_id)).dry_run
+        raise ActionError("invalid_args", f"unknown undo step {step.kind!r}")
 
     async def undo(self, args: dict[str, Any]) -> Outcome:
         activity_id = args.get("activity_id")
@@ -505,13 +526,19 @@ class Actions:
             raise ActionError("invalid_args", "That action can no longer be undone")
         async with self._lock:
             failures: list[str] = []
+            dry_run = False
             for step in reversed(entry.undo):
                 try:
-                    await self._apply_undo(step)
-                except (SpoolmanError, PrinterOffline, PrinterCommandError, UnknownPrinter, ActionError,
-                        asyncio.TimeoutError) as error:
+                    dry_run = await self._apply_undo(step) or dry_run
+                except asyncio.TimeoutError:
+                    failures.append(NO_REPLY)
+                except (SpoolmanError, PrinterOffline, PrinterCommandError, UnknownPrinter, ActionError) as error:
                     failures.append(str(error) or type(error).__name__)
             label = UNDO_LABELS.get(entry.action, entry.action.replace("_", " "))
+            if dry_run and not failures:
+                step = StepResult(f"Dry run: would undo {label}", dry_run=True, printers=entry.printers)
+                new_id = self._record("undo", entry.spool_id, step)
+                return Outcome(True, step.message, activity_id=new_id, dry_run=True)
             if failures:
                 self.cues.play("error")
                 step = StepResult(f"Undo {label} incomplete: {'; '.join(failures)}", ok=False, code="undo_failed",

@@ -47,6 +47,33 @@ shot printers
 
 
 @pytest.mark.e2e
+async def test_ui_confirmation_applies_to_the_original_spool(station: Station, tmp_path: Path) -> None:
+    exe = find_ui()
+    if exe is None:
+        pytest.skip("station-ui is not built")
+    script = tmp_path / "confirm.script"
+    script.write_text(
+        'request sim.scale {"grams": 984}\n'
+        "type 97\nkey enter\nwait 500\n"
+        "tap 383 332\nwait 800\nshot confirm\n"
+        'request set_setting {"key": "scan_mode", "value": "fill"}\n'
+        'request sim.scan {"code": "web+spoolman:s-86"}\nwait 800\n'
+        "tap 514 377\nwait 1000\nshot saved\n",
+        encoding="utf-8",
+    )
+    process = await asyncio.create_subprocess_exec(
+        str(exe), "--snapshot", str(tmp_path / "shots"), "--connect", "--port", str(station.ipc_port),
+        "--script", str(script), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await asyncio.wait_for(process.communicate(), 90)
+    assert process.returncode == 0, stderr.decode(errors="replace")
+    spools = station.sim_spoolman.spools
+    assert spools[97]["remaining_weight"] == pytest.approx(984 - 180)
+    assert spools[86]["remaining_weight"] == pytest.approx(74.2)
+    assert [(e["action"], e["spool_id"]) for e in station.store.activity] == [("weigh", 97)]
+
+
+@pytest.mark.e2e
 async def test_ui_weigh_load_and_undo(station: Station, tmp_path: Path) -> None:
     exe = find_ui()
     if exe is None:

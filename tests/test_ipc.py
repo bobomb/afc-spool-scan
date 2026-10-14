@@ -136,6 +136,22 @@ async def test_events_reach_multiple_clients_and_slow_actions_do_not_block(serve
     await second.close()
 
 
+async def test_disconnect_does_not_cancel_running_actions(server) -> None:  # noqa: ANN001
+    ipc, _, calls, release = server
+    client = await Client.connect(ipc.port)
+    await client.read()
+    await client.read()
+    await client.request("slow-1", "slow")
+    await asyncio.sleep(0.05)
+    await client.close()
+    await asyncio.sleep(0.05)
+    assert len(ipc._tasks) == 1  # noqa: SLF001
+    release.set()
+    await asyncio.sleep(0.05)
+    assert not ipc._tasks  # noqa: SLF001
+    assert calls == [("slow", {})]
+
+
 async def test_oversized_line_disconnects(server) -> None:  # noqa: ANN001
     ipc, _, _, _ = server
     client = await Client.connect(ipc.port)
