@@ -501,10 +501,11 @@ within a phase unless noted. Each task ends with tests/build passing.
 ### P — spoolpi deployment
 
 - [ ] **P1** `scripts/install-spoolpi.sh`: apt deps (`build-essential cmake
-  ninja-build pkg-config libdrm-dev python3-venv python3-dev`), venv at
-  `~/afc-spool-scan/.venv`, `pip install -e ".[linux]"`, build UI with the
-  `pi` preset. Idempotent; `--update` skips apt.
-  *Written (`bash -n` clean); not run on spoolpi.*
+  ninja-build pkg-config libdrm-dev libevdev-dev python3-venv python3-dev`),
+  venv at `~/afc-spool-scan/.venv`, `pip install -e ".[linux]"`, build UI with
+  the `pi` preset. Idempotent; `--update` skips apt.
+  *Written (`bash -n` clean); not run on spoolpi. `libevdev-dev` added after CI
+  showed LVGL 9.6's evdev driver links libevdev.*
 - [ ] **P2** `systemd/spool-station.service` (user service, like the current
   scanner service) and `spool-station-ui.service`. UI needs DRM master and
   `/dev/input` access as `pi` (groups `video`, `render`, `input`);
@@ -529,8 +530,8 @@ within a phase unless noted. Each task ends with tests/build passing.
 
 - [ ] **C1** GitHub Actions: `pytest` on Ubuntu and Windows; build UI with
   `sdl` on Ubuntu and `windows` on Windows.
-  *`.github/workflows/ci.yml` added (also `headless` + UI end-to-end and
-  `pi` compile check); not run yet because nothing was pushed.*
+  *`.github/workflows/ci.yml` (also `headless` + UI end-to-end and the `pi`
+  build); first pushed 2026-10-14, see §10.*
 
 ## 9. Definition of done (per task)
 

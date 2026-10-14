@@ -103,9 +103,9 @@ async def test_evdev_scanner_grabs_reads_and_reconnects() -> None:
     presence: list[bool] = []
     scanner = EvdevScanner("/dev/input/scanner", scans.append, presence.append, evdev_module=fake, retry_s=0.01)
     scanner.start()
-    for _ in range(100):
+    for _ in range(200):
         await asyncio.sleep(0.005)
-        if len(FakeInputDevice.instances) >= 2:
+        if len(FakeInputDevice.instances) >= 2 and len(scans) >= 2:
             break
     await scanner.stop()
     assert scans[:2] == ["97", "97"]

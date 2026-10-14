@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: sudo apt-get update && sudo apt-get install -y ninja-build pkg-config libsdl2-dev libdrm-dev
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build pkg-config libsdl2-dev libdrm-dev libevdev-dev
       - name: Build
         working-directory: ui
         run: |
@@ -57,11 +57,12 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      # windows-latest ships Visual Studio 2026 (and CMake 4.x), not 2022.
       - name: Build
         working-directory: ui
         run: |
-          cmake --preset windows
-          cmake --build --preset windows
+          cmake --preset windows-vs2026
+          cmake --build --preset windows-vs2026
       - name: Unit and snapshot tests
         working-directory: ui
-        run: ctest --preset windows
+        run: ctest --preset windows-vs2026

@@ -3,13 +3,24 @@
   "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
   "configurePresets": [
     {
-      "name": "windows",
-      "displayName": "Windows (LVGL Windows driver, MSVC)",
-      "generator": "Visual Studio 17 2022",
+      "name": "windows-base",
+      "hidden": true,
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/windows",
       "cacheVariables": { "STATION_UI_BACKEND": "windows" },
       "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "windows",
+      "displayName": "Windows (LVGL Windows driver, Visual Studio 2022)",
+      "inherits": "windows-base",
+      "generator": "Visual Studio 17 2022"
+    },
+    {
+      "name": "windows-vs2026",
+      "displayName": "Windows (LVGL Windows driver, Visual Studio 2026; needs CMake 4.2+)",
+      "inherits": "windows-base",
+      "generator": "Visual Studio 18 2026"
     },
     {
       "name": "sdl",
@@ -35,12 +46,15 @@
   ],
   "buildPresets": [
     { "name": "windows", "configurePreset": "windows", "configuration": "Release" },
+    { "name": "windows-vs2026", "configurePreset": "windows-vs2026", "configuration": "Release" },
     { "name": "sdl", "configurePreset": "sdl" },
     { "name": "pi", "configurePreset": "pi" },
     { "name": "headless", "configurePreset": "headless" }
   ],
   "testPresets": [
     { "name": "windows", "configurePreset": "windows", "configuration": "Release",
+      "output": { "outputOnFailure": true } },
+    { "name": "windows-vs2026", "configurePreset": "windows-vs2026", "configuration": "Release",
       "output": { "outputOnFailure": true } },
     { "name": "sdl", "configurePreset": "sdl", "output": { "outputOnFailure": true } },
     { "name": "pi", "configurePreset": "pi", "output": { "outputOnFailure": true } },
