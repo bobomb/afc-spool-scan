@@ -45,6 +45,10 @@ winget install --id Kitware.CMake
 winget install --id Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive"
 ```
 
+Reuse existing installations when available. Visual Studio 2022 Community
+with the C++ build tools and a Windows SDK satisfies the Build Tools
+requirement; a second Visual Studio installation is not needed.
+
 VS Code extensions: C/C++, CMake Tools, Python, GitHub Copilot Chat.
 
 Clone and prepare:
@@ -312,7 +316,7 @@ within a phase unless noted. Each task ends with tests/build passing.
 
 ### W — Windows environment
 
-- [ ] **W1** Install toolchain (§2).
+- [x] **W1** Install toolchain (§2).
 - [ ] **W2** Clone fork, check out `touch-ui`, create venv.
 - [ ] **W3** `pytest` runs (no tests yet is fine).
 
@@ -443,3 +447,14 @@ Append dated notes here (verified API details, gotchas, measurements).
 
 - 2026-10-13: spoolpi already has `cmake`, `ninja` and `gcc` installed (also
   `mingw-w64`, not needed for this plan).
+- 2026-10-13 (W1): Windows toolchain was already installed: Git
+  2.53.0.windows.4, Python 3.13.7 (`py -3.13`), CMake 3.29.2, Visual Studio
+  2022 Community 17.14 with MSVC 19.44.35217.0 and Windows SDK 10.0.26100.0.
+  CMake on PATH comes from `C:\Strawberry\c\bin` and supports the
+  `Visual Studio 17 2022` generator. An isolated x64 C11 smoke project
+  configured, built and passed CTest, including Windows SDK, Winsock,
+  User32 and GDI linkage, without network or hardware access.
+- 2026-10-13 (W1): Python did not have pytest installed. Ran pytest 9.1.1
+  in a temporary Python 3.13 venv: zero tests collected (exit 5), expected
+  before R1 adds the test layout. Removed the temporary validation files;
+  the repository venv and development dependencies remain W2/R1 work.
