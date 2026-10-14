@@ -73,7 +73,8 @@ python -m station.simctl scan WEB+SPOOLMAN:S-97
 python -m station.simctl printer yankee --disconnect
 python -m station.simctl state activity
 
-# Build and run the touch UI (LVGL Windows driver, 800x480 window)
+# Build and run the touch UI (LVGL Windows driver, 800x480 window).
+# Use the windows-vs2026 preset instead with Visual Studio 2026 and CMake 4.2+.
 cd ui
 cmake --preset windows
 cmake --build --preset windows

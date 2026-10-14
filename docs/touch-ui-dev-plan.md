@@ -476,8 +476,9 @@ within a phase unless noted. Each task ends with tests/build passing.
 - [ ] **U9** `platform_drm.cpp` (DRM + evdev); builds on spoolpi via the `pi`
   preset; snapshot mode runs there.
   *`platform_drm.cpp` written (DRM fbdev buffers, evdev auto-discovery or
-  `--touch`, sysfs backlight); not yet compiled on Linux (CI job `pi` or
-  spoolpi).*
+  `--touch`, sysfs backlight). Compiles and passes CTest (unit + snapshot
+  mode) in CI's `pi` job on x86-64 Ubuntu; still to build and run on spoolpi
+  (arm64).*
 
 ### F — Features (service + UI)
 
@@ -528,10 +529,10 @@ within a phase unless noted. Each task ends with tests/build passing.
 
 ### C — Continuous integration (optional)
 
-- [ ] **C1** GitHub Actions: `pytest` on Ubuntu and Windows; build UI with
+- [x] **C1** GitHub Actions: `pytest` on Ubuntu and Windows; build UI with
   `sdl` on Ubuntu and `windows` on Windows.
   *`.github/workflows/ci.yml` (also `headless` + UI end-to-end and the `pi`
-  build); first pushed 2026-10-14, see §10.*
+  build); green since 2026-10-14, see §10.*
 
 ## 9. Definition of done (per task)
 
@@ -625,3 +626,15 @@ Append dated notes here (verified API details, gotchas, measurements).
   (539 g); the service ignores the weight and the UI shows "Untagged". Yankee
   lanes report `status: "None"` while `filament_status` is `Ready`, so the UI
   relies on `filament_status`.
+- 2026-10-14 (C1): First CI runs on github.com/bobomb/afc-spool-scan
+  (`touch-ui`). Run 1 found three problems the Windows PC could not:
+  a timing race in the evdev reconnect test, LVGL 9.6's evdev driver needing
+  `libevdev` (pkg-config `libevdev`, now in CI and `install-spoolpi.sh`), and
+  `windows-latest` now shipping Visual Studio 2026 with CMake 4.4 (CI uses the
+  `windows-vs2026` preset; `windows` stays on VS 2022 for the PC, whose
+  Strawberry CMake 3.29 defaults to Ninja without a generator). Run 2 was green:
+  pytest on Ubuntu and Windows (the Linux hidraw pipe test runs there), UI
+  builds for `pi` (DRM + evdev), `sdl`, `headless` and `windows-vs2026` with
+  13/13 CTest each, and the UI end-to-end tests against the simulated service
+  on Linux. The headless job uploads the snapshot PNGs as the `ui-snapshots`
+  artifact. GCC `-Wall -Wextra` warnings in our code are fixed.

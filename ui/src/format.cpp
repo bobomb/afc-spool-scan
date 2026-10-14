@@ -166,7 +166,7 @@ std::string local_time_of_day(const std::string& iso_utc)
 {
     std::tm local{};
     if (!local_tm(iso_utc, local)) return std::string();
-    char buffer[16];
+    char buffer[48];
     std::snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", local.tm_hour, local.tm_min, local.tm_sec);
     return buffer;
 }
@@ -175,7 +175,7 @@ std::string local_date(const std::string& iso_utc)
 {
     std::tm local{};
     if (!local_tm(iso_utc, local)) return std::string();
-    char buffer[16];
+    char buffer[48];
     std::snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d", local.tm_year + 1900, local.tm_mon + 1, local.tm_mday);
     return buffer;
 }

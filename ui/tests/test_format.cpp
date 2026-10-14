@@ -66,7 +66,7 @@ TEST_CASE("display text fits the built-in fonts")
     CHECK(display_text("wait\xE2\x80\xA6") == "wait...");
     CHECK(display_text("60\xC2\xB0" "C \xE2\x80\xA2 ok") == "60\xC2\xB0" "C \xE2\x80\xA2 ok");
     CHECK(display_text(LV_SYMBOL_OK_TEXT " done") == LV_SYMBOL_OK_TEXT " done");
-    CHECK(display_text("\xE6\xBC\xA2\xF0\x9F\x99\x82!") == "??!");
+    CHECK(display_text("\xE6\xBC\xA2\xF0\x9F\x99\x82!") == "?" "?!");
     CHECK(display_text("bad\xC3(\xFF") == "bad?(?");
     CHECK(display_text("tab\there\nline") == "tab here\nline");
     CHECK(display_text("") == "");
