@@ -140,6 +140,12 @@ async def test_writes_off_does_not_send(rig) -> None:  # noqa: ANN001
     assert result.dry_run is True
     assert printer.gcode_log == before
     assert client.state.pending_spool is None
+    with pytest.raises(PrinterCommandError, match="writes are off"):
+        await client.call("printer.gcode.script", {"script": "SET_NEXT_SPOOL_ID SPOOL_ID=1"})
+    with pytest.raises(PrinterCommandError, match="writes are off"):
+        await client.call("printer.emergency_stop")
+    assert printer.gcode_log == before
+    assert (await client.call("server.info"))["klippy_state"] == "ready"
 
 
 async def test_disconnect_and_reconnect(rig) -> None:  # noqa: ANN001

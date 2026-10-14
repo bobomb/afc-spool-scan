@@ -24,8 +24,9 @@ from .scale.source import ScaleReading, ScaleSource
 from .scanflow import ScanFlow
 from .scanner.sim import SimScanner
 from .settings import Settings
+from .sim.printers import FIXTURES as PRINTER_FIXTURES
 from .sim.printers import SimPrinterServer
-from .sim.spoolman import SimSpoolman
+from .sim.spoolman import SimSpoolman, load_spool_fixtures
 from .simcontrol import SimControl
 from .spoolman import SpoolmanClient
 from .state import ServiceInfo, Store
@@ -122,13 +123,18 @@ class Station:
 
         self.session = aiohttp.ClientSession()
         spoolman_url = config.spoolman_url
+        fixtures = config.sim_fixtures
         if config.spoolman_mode == "sim":
-            self.sim_spoolman = SimSpoolman()
+            spools = load_spool_fixtures(fixtures / "spoolman" / "spools.json") if fixtures else None
+            self.sim_spoolman = SimSpoolman(spools)
             spoolman_url = await self.sim_spoolman.start()
         urls: dict[str, str] = {}
         if config.printers_mode == "sim":
             lookup = self.sim_spoolman.get if self.sim_spoolman else None
-            self.sim_printers = SimPrinterServer.from_fixtures([p.key for p in config.printers], spool_lookup=lookup)
+            self.sim_printers = SimPrinterServer.from_fixtures(
+                [p.key for p in config.printers], spool_lookup=lookup,
+                directory=fixtures / "printers" if fixtures else PRINTER_FIXTURES,
+            )
             await self.sim_printers.start()
             urls = {p.key: self.sim_printers.url_for(p.key) for p in config.printers}
 

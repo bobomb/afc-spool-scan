@@ -44,7 +44,7 @@ lv_obj_t* label(lv_obj_t* parent, const lv_font_t* font, lv_color_t color, const
     lv_obj_t* obj = lv_label_create(parent);
     lv_obj_set_style_text_font(obj, font, 0);
     lv_obj_set_style_text_color(obj, color, 0);
-    lv_label_set_text(obj, text.c_str());
+    lv_label_set_text(obj, display_text(text).c_str());
     return obj;
 }
 
@@ -64,7 +64,7 @@ lv_obj_t* button(lv_obj_t* parent, Theme& theme, const std::string& text, Button
     lv_obj_set_scroll_on_focus(obj, false);
     if (!text.empty()) {
         lv_obj_t* text_label = lv_label_create(obj);
-        lv_label_set_text(text_label, text.c_str());
+        lv_label_set_text(text_label, display_text(text).c_str());
         lv_obj_set_style_text_font(text_label, font ? font : theme.small(), 0);
         lv_obj_set_style_text_align(text_label, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_center(text_label);
@@ -121,9 +121,10 @@ void on_click(lv_obj_t* obj, std::function<void()> callback)
 
 void set_text(lv_obj_t* label, const std::string& text)
 {
+    const std::string shown = display_text(text);
     const char* current = lv_label_get_text(label);
-    if (current == nullptr || text != current) {
-        lv_label_set_text(label, text.c_str());
+    if (current == nullptr || shown != current) {
+        lv_label_set_text(label, shown.c_str());
     }
 }
 

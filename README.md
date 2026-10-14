@@ -81,9 +81,18 @@ ctest --preset windows
 .\build\windows\Release\station-ui.exe
 ```
 
-With live printers but no writes: `python -m station --printers live
---spoolman live --writes off` (Spoolman updates and G-code are logged as dry
-runs). In the simulator window the PC keyboard digits, Backspace, Enter and Esc
+With live printers and Spoolman but no writes (reads only; Spoolman updates and
+G-code are logged as dry runs and refused by the clients):
+
+```powershell
+$env:SPOOLMAN_URL = 'http://192.0.2.10:7912/api/v1'
+python -m station --hardware sim --printers live --spoolman live --writes off
+```
+
+The simulators can also replay data captured from the real printers and
+Spoolman (`scripts/capture-fixtures.py`, read-only):
+`python -m station --sim-fixtures station/sim/fixtures/captured`.
+In the simulator window the PC keyboard digits, Backspace, Enter and Esc
 drive the numpad.
 
 Headless screenshots (no window, no service needed):

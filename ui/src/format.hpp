@@ -29,5 +29,9 @@ std::string local_date(const std::string& iso_utc);
 std::uint32_t parse_hex_color(const std::string& text, std::uint32_t fallback);
 // Perceived luminance 0..255 for choosing readable text on a swatch.
 int luminance(std::uint32_t rgb);
+// Maps UTF-8 text onto the glyphs of the built-in fonts (ASCII, U+00B0, U+2022 and
+// the LVGL symbols): no-break spaces become spaces, accents are stripped, typographic
+// punctuation becomes ASCII, trademark signs are dropped and anything else becomes '?'.
+std::string display_text(const std::string& utf8);
 
 }  // namespace station

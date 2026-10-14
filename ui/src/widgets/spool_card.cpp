@@ -115,6 +115,10 @@ void SpoolCard::update(const State& state, const std::string& entry)
 
     if (spool->low_stock) ui::chip(tags_, theme, "LOW", theme.warn());
     if (spool->archived) ui::chip(tags_, theme, "ARCHIVED", theme.muted());
+    lv_obj_update_layout(tags_);
+    const int32_t card_w = lv_obj_get_content_width(card_);
+    const int32_t tags_w = lv_obj_get_child_count(tags_) ? lv_obj_get_width(tags_) + 8 : 0;
+    lv_obj_set_width(line1_, card_w - lv_obj_get_x(line1_) - tags_w);
 
     const ScaleState& scale = state.scale;
     std::string warning;

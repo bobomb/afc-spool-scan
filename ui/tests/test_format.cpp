@@ -2,6 +2,9 @@
 
 #include "format.hpp"
 
+// LV_SYMBOL_OK ("\xEF\x80\x8C", U+F00C) without pulling LVGL into the core tests.
+#define LV_SYMBOL_OK_TEXT "\xEF\x80\x8C"
+
 using namespace station;
 
 TEST_CASE("weights and deltas")
@@ -51,6 +54,22 @@ TEST_CASE("ISO timestamps")
     CHECK(local_date("2026-10-01T12:00:00Z").size() == 10);
     CHECK(local_date("2026-10-01T12:00:00Z").rfind("2026-", 0) == 0);
     CHECK(local_date("").empty());
+}
+
+TEST_CASE("display text fits the built-in fonts")
+{
+    CHECK(display_text("PolyLite\xE2\x84\xA2\xC2\xA0" "ABS Yellow") == "PolyLite ABS Yellow");
+    CHECK(display_text("Prusament\xC2\xAE PETG") == "Prusament PETG");
+    CHECK(display_text("Cr\xC3\xA8me Br\xC3\xBBl\xC3\xA9" "e") == "Creme Brulee");
+    CHECK(display_text("Stra\xC3\x9F" "e \xE2\x80\x93 \xE2\x80\x9Cmatte\xE2\x80\x9D \xE2\x80\x99s") ==
+          "Strasse - \"matte\" 's");
+    CHECK(display_text("wait\xE2\x80\xA6") == "wait...");
+    CHECK(display_text("60\xC2\xB0" "C \xE2\x80\xA2 ok") == "60\xC2\xB0" "C \xE2\x80\xA2 ok");
+    CHECK(display_text(LV_SYMBOL_OK_TEXT " done") == LV_SYMBOL_OK_TEXT " done");
+    CHECK(display_text("\xE6\xBC\xA2\xF0\x9F\x99\x82!") == "??!");
+    CHECK(display_text("bad\xC3(\xFF") == "bad?(?");
+    CHECK(display_text("tab\there\nline") == "tab here\nline");
+    CHECK(display_text("") == "");
 }
 
 TEST_CASE("colors")

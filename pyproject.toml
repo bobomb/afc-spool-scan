@@ -22,7 +22,7 @@ spool-station-simctl = "station.simctl:main"
 include = ["station*"]
 
 [tool.setuptools.package-data]
-"station.sim" = ["fixtures/*.json", "fixtures/*/*.json"]
+"station.sim" = ["fixtures/*.json", "fixtures/*/*.json", "fixtures/*/*/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

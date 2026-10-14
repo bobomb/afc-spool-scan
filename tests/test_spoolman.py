@@ -77,8 +77,11 @@ async def test_writes_off_is_a_dry_run(spoolman) -> None:  # noqa: ANN001
     before = len(sim.requests)
     assert (await client.measure(97, 984.0)).dry_run is True
     assert (await client.patch(97, {"archived": True})).dry_run is True
+    with pytest.raises(SpoolmanError, match="writes are off"):
+        await client._request("PUT", "/spool/97/measure", {"weight": 1})  # noqa: SLF001
     assert len(sim.requests) == before
     assert sim.spools[97]["archived"] is False
+    assert (await client.get_spool(97))["id"] == 97
 
 
 async def test_offline_and_unreachable(spoolman) -> None:  # noqa: ANN001

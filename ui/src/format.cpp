@@ -201,4 +201,91 @@ int luminance(std::uint32_t rgb)
     return (r * 299 + g * 587 + b * 114) / 1000;
 }
 
+namespace {
+
+// U+00C0..U+00FF without diacritics.
+const char* const kLatin1[64] = {
+    "A", "A", "A", "A", "A", "A", "AE", "C", "E", "E", "E", "E", "I", "I", "I", "I",
+    "D", "N", "O", "O", "O", "O", "O", "x", "O", "U", "U", "U", "U", "Y", "Th", "ss",
+    "a", "a", "a", "a", "a", "a", "ae", "c", "e", "e", "e", "e", "i", "i", "i", "i",
+    "d", "n", "o", "o", "o", "o", "o", "/", "o", "u", "u", "u", "u", "y", "th", "y",
+};
+
+void append_utf8(std::string& out, std::uint32_t cp)
+{
+    if (cp < 0x80) {
+        out.push_back(static_cast<char>(cp));
+    } else if (cp < 0x800) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+
+const char* replacement(std::uint32_t cp)
+{
+    if (cp == 0xA0 || (cp >= 0x2000 && cp <= 0x200A) || cp == 0x202F || cp == 0x3000 || cp == '\t') return " ";
+    if (cp == 0x2122 || cp == 0xAE || cp == 0xA9 || cp == 0x200B || cp == 0xFEFF || cp == 0xAD) return "";
+    if ((cp >= 0x2010 && cp <= 0x2015) || cp == 0x2212) return "-";
+    if (cp == 0x2018 || cp == 0x2019 || cp == 0x201A || cp == 0x2032 || cp == 0xB4) return "'";
+    if (cp == 0x201C || cp == 0x201D || cp == 0x201E || cp == 0x2033) return "\"";
+    if (cp == 0x2026) return "...";
+    if (cp == 0xB5) return "u";
+    if (cp == 0xB1) return "+/-";
+    if (cp >= 0xC0 && cp <= 0xFF) return kLatin1[cp - 0xC0];
+    return "?";
+}
+
+}  // namespace
+
+std::string display_text(const std::string& utf8)
+{
+    std::string out;
+    out.reserve(utf8.size());
+    std::size_t i = 0;
+    while (i < utf8.size()) {
+        const auto lead = static_cast<unsigned char>(utf8[i]);
+        std::uint32_t cp = 0;
+        std::size_t length = 0;
+        if (lead < 0x80) {
+            cp = lead;
+            length = 1;
+        } else if ((lead & 0xE0) == 0xC0) {
+            cp = lead & 0x1Fu;
+            length = 2;
+        } else if ((lead & 0xF0) == 0xE0) {
+            cp = lead & 0x0Fu;
+            length = 3;
+        } else if ((lead & 0xF8) == 0xF0) {
+            cp = lead & 0x07u;
+            length = 4;
+        }
+        bool valid = length > 0 && i + length <= utf8.size();
+        for (std::size_t k = 1; valid && k < length; ++k) {
+            const auto next = static_cast<unsigned char>(utf8[i + k]);
+            valid = (next & 0xC0) == 0x80;
+            cp = (cp << 6) | (next & 0x3Fu);
+        }
+        if (!valid) {
+            out.push_back('?');
+            ++i;
+            continue;
+        }
+        i += length;
+        const bool supported = (cp >= 0x20 && cp < 0x7F) || cp == '\n' || cp == 0xB0 || cp == 0x2022 ||
+                               (cp >= 0xF000 && cp <= 0xF8FF);
+        if (supported) {
+            append_utf8(out, cp);
+        } else if (cp < 0x20 || cp == 0x7F) {
+            out.push_back(cp == '\t' ? ' ' : '?');
+        } else {
+            out += replacement(cp);
+        }
+    }
+    return out;
+}
+
 }  // namespace station

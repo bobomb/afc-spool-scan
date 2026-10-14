@@ -122,6 +122,8 @@ only), so the `station/` directory must stay next to it.
 | `--ipc-port` / `STATION_IPC_PORT` | port | `7913` | `7913` |
 | `--state-dir` / `STATION_STATE_DIR` | path | `%LOCALAPPDATA%\spool-station` | `~/.local/state/spool-station` |
 | `--log-level` / `STATION_LOG_LEVEL` | `DEBUG`…`ERROR` | `INFO` | `INFO` |
+| `--sim-fixtures` / `STATION_SIM_FIXTURES` | fixture dir | built-in synthetic | — |
+| `SPOOLMAN_URL` | URL | `http://192.0.2.10:7912/api/v1` for live reads | `http://127.0.0.1:7912/api/v1` |
 | `PRINTERS` | `Name=host:port,…` | `Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125` | same |
 
 Precedence: platform defaults < `config.env` < environment < CLI flags.
@@ -131,6 +133,9 @@ Precedence: platform defaults < `config.env` < environment < CLI flags.
   "Dry run: …" message, and dry-run activity entries are not undoable.
   Reads (spool lookup, printer subscriptions) still work against live
   services. Simulated services (`sim`) are in-memory and always accept writes.
+  A second guard sits in the clients: with writes off the Moonraker client
+  only sends `server.info` and `printer.objects.list/query/subscribe`, and the
+  Spoolman client only sends `GET`.
 - Never enable `--writes on` against the real printers from Windows except for
   a deliberate test with a known spare spool.
 - Tests never touch the network; they use mocks and fixtures.
@@ -412,13 +417,15 @@ within a phase unless noted. Each task ends with tests/build passing.
 - [x] **R3** `station/qr.py` port of `extract_spool_id` with tests:
   `web+spoolman:s-97`, `WEB+SPOOLMAN:S-97`, URL `/spool/show/97`,
   uppercase URL, non-numeric rejected.
-- [ ] **R4** `scripts/capture-fixtures.py`: save AFC, `AFC_stepper` lanes,
+- [x] **R4** `scripts/capture-fixtures.py`: save AFC, `AFC_stepper` lanes,
   `print_stats`, `display_status` for both printers and three Spoolman spools
   (normal, low stock, archived) into `station/sim/fixtures/`. Run once from
   Windows over LAN and commit the fixtures.
-  *Script done and tested against the sims; fixtures are synthetic (AFC
-  v1.1.0 / Spoolman schemas). Live capture not run yet (no live API calls
-  allowed in the 2026-10-13 session).*
+  *Captured read-only on 2026-10-14 into `station/sim/fixtures/captured/`
+  (both printers; spools 46, 61, 70, 84, 18, 32, 99 in lanes, 31 low stock,
+  2 archived). The synthetic fixtures stay the default for deterministic
+  tests; `--sim-fixtures station/sim/fixtures/captured` runs the simulators
+  on the real data, and `tests/test_captured_fixtures.py` is a contract test.*
 
 ### S — Station service
 
@@ -444,10 +451,9 @@ within a phase unless noted. Each task ends with tests/build passing.
 - [x] **S9** Scan handling in `immediate` mode at parity with
   `usb-qr-scanner-read.sh`; audio cues via `audio.py`.
 - [x] **S10** `simctl.py` (§4).
-- [ ] **S11** `python -m station` on Windows with `--hardware sim --printers sim`
+- [x] **S11** `python -m station` on Windows with `--hardware sim --printers sim`
   and with `--printers live --writes off`; documented in README.
-  *Sim run verified with simctl and the UI; the read-only live run is still
-  to do.*
+  *Both verified (2026-10-14); see §10.*
 
 ### U — UI
 
@@ -600,3 +606,21 @@ Append dated notes here (verified API details, gotchas, measurements).
   heats) are `printer_error` "may still apply" results that are recorded with
   their undo step. The UI's "Save anyway" re-sends the original spool ID and
   target, and keys are ignored while a dialog is open.
+- 2026-10-14 (S11, R4): Read-only live run from the Windows PC:
+  `SPOOLMAN_URL=http://192.0.2.10:7912/api/v1 python -m station --hardware
+  sim --printers live --spoolman live --writes off`. Moonraker on both printers
+  accepts the WebSocket from the LAN without an API key; both subscribe and
+  report AFC Idle, `current_load` lane4, 4 Box Turtle lanes (`AFC_stepper`).
+  All 99 Spoolman spools are reachable (23 archived, all with a known tare,
+  none multi-colour). Weigh, Weigh + Load, Load and Clear returned dry runs;
+  Moonraker's `/server/gcode_store` gained no entries on either printer and
+  spool 99 was unchanged in Spoolman (checked with GET before and after).
+- 2026-10-14: Real data differs from the synthetic fixtures in ways the UI must
+  handle: 21 filament names contain U+2122 (™) and 15 contain U+00A0
+  (no-break space), which the built-in Montserrat fonts (ASCII, U+00B0,
+  U+2022, symbols) render as boxes, so the UI maps all label text through
+  `display_text()`. A loaded but untagged lane (Kilo lane2) reports
+  `spool_id: null`, `material: null`, `color: ""` but a stale `weight`
+  (539 g); the service ignores the weight and the UI shows "Untagged". Yankee
+  lanes report `status: "None"` while `filament_status` is `Ready`, so the UI
+  relies on `filament_status`.

@@ -68,6 +68,8 @@ class Config:
     state_dir: Path = field(default_factory=lambda: default_state_dir(sys.platform, os.environ))
     repo_dir: Path = REPO_DIR
     log_level: str = "INFO"
+    # Fixture directory (printers/*.json, spoolman/spools.json) for the simulators; None = built-in.
+    sim_fixtures: Path | None = None
 
     def writes_enabled(self, service: str) -> bool:
         """Simulated services are in-memory, so --writes only guards live ones."""
@@ -190,6 +192,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ipc-host")
     parser.add_argument("--ipc-port", type=int)
     parser.add_argument("--state-dir", type=Path)
+    parser.add_argument("--sim-fixtures", type=Path,
+                        help="fixture directory for the simulators, e.g. station/sim/fixtures/captured")
     parser.add_argument("--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"))
     return parser
 
@@ -216,6 +220,7 @@ def load_config(
         "STATION_IPC_HOST": args.ipc_host,
         "STATION_IPC_PORT": None if args.ipc_port is None else str(args.ipc_port),
         "STATION_STATE_DIR": None if args.state_dir is None else str(args.state_dir),
+        "STATION_SIM_FIXTURES": None if args.sim_fixtures is None else str(args.sim_fixtures),
         "STATION_LOG_LEVEL": args.log_level,
     }
     values.update({key: value for key, value in cli.items() if value is not None})
@@ -240,6 +245,14 @@ def load_config(
     )
     state_dir_text = values.get("STATION_STATE_DIR", "").strip()
     state_dir = Path(state_dir_text) if state_dir_text else default_state_dir(platform, environ)
+    fixtures_text = values.get("STATION_SIM_FIXTURES", "").strip()
+    sim_fixtures: Path | None = None
+    if fixtures_text:
+        sim_fixtures = Path(fixtures_text)
+        if not sim_fixtures.is_absolute():
+            sim_fixtures = repo_dir / sim_fixtures
+        if not (sim_fixtures / "printers").is_dir() or not (sim_fixtures / "spoolman" / "spools.json").is_file():
+            raise ConfigError(f"STATION_SIM_FIXTURES {fixtures_text!r} needs printers/*.json and spoolman/spools.json")
 
     config = Config(
         hardware=_choice(values, "STATION_HARDWARE", ("sim", "real")),
@@ -262,6 +275,7 @@ def load_config(
         state_dir=state_dir,
         repo_dir=repo_dir,
         log_level=values.get("STATION_LOG_LEVEL", "INFO").strip().upper() or "INFO",
+        sim_fixtures=sim_fixtures,
     )
     return config
 

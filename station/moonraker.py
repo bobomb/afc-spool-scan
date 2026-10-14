@@ -22,6 +22,10 @@ NEXT_SPOOL_PATTERN = re.compile(
     r"Spool ID (?:'[^']*' being overwritten for next load|set for next load): '([^']*)'"
 )
 LANE_PREFIXES = ("AFC_stepper ", "AFC_lane ")
+# With writes off only these JSON-RPC methods may reach Moonraker (second guard behind gcode()).
+READ_ONLY_METHODS = frozenset(
+    {"server.info", "printer.objects.list", "printer.objects.query", "printer.objects.subscribe"}
+)
 
 
 class PrinterOffline(Exception):
@@ -178,6 +182,8 @@ class MoonrakerClient:
         self._rpc.clear()
 
     async def call(self, method: str, params: dict[str, Any] | None = None, timeout: float | None = None) -> Any:
+        if not self.writes and method not in READ_ONLY_METHODS:
+            raise PrinterCommandError(f"writes are off; refusing {method}")
         ws = self._ws
         if ws is None or ws.closed:
             raise PrinterOffline(f"{self.printer.name} is offline")

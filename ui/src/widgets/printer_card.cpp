@@ -171,7 +171,7 @@ void PrinterCard::update(const Printer& printer, const Settings& settings, bool 
             ui::set_text(row.spool, text);
             lv_obj_set_style_text_color(row.spool, theme.text(), 0);
         } else {
-            ui::set_text(row.spool, lane.prep ? "Untagged filament" : "Empty");
+            ui::set_text(row.spool, lane.prep ? "Untagged" : "Empty");
             lv_obj_set_style_text_color(row.spool, theme.muted(), 0);
         }
         ui::set_text(row.weight, lane.remaining_g ? fmt_grams(lane.remaining_g) : "");

@@ -63,6 +63,8 @@ class SpoolmanClient:
             self.on_health(healthy)
 
     async def _request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+        if not self.writes and method != "GET":
+            raise SpoolmanError(f"writes are off; refusing {method} {path}")
         url = f"{self.base_url}{path}"
         try:
             async with self.session.request(method, url, json=payload, timeout=self.timeout) as response:
