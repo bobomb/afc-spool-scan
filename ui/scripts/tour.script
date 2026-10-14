@@ -1,0 +1,106 @@
+# Scripted tour of the touch UI against the simulated service.
+#
+#   python -m station --hardware sim --printers sim --spoolman sim --writes off
+#   station-ui --snapshot out/tour --connect --script ui/scripts/tour.script
+#
+# Coordinates are for the 800x480 layout. Requests go through the UI's own
+# IPC connection, so sim.* actions only work while the service is simulated.
+
+screen main
+request sim.scale {"grams": 640}
+wait 400
+shot 01-start
+
+# Type a spool ID, look it up, then Weigh + Load to both printers.
+type 97
+key enter
+wait 500
+shot 02-lookup
+tap 554 332
+wait 900
+shot 03-weigh-load
+
+# Printers: pending spool on both; tap Kilo lane4 to assign the spool.
+tap 590 28
+wait 300
+shot 04-printers
+tap 202 376
+wait 300
+shot 05-assign-dialog
+tap 554 404
+wait 900
+shot 06-assigned
+
+# Log, then undo the assignment from the banner.
+tap 694 28
+wait 300
+shot 07-log
+tap 732 452
+wait 900
+shot 08-undo
+
+# Sanity check: 984 g is far from the expected 634.7 g, so Weigh asks first.
+tap 486 28
+request sim.scale {"grams": 984}
+wait 400
+tap 383 332
+wait 700
+shot 09-confirm
+tap 514 377
+wait 900
+shot 10-confirmed
+
+# A scan in immediate mode with a suspicious weight prompts on screen.
+request sim.scan {"code": "WEB+SPOOLMAN:S-86"}
+wait 1200
+shot 11-scan-prompt
+tap 236 377
+wait 600
+
+# Countdown scan mode, cancelled from the overlay.
+request set_setting {"key": "scan_mode", "value": "countdown"}
+request sim.scan {"code": "web+spoolman:s-90"}
+wait 1600
+shot 12-countdown
+tap 400 342
+wait 600
+shot 13-countdown-cancelled
+request set_setting {"key": "scan_mode", "value": "immediate"}
+
+# Record spool 93 as empty (141 g core, known tare 140 g).
+key clear
+type 93
+key enter
+request sim.scale {"grams": 141}
+wait 500
+tap 672 396
+wait 400
+shot 14-empty-dialog
+tap 514 349
+wait 900
+shot 15-empty-recorded
+
+# A printer drops off the network.
+request sim.printer {"printer": "yankee", "op": "disconnect"}
+wait 600
+tap 590 28
+wait 300
+shot 16-printer-offline
+request sim.printer {"printer": "yankee", "op": "connect"}
+
+# Light theme from Settings.
+tap 770 28
+wait 300
+tap 684 229
+wait 1500
+shot 17-light-settings
+tap 486 28
+wait 300
+shot 18-light-main
+request set_setting {"key": "theme", "value": "dark"}
+wait 1200
+
+# Idle blanking.
+idle off
+shot 19-blank
+idle wake

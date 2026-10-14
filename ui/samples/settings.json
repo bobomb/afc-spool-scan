@@ -1,0 +1,344 @@
+{
+  "hello": {
+    "type": "hello",
+    "protocol": 1,
+    "service_version": "0.1.0",
+    "hardware": "sim",
+    "printers": "sim",
+    "spoolman": "sim",
+    "writes": false
+  },
+  "snapshot": {
+    "service": {
+      "version": "0.1.0",
+      "protocol": 1,
+      "hardware": "sim",
+      "printers": "sim",
+      "spoolman": "sim",
+      "writes": false,
+      "dry_run": false
+    },
+    "scale": {
+      "present": true,
+      "status": "stable",
+      "grams": 984.0,
+      "source_unit": "g",
+      "stable": true,
+      "tare_g": 180.0,
+      "net_g": 804.0,
+      "expected_g": 634.7,
+      "delta_g": 349.3,
+      "check": "warn"
+    },
+    "scan": {
+      "last_code": "WEB+SPOOLMAN:S-97",
+      "spool_id": 97,
+      "at": "2026-10-13T20:59:58Z",
+      "countdown": null,
+      "prompt": null
+    },
+    "spool": {
+      "id": 97,
+      "found": true,
+      "vendor": "Sunlu",
+      "name": "ABS White",
+      "material": "ABS",
+      "color": "#FFFFFF",
+      "remaining_g": 454.7,
+      "spool_weight_g": 180.0,
+      "expected_gross_g": 634.7,
+      "initial_weight_g": 1000.0,
+      "used_weight_g": 545.3,
+      "tare_source": "spool",
+      "location": "Dry box A",
+      "last_used": "2026-10-14T03:53:07Z",
+      "archived": false,
+      "low_stock": false,
+      "message": null
+    },
+    "printers": [
+      {
+        "key": "kilo",
+        "name": "Kilo",
+        "connected": true,
+        "klippy_state": "ready",
+        "print_state": "complete",
+        "progress": 1.0,
+        "filename": "bracket_v3.gcode",
+        "afc_state": "Idle",
+        "afc_error": null,
+        "current_load": "lane2",
+        "pending_spool": 90,
+        "pending_confirmed": true,
+        "lanes": [
+          {
+            "lane": "lane1",
+            "map": "T0",
+            "spool_id": 84,
+            "material": "PLA",
+            "color": "#F5F5F5",
+            "remaining_g": 888.0,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": false
+          },
+          {
+            "lane": "lane2",
+            "map": "T1",
+            "spool_id": 85,
+            "material": "PLA",
+            "color": "#1A1A1A",
+            "remaining_g": 612.4,
+            "filament_status": "In Tool",
+            "status": "Tool Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": true,
+            "low_stock": false
+          },
+          {
+            "lane": "lane3",
+            "map": "T2",
+            "spool_id": 86,
+            "material": "PETG",
+            "color": "#1E5AA8",
+            "remaining_g": 74.2,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": true
+          },
+          {
+            "lane": "lane4",
+            "map": "T3",
+            "spool_id": null,
+            "material": null,
+            "color": null,
+            "remaining_g": null,
+            "filament_status": "Not Ready",
+            "status": "None",
+            "prep": false,
+            "load": false,
+            "tool_loaded": false,
+            "low_stock": false
+          }
+        ]
+      },
+      {
+        "key": "yankee",
+        "name": "Yankee",
+        "connected": true,
+        "klippy_state": "ready",
+        "print_state": "printing",
+        "progress": 0.42,
+        "filename": "enclosure_hinge.gcode",
+        "afc_state": "Error",
+        "afc_error": "lane4: filament jam detected at hub",
+        "current_load": "lane2",
+        "pending_spool": 91,
+        "pending_confirmed": true,
+        "lanes": [
+          {
+            "lane": "lane1",
+            "map": "T0",
+            "spool_id": 90,
+            "material": "PLA",
+            "color": "#D32F2F",
+            "remaining_g": 950.0,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": false
+          },
+          {
+            "lane": "lane2",
+            "map": "T1",
+            "spool_id": 91,
+            "material": "PETG",
+            "color": "#F57C00",
+            "remaining_g": 320.5,
+            "filament_status": "In Tool",
+            "status": "Tool Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": true,
+            "low_stock": false
+          },
+          {
+            "lane": "lane3",
+            "map": "T2",
+            "spool_id": 93,
+            "material": "PLA",
+            "color": "#C94CE0",
+            "remaining_g": 701.0,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": false
+          },
+          {
+            "lane": "lane4",
+            "map": "T3",
+            "spool_id": 92,
+            "material": "ABS",
+            "color": "#8A8D91",
+            "remaining_g": 45.0,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": true
+          }
+        ]
+      }
+    ],
+    "health": {
+      "spoolman": true,
+      "scale": true,
+      "scanner": true,
+      "scale_status": "stable"
+    },
+    "activity": [
+      {
+        "id": "a-8",
+        "at": "2026-10-13T20:07:12Z",
+        "action": "load",
+        "spool_id": 91,
+        "printers": [
+          "Yankee"
+        ],
+        "ok": true,
+        "message": "next spool set on Yankee",
+        "code": null,
+        "dry_run": false,
+        "undone": false,
+        "undoable": true
+      },
+      {
+        "id": "a-7",
+        "at": "2026-10-13T20:06:12Z",
+        "action": "weigh_load",
+        "spool_id": 90,
+        "printers": [
+          "Kilo",
+          "Yankee"
+        ],
+        "ok": true,
+        "message": "1102 g saved; next spool set on Kilo, Yankee",
+        "code": null,
+        "dry_run": false,
+        "undone": false,
+        "undoable": true
+      },
+      {
+        "id": "a-6",
+        "at": "2026-10-13T20:05:12Z",
+        "action": "undo",
+        "spool_id": 97,
+        "printers": [
+          "Kilo"
+        ],
+        "ok": true,
+        "message": "Undid weigh load of spool 97",
+        "code": null,
+        "dry_run": false,
+        "undone": false,
+        "undoable": false
+      },
+      {
+        "id": "a-5",
+        "at": "2026-10-13T20:04:12Z",
+        "action": "weigh_load",
+        "spool_id": 97,
+        "printers": [
+          "Kilo"
+        ],
+        "ok": true,
+        "message": "640 g saved; next spool set on Kilo",
+        "code": null,
+        "dry_run": false,
+        "undone": true,
+        "undoable": false
+      },
+      {
+        "id": "a-4",
+        "at": "2026-10-13T20:03:12Z",
+        "action": "weigh",
+        "spool_id": 86,
+        "printers": [],
+        "ok": false,
+        "message": "Spoolman error 503: Spoolman is offline (simulated)",
+        "code": "spoolman_error",
+        "dry_run": false,
+        "undone": false,
+        "undoable": false
+      },
+      {
+        "id": "a-3",
+        "at": "2026-10-13T20:02:12Z",
+        "action": "empty_spool",
+        "spool_id": 60,
+        "printers": [],
+        "ok": true,
+        "message": "empty spool 176.5 g recorded; archived",
+        "code": null,
+        "dry_run": false,
+        "undone": false,
+        "undoable": true
+      },
+      {
+        "id": "a-2",
+        "at": "2026-10-13T20:01:12Z",
+        "action": "load",
+        "spool_id": 93,
+        "printers": [
+          "Yankee"
+        ],
+        "ok": true,
+        "message": "next spool set on Yankee",
+        "code": null,
+        "dry_run": false,
+        "undone": false,
+        "undoable": true
+      },
+      {
+        "id": "a-1",
+        "at": "2026-10-13T20:00:12Z",
+        "action": "weigh",
+        "spool_id": 84,
+        "printers": [],
+        "ok": true,
+        "message": "1057 g saved",
+        "code": null,
+        "dry_run": false,
+        "undone": false,
+        "undoable": true
+      }
+    ],
+    "settings": {
+      "target": "both",
+      "scan_mode": "immediate",
+      "theme": "dark",
+      "sanity_threshold_g": 50,
+      "sanity_threshold_pct": 10,
+      "low_stock_g": 100,
+      "undo_depth": 20,
+      "idle_dim_s": 120,
+      "idle_off_s": 300
+    }
+  },
+  "screens": [
+    "settings"
+  ],
+  "entry": "97"
+}

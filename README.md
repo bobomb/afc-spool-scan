@@ -44,6 +44,58 @@ Scale support is isolated from the QR scanner:
   report decoding, unit detection, stability checks, and conversion to grams.
 
 This keeps DYMO protocol and scale policy code out of the QR event loop.
+`dymo-scale-read.py` imports its decoder from `station/scale/dymo.py`
+(standard library only), so keep the `station/` directory next to it.
+
+## Touch UI and spool-station service (in development)
+
+A Python `spool-station` service (`station/`) and an LVGL touch UI in C++
+(`ui/`) will replace the scanner script; see
+[docs/touch-ui-plan.md](docs/touch-ui-plan.md) and
+[docs/touch-ui-dev-plan.md](docs/touch-ui-dev-plan.md). The production scripts
+above keep running until the cutover.
+
+On Windows (PowerShell), everything runs simulated by default and makes no
+network calls except to the local simulators:
+
+```powershell
+py -3.13 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+pytest
+
+# Service with simulated scale, scanner, printers and Spoolman (IPC on 127.0.0.1:7913)
+python -m station --hardware sim --printers sim --spoolman sim --writes off
+
+# In another terminal: drive the simulation
+python -m station.simctl scale 984.0
+python -m station.simctl scan WEB+SPOOLMAN:S-97
+python -m station.simctl printer yankee --disconnect
+python -m station.simctl state activity
+
+# Build and run the touch UI (LVGL Windows driver, 800x480 window)
+cd ui
+cmake --preset windows
+cmake --build --preset windows
+ctest --preset windows
+.\build\windows\Release\station-ui.exe
+```
+
+With live printers but no writes: `python -m station --printers live
+--spoolman live --writes off` (Spoolman updates and G-code are logged as dry
+runs). In the simulator window the PC keyboard digits, Backspace, Enter and Esc
+drive the numpad.
+
+Headless screenshots (no window, no service needed):
+
+```powershell
+.\ui\build\windows\Release\station-ui.exe --snapshot out\main --state ui\samples\main.json
+.\ui\build\windows\Release\station-ui.exe --snapshot out\tour --connect --script ui\scripts\tour.script
+```
+
+`scripts/make-ui-samples.py` regenerates `ui/samples/` from the simulator.
+Deployment to spoolpi (`scripts/install-spoolpi.sh`, `systemd/`,
+`scripts/deploy-spoolpi.ps1`) is prepared but not yet done.
 
 ## Requirements
 

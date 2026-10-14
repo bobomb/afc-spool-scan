@@ -1,0 +1,49 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "windows",
+      "displayName": "Windows (LVGL Windows driver, MSVC)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/windows",
+      "cacheVariables": { "STATION_UI_BACKEND": "windows" },
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    {
+      "name": "sdl",
+      "displayName": "Linux/WSL desktop (SDL2)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/sdl",
+      "cacheVariables": { "STATION_UI_BACKEND": "sdl", "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    },
+    {
+      "name": "pi",
+      "displayName": "spoolpi (DRM/KMS + evdev)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/pi",
+      "cacheVariables": { "STATION_UI_BACKEND": "drm", "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "headless",
+      "displayName": "Headless (snapshot mode only)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/headless",
+      "cacheVariables": { "STATION_UI_BACKEND": "headless", "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "windows", "configurePreset": "windows", "configuration": "Release" },
+    { "name": "sdl", "configurePreset": "sdl" },
+    { "name": "pi", "configurePreset": "pi" },
+    { "name": "headless", "configurePreset": "headless" }
+  ],
+  "testPresets": [
+    { "name": "windows", "configurePreset": "windows", "configuration": "Release",
+      "output": { "outputOnFailure": true } },
+    { "name": "sdl", "configurePreset": "sdl", "output": { "outputOnFailure": true } },
+    { "name": "pi", "configurePreset": "pi", "output": { "outputOnFailure": true } },
+    { "name": "headless", "configurePreset": "headless", "output": { "outputOnFailure": true } }
+  ]
+}

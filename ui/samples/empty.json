@@ -1,0 +1,210 @@
+{
+  "hello": {
+    "type": "hello",
+    "protocol": 1,
+    "service_version": "0.1.0",
+    "hardware": "sim",
+    "printers": "sim",
+    "spoolman": "sim",
+    "writes": false
+  },
+  "snapshot": {
+    "service": {
+      "version": "0.1.0",
+      "protocol": 1,
+      "hardware": "sim",
+      "printers": "sim",
+      "spoolman": "sim",
+      "writes": false,
+      "dry_run": false
+    },
+    "scale": {
+      "present": true,
+      "status": "zero",
+      "grams": 0.0,
+      "source_unit": "g",
+      "stable": false,
+      "tare_g": null,
+      "net_g": null,
+      "expected_g": null,
+      "delta_g": null,
+      "check": null
+    },
+    "scan": {
+      "last_code": "WEB+SPOOLMAN:S-97",
+      "spool_id": 97,
+      "at": "2026-10-13T20:59:58Z",
+      "countdown": null,
+      "prompt": null
+    },
+    "spool": null,
+    "printers": [
+      {
+        "key": "kilo",
+        "name": "Kilo",
+        "connected": true,
+        "klippy_state": "ready",
+        "print_state": "complete",
+        "progress": 1.0,
+        "filename": "bracket_v3.gcode",
+        "afc_state": "Idle",
+        "afc_error": null,
+        "current_load": "lane2",
+        "pending_spool": 90,
+        "pending_confirmed": true,
+        "lanes": [
+          {
+            "lane": "lane1",
+            "map": "T0",
+            "spool_id": 84,
+            "material": "PLA",
+            "color": "#F5F5F5",
+            "remaining_g": 888.0,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": false
+          },
+          {
+            "lane": "lane2",
+            "map": "T1",
+            "spool_id": 85,
+            "material": "PLA",
+            "color": "#1A1A1A",
+            "remaining_g": 612.4,
+            "filament_status": "In Tool",
+            "status": "Tool Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": true,
+            "low_stock": false
+          },
+          {
+            "lane": "lane3",
+            "map": "T2",
+            "spool_id": 86,
+            "material": "PETG",
+            "color": "#1E5AA8",
+            "remaining_g": 74.2,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": true
+          },
+          {
+            "lane": "lane4",
+            "map": "T3",
+            "spool_id": null,
+            "material": null,
+            "color": null,
+            "remaining_g": null,
+            "filament_status": "Not Ready",
+            "status": "None",
+            "prep": false,
+            "load": false,
+            "tool_loaded": false,
+            "low_stock": false
+          }
+        ]
+      },
+      {
+        "key": "yankee",
+        "name": "Yankee",
+        "connected": true,
+        "klippy_state": "ready",
+        "print_state": "printing",
+        "progress": 0.42,
+        "filename": "enclosure_hinge.gcode",
+        "afc_state": "Error",
+        "afc_error": "lane4: filament jam detected at hub",
+        "current_load": "lane2",
+        "pending_spool": 91,
+        "pending_confirmed": true,
+        "lanes": [
+          {
+            "lane": "lane1",
+            "map": "T0",
+            "spool_id": 90,
+            "material": "PLA",
+            "color": "#D32F2F",
+            "remaining_g": 950.0,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": false
+          },
+          {
+            "lane": "lane2",
+            "map": "T1",
+            "spool_id": 91,
+            "material": "PETG",
+            "color": "#F57C00",
+            "remaining_g": 320.5,
+            "filament_status": "In Tool",
+            "status": "Tool Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": true,
+            "low_stock": false
+          },
+          {
+            "lane": "lane3",
+            "map": "T2",
+            "spool_id": 93,
+            "material": "PLA",
+            "color": "#C94CE0",
+            "remaining_g": 701.0,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": false
+          },
+          {
+            "lane": "lane4",
+            "map": "T3",
+            "spool_id": 92,
+            "material": "ABS",
+            "color": "#8A8D91",
+            "remaining_g": 45.0,
+            "filament_status": "Ready",
+            "status": "Loaded",
+            "prep": true,
+            "load": true,
+            "tool_loaded": false,
+            "low_stock": true
+          }
+        ]
+      }
+    ],
+    "health": {
+      "spoolman": true,
+      "scale": true,
+      "scanner": true,
+      "scale_status": "stable"
+    },
+    "activity": [],
+    "settings": {
+      "target": "both",
+      "scan_mode": "immediate",
+      "theme": "dark",
+      "sanity_threshold_g": 50,
+      "sanity_threshold_pct": 10,
+      "low_stock_g": 100,
+      "undo_depth": 20,
+      "idle_dim_s": 120,
+      "idle_off_s": 300
+    }
+  },
+  "screens": [
+    "main"
+  ],
+  "entry": ""
+}

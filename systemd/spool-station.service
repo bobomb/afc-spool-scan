@@ -1,0 +1,18 @@
+[Unit]
+Description=Spool station service (scale, QR scanner, Spoolman, Moonraker)
+After=network-online.target
+Wants=network-online.target
+# Owns the scale and QR scanner; never run alongside usb-qr-scanner.service.
+Conflicts=usb-qr-scanner.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/afc-spool-scan
+ExecStart=%h/afc-spool-scan/.venv/bin/python -m station
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

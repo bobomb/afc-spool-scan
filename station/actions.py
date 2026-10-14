@@ -28,6 +28,13 @@ from .state import Prompt, SpoolInfo, Store
 
 log = logging.getLogger(__name__)
 
+UNDO_LABELS = {
+    "weigh_load": "weigh + load",
+    "assign_lane": "lane assignment",
+    "empty_spool": "empty spool",
+    "clear_pending": "clear pending",
+}
+
 
 class Cues(Protocol):
     def play(self, cue: str) -> None: ...
@@ -504,7 +511,7 @@ class Actions:
                 except (SpoolmanError, PrinterOffline, PrinterCommandError, UnknownPrinter, ActionError,
                         asyncio.TimeoutError) as error:
                     failures.append(str(error) or type(error).__name__)
-            label = entry.action.replace("_", " ")
+            label = UNDO_LABELS.get(entry.action, entry.action.replace("_", " "))
             if failures:
                 self.cues.play("error")
                 step = StepResult(f"Undo {label} incomplete: {'; '.join(failures)}", ok=False, code="undo_failed",

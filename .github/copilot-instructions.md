@@ -38,9 +38,12 @@ silently change a **Decided** item.
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 pytest
-python -m station --hardware sim --printers sim
-cmake --preset windows; cmake --build --preset windows
+python -m station --hardware sim --printers sim --spoolman sim
+cd ui; cmake --preset windows; cmake --build --preset windows; ctest --preset windows
 ```
+
+Visual checks: `station-ui --snapshot <dir> --state ui/samples/<name>.json`
+or `--connect --script ui/scripts/tour.script` writes PNG screenshots.
 
 ## Conventions
 

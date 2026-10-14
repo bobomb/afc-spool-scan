@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest -q
+
+  ui-linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [headless, sdl, pi]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build pkg-config libsdl2-dev libdrm-dev
+      - name: Build
+        working-directory: ui
+        run: |
+          cmake --preset ${{ matrix.preset }}
+          cmake --build --preset ${{ matrix.preset }}
+      - name: Unit and snapshot tests
+        working-directory: ui
+        run: ctest --preset ${{ matrix.preset }}
+      - uses: actions/setup-python@v5
+        if: matrix.preset == 'headless'
+        with:
+          python-version: "3.13"
+      - name: UI end-to-end against the simulated service
+        if: matrix.preset == 'headless'
+        env:
+          STATION_UI_EXE: ui/build/headless/station-ui
+        run: |
+          python -m pip install -e ".[dev]"
+          python -m pytest -q tests/test_ui_e2e.py
+      - uses: actions/upload-artifact@v4
+        if: matrix.preset == 'headless'
+        with:
+          name: ui-snapshots
+          path: ui/build/headless/snapshots
+
+  ui-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        working-directory: ui
+        run: |
+          cmake --preset windows
+          cmake --build --preset windows
+      - name: Unit and snapshot tests
+        working-directory: ui
+        run: ctest --preset windows

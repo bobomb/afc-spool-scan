@@ -1,0 +1,18 @@
+[Unit]
+Description=Spool station touch UI (LVGL on DRM/KMS)
+After=spool-station.service
+Wants=spool-station.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/afc-spool-scan
+# Needs DRM master and /dev/input access (groups video, render, input). Whether a
+# user service can hold DRM master on spoolpi is verified in dev plan task P2/P5.
+ExecStart=%h/afc-spool-scan/ui/build/pi/station-ui
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

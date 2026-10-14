@@ -195,8 +195,8 @@ class Station:
             await self.session.close()
 
     async def run_forever(self) -> None:
-        await self.start()
         try:
+            await self.start()
             await asyncio.Event().wait()
         finally:
             await self.stop()

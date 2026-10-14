@@ -205,6 +205,8 @@ undoable entries.
 
 Target printer default, scan mode, thresholds, idle timeout, brightness
 (only if a software backlight is available, §2.1), theme/skin.
+Implemented without the brightness control, which waits for Phase 0 to show
+whether `/sys/class/backlight` exists.
 
 ### 5.5 Styling
 
@@ -224,7 +226,7 @@ Subscribe via Moonraker WebSocket to:
 | Object | Fields used |
 |---|---|
 | `AFC` | `current_load`, `current_state`, `error_state`, `message`, `lanes`, `units`, `maps` |
-| `AFC_stepper lane1`…`lane4` | `spool_id`, `material`, `color`, `weight`, `filament_status`, `status`, `map`, `prep`, `load`, `tool_loaded` |
+| `AFC_stepper lane1`…`lane4` (or `AFC_lane …`) | `spool_id`, `material`, `color`, `weight`, `filament_status`, `status`, `map`, `prep`, `load`, `tool_loaded` |
 | `print_stats` | `state`, `filename` |
 | `display_status` | `progress` |
 
@@ -307,11 +309,11 @@ Detailed tasks: dev plan §8.
 | Phase | Scope | Exit criteria | Status |
 |---|---|---|---|
 | 0. Display bring-up | Connect Hosyond panel; confirm auto-detect (fallback `dtoverlay=vc4-kms-dsi-7inch`); verify DSI DRM connector, FT5x06 touch event device, `/sys/class/backlight` availability and power headroom; LVGL DRM + evdev hello-world | Touch + render verified on spoolpi; backlight capability recorded in §2.1 | Deferred (software first) |
-| 1. Station service | Scale poller, QR scanner (python-evdev), Moonraker subscriptions, Spoolman client, core actions, audio, activity log, IPC; replaces scanner service | Scan parity with current behaviour; unit tests for decoding, QR parsing, actions | Not started |
-| 2. UI MVP | Main screen: scale, numpad, spool lookup card, target selector, Weigh / Weigh + Load / Load, result banner, health indicators | All core functions usable by touch | Not started |
-| 3. Printer dashboard | Printers screen per §5.2; pending spool + Clear; tap lane → assign | Live lane state for both printers | Not started |
-| 4. Extended workflows | Assign to lane, empty spool, sanity check, undo + Log screen, low-stock, scan mode setting | Functions #1–3, #5–9 complete | Not started |
-| 5. Polish | Idle blank/wake, Settings screen, theme/skin, packaging, docs, push to fork | Runs unattended after reboot | Not started |
+| 1. Station service | Scale poller, QR scanner (python-evdev), Moonraker subscriptions, Spoolman client, core actions, audio, activity log, IPC; replaces scanner service | Scan parity with current behaviour; unit tests for decoding, QR parsing, actions | Implemented and tested with simulated hardware/printers/Spoolman; parity on spoolpi pending cutover (P4) |
+| 2. UI MVP | Main screen: scale, numpad, spool lookup card, target selector, Weigh / Weigh + Load / Load, result banner, health indicators | All core functions usable by touch | Implemented; verified in the Windows simulator and headless screenshots |
+| 3. Printer dashboard | Printers screen per §5.2; pending spool + Clear; tap lane → assign | Live lane state for both printers | Implemented against simulated printers; live printers not yet connected |
+| 4. Extended workflows | Assign to lane, empty spool, sanity check, undo + Log screen, low-stock, scan mode setting | Functions #1–3, #5–9 complete | Implemented (simulated services) |
+| 5. Polish | Idle blank/wake, Settings screen, theme/skin, packaging, docs, push to fork | Runs unattended after reboot | Idle, Settings, light/dark theme done; install/systemd/deploy scripts written, not deployed |
 
 ## 10. Open questions
 
