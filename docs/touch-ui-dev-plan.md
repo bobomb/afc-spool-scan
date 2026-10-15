@@ -537,8 +537,8 @@ within a phase unless noted. Each task ends with tests/build passing.
   `card1`, primary plane scanning out an 800×480 XR24 framebuffer allocated
   by `station-ui`, touch device open (axes 0–799 × 0–479, no calibration),
   backlight dim to 25% (63/255), blank (0) and wake on a scale change
-  verified. Remaining: tap test for alignment/orientation by eye, then
-  enable `spool-station-ui.service` at cutover.*
+  verified. Tap test by the user: touch aligned in landscape, touch wakes
+  the screen. Remaining: enable `spool-station-ui.service` at cutover.*
 
 ### C — Continuous integration (optional)
 

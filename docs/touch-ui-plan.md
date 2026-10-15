@@ -65,8 +65,9 @@ State on spoolpi (2026-10-14, panel connected; read-only inspection):
   shortly after boot (recheck under load). 3.8 GB free on `/` (87% used).
 - Verified 2026-10-15 with the LVGL UI: rendering on DSI-1 as uid 1000 (DRM
   master on first open), touch device 0–799 × 0–479 (no calibration),
-  backlight dim/blank/wake. Still to verify by eye: touch alignment and
-  orientation.
+  backlight dim/blank/wake. Tap test by eye (user, 2026-10-15): touch is
+  aligned in the current landscape orientation, and a touch wakes the dimmed
+  or blank screen to full brightness.
 
 Notes:
 
@@ -300,7 +301,7 @@ Status byte values to surface in the UI:
 | Topic | Status | Value |
 |---|---|---|
 | Weight acceptance | Decided | Stable reading > 50 g |
-| Display orientation | Proposed | Landscape, not rotated; if the mount requires it, rotate in LVGL (display + touch) |
+| Display orientation | Proposed | Landscape, not rotated (works as currently placed, verified 2026-10-15); if the final mount requires it, rotate in LVGL (display + touch) |
 | Target printer default | **Open** | Both / last used / require choice |
 | Scan behaviour mode (#8) | Decided: configurable; **Open:** default | Options: *immediate* (current: weigh if possible + load), *fill + countdown* (fill ID, run default action after cancellable countdown), *fill only* |
 | Sanity-check warning threshold | **Open** | e.g. 50 g or 10% of expected |
@@ -329,7 +330,7 @@ Detailed tasks: dev plan §8.
 
 | Phase | Scope | Exit criteria | Status |
 |---|---|---|---|
-| 0. Display bring-up | Connect Hosyond panel; confirm auto-detect (fallback `dtoverlay=vc4-kms-dsi-7inch`); verify DSI DRM connector, FT5x06 touch event device, `/sys/class/backlight` availability and power headroom; LVGL DRM + evdev hello-world | Touch + render verified on spoolpi; backlight capability recorded in §2.1 | Render, touch device and backlight verified on spoolpi (2026-10-15); tap test by eye pending |
+| 0. Display bring-up | Connect Hosyond panel; confirm auto-detect (fallback `dtoverlay=vc4-kms-dsi-7inch`); verify DSI DRM connector, FT5x06 touch event device, `/sys/class/backlight` availability and power headroom; LVGL DRM + evdev hello-world | Touch + render verified on spoolpi; backlight capability recorded in §2.1 | Done 2026-10-15 (render, touch alignment, backlight dim/blank/wake; §2.1) |
 | 1. Station service | Scale poller, QR scanner (python-evdev), Moonraker subscriptions, Spoolman client, core actions, audio, activity log, IPC; replaces scanner service | Scan parity with current behaviour; unit tests for decoding, QR parsing, actions | Implemented and tested with simulated hardware/printers/Spoolman; parity on spoolpi pending cutover (P4) |
 | 2. UI MVP | Main screen: scale, numpad, spool lookup card, target selector, Weigh / Weigh + Load / Load, result banner, health indicators | All core functions usable by touch | Implemented; verified in the Windows simulator and headless screenshots |
 | 3. Printer dashboard | Printers screen per §5.2; pending spool + Clear; tap lane → assign | Live lane state for both printers | Implemented against simulated printers; live printers not yet connected |
@@ -350,7 +351,8 @@ Detailed tasks: dev plan §8.
    `SET_NEXT_SPOOL_ID` without `SPOOL_ID` (§6.1).
 10. ~~Does the panel expose software backlight control?~~ Resolved
     2026-10-14: yes, `/sys/class/backlight/10-0045` (§2.1).
-11. Mounting orientation (landscape assumed).
+11. Mounting orientation (landscape assumed; landscape verified on the
+    panel as currently placed, 2026-10-15).
 
 ## Decision log
 
