@@ -27,11 +27,13 @@ trap cleanup EXIT INT TERM
 
 pids=()
 
-echo "Following scanner/scale and Spoolman logs (Ctrl+C to stop)..."
+echo "Following spool station/scanner and Spoolman logs (Ctrl+C to stop)..."
 
-journalctl --user-unit=usb-qr-scanner.service \
+# spool-station replaced usb-qr-scanner at cutover; both are followed so a rollback still shows up.
+journalctl --user-unit=spool-station.service --user-unit=spool-station-ui.service \
+    --user-unit=usb-qr-scanner.service \
     --follow --lines="$TAIL_LINES" --output=cat 2>&1 \
-    | sed -u 's/^/[scanner-scale] /' &
+    | sed -u 's/^/[station]      /' &
 pids+=("$!")
 
 docker compose -f "$SPOOLMAN_COMPOSE_FILE" logs \

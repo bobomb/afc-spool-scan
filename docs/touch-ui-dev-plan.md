@@ -506,26 +506,35 @@ within a phase unless noted. Each task ends with tests/build passing.
   *Run on spoolpi 2026-10-15 in a separate clone `~/afc-spool-scan-touch`
   (production checkout untouched): 6 m 48 s first run, 10.6 s `--update`
   re-run with nothing to rebuild. See §10.*
-- [ ] **P2** `systemd/spool-station.service` (user service, like the current
+- [x] **P2** `systemd/spool-station.service` (user service, like the current
   scanner service) and `spool-station-ui.service`. UI needs DRM master and
   `/dev/input` access as `pi` (groups `video`, `render`, `input`);
   verify whether a user service can hold DRM master or a system service with
   `User=` is required; disable the tty1 getty/console cursor if they
   interfere.
-  *Units and `systemd/README.md` written. DRM master: a uid 1000 process
-  started outside any VT/logind session became master of `card1` on first
-  open (debugfs `clients`), so a user service is expected to work; confirm
-  when the unit is enabled. The getty on tty1 did not interfere.*
-- [ ] **P3** `scripts/deploy-spoolpi.ps1`: from Windows, push the branch, then
+  *Verified at cutover 2026-10-15: as a user service the UI is DRM master of
+  `card1` (uid 1000); no system service needed; the tty1 getty does not
+  interfere. Rollback documented in `systemd/README.md` (`disable` removes
+  the unit link, so re-enable by full path).*
+- [x] **P3** `scripts/deploy-spoolpi.ps1`: from Windows, push the branch, then
   `ssh pi@192.0.2.10` to `git pull --ff-only fork touch-ui`,
   run `install-spoolpi.sh --update` and restart services.
-  *Written (`-WhatIf` checked; `try-restart` so it never starts units
-  before cutover); not run.*
+  *Used for the cutover deploy 2026-10-15 (push, pull, venv, UI build,
+  `try-restart`). Fixed first: Windows PowerShell 5.1 aborted on `git fetch`
+  stderr. Defaults to `spoolpi.local`, which the PC's SSH config and
+  `known_hosts` cover.*
 - [ ] **P4** Cutover: add `PRINTERS`/`STATION_*` keys to spoolpi's
   `config.env`; disable `usb-qr-scanner.service`, enable
   `spool-station.service`; verify a real scan at parity. Rollback: disable
   `spool-station.service`, re-enable `usb-qr-scanner.service`.
-- [ ] **P5** Panel bring-up (product plan Phase 0) when the panel is
+  *Cut over 2026-10-15 10:27 (config backup
+  `~/afc-spool-scan.config.env.bak-20261015`). Pre-flight with the
+  production config (writes off) and post-switch checks passed: scanner
+  opened and grabbed, both printers connected, Spoolman healthy, scale
+  absent (off). The real-kernel scan path was verified with a uinput
+  keyboard (shifted Spoolman codes and URLs decode). Remaining: a physical
+  scan at parity, with and without a weight.*
+- [x] **P5** Panel bring-up (product plan Phase 0) when the panel is
   connected: DRM connector, touch device, backlight, rotation; then enable
   `spool-station-ui.service`.
   *2026-10-14 read-only inspection: DSI-1 on `/dev/dri/card1`, touch at
@@ -538,7 +547,7 @@ within a phase unless noted. Each task ends with tests/build passing.
   by `station-ui`, touch device open (axes 0–799 × 0–479, no calibration),
   backlight dim to 25% (63/255), blank (0) and wake on a scale change
   verified. Tap test by the user: touch aligned in landscape, touch wakes
-  the screen. Remaining: enable `spool-station-ui.service` at cutover.*
+  the screen. `spool-station-ui.service` enabled at the cutover.*
 
 ### C — Continuous integration (optional)
 
@@ -666,3 +675,15 @@ Append dated notes here (verified API details, gotchas, measurements).
   the panel scanned out its framebuffer; `station-ui` stdout is block
   buffered when not on a terminal, so it is now line buffered for the
   journal.
+- 2026-10-15 (P4): Cutover at 10:27 with `scripts/deploy-spoolpi.ps1` (push,
+  pull, venv, UI build) and a guarded switch that would have restored
+  `usb-qr-scanner.service` if the station was not active or could not open
+  the scanner. `config.env` gained `PRINTERS` and `STATION_*` (without
+  `PRINTERS` the station falls back to `MOONRAKER_HOSTS` and names the
+  printers by IP). `systemctl --user disable` on a linked unit deletes the
+  link, so the rollback re-enables `usb-qr-scanner.service` by full path.
+  A uinput keyboard on spoolpi confirmed the python-evdev read, grab and keymap
+  path on the real kernel; it also showed that writing a whole code without
+  yielding overflows the evdev client buffer (~64 events) and drops the
+  start, which a real scanner at USB speed does not do. The temporary clone
+  `~/afc-spool-scan-touch` was removed after the cutover.

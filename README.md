@@ -47,13 +47,15 @@ This keeps DYMO protocol and scale policy code out of the QR event loop.
 `dymo-scale-read.py` imports its decoder from `station/scale/dymo.py`
 (standard library only), so keep the `station/` directory next to it.
 
-## Touch UI and spool-station service (in development)
+## Touch UI and spool-station service
 
 A Python `spool-station` service (`station/`) and an LVGL touch UI in C++
-(`ui/`) will replace the scanner script; see
+(`ui/`) replace the scanner script; see
 [docs/touch-ui-plan.md](docs/touch-ui-plan.md) and
-[docs/touch-ui-dev-plan.md](docs/touch-ui-dev-plan.md). The production scripts
-above keep running until the cutover.
+[docs/touch-ui-dev-plan.md](docs/touch-ui-dev-plan.md). On spoolpi they run as
+the `spool-station` and `spool-station-ui` user services since the cutover on
+2026-10-15; the scripts above remain usable from the CLI and as the rollback
+(see [systemd/README.md](systemd/README.md)).
 
 On Windows (PowerShell), everything runs simulated by default and makes no
 network calls except to the local simulators:
@@ -198,7 +200,11 @@ include:
 
 ## User service
 
-Install and start the service:
+Since the 2026-10-15 cutover spoolpi runs `spool-station.service` and
+`spool-station-ui.service` instead (installed by `scripts/install-spoolpi.sh`,
+updated by `scripts/deploy-spoolpi.ps1`; units and rollback in
+[systemd/README.md](systemd/README.md)). The original scanner service is kept
+as the rollback:
 
 ```bash
 mkdir -p ~/.config/systemd/user
@@ -210,17 +216,18 @@ systemctl --user enable --now usb-qr-scanner.service
 After changing code or configuration:
 
 ```bash
-systemctl --user restart usb-qr-scanner.service
+systemctl --user restart spool-station.service   # or usb-qr-scanner.service after a rollback
 ```
 
 ## Logs
 
-The QR scanner and scale updater both write to the `usb-qr-scanner` user
-service journal. On this Raspberry Pi, query user-service records from the
-system journal with `--user-unit`:
+The station service (scanner, scale, Spoolman and printers) writes to the
+`spool-station` user service journal (`usb-qr-scanner` before the cutover).
+On this Raspberry Pi, query user-service records from the system journal with
+`--user-unit`:
 
 ```bash
-journalctl --user-unit=usb-qr-scanner.service -f
+journalctl --user-unit=spool-station.service -f
 ```
 
 Spoolman writes its application log to `~/spoolman/data/spoolman.log` and its
@@ -243,7 +250,7 @@ cd ~/afc-spool-scan
 ./tail-logs.sh
 ```
 
-It prints `[scanner-scale]` and `[spoolman]` prefixes. Pass a number to change
+It prints `[station]` and `[spoolman]` prefixes. Pass a number to change
 how many existing lines are shown before following, for example
 `./tail-logs.sh 100`. Press Ctrl+C to stop.
 
