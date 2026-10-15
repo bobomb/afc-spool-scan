@@ -43,6 +43,8 @@ public:
     Platform& platform() { return platform_; }
     IdleManager& idle() { return *idle_; }
     bool online() const;
+    // False once the display (and with it every widget) has been deleted.
+    bool alive() const { return !display_gone_; }
 
     void show(ScreenId screen);
     ScreenId screen() const { return screen_; }
@@ -74,6 +76,9 @@ private:
     void build_ui();
     void destroy_ui();
     static void rebuild_async(void* self);
+    // The Windows driver deletes the display (and every widget) when the window closes;
+    // after that nothing may touch LVGL objects until the driver exits the process.
+    static void on_display_deleted(lv_event_t* e);
     void on_line(const std::string& line);
     void on_connection(bool connected);
     void refresh(std::uint32_t topics);
@@ -99,6 +104,7 @@ private:
     std::string theme_name_ = "dark";
     bool rebuild_scheduled_ = false;
     bool sample_mode_ = false;
+    bool display_gone_ = false;
 
     ScreenId screen_ = ScreenId::Main;
     std::string entry_;

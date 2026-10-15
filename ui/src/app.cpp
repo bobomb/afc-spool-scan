@@ -50,10 +50,20 @@ void App::start()
 {
     // Buttons must not join the default group, or the keypad would navigate them.
     lv_group_set_default(nullptr);
+    lv_display_add_event_cb(platform_.display(), on_display_deleted, LV_EVENT_DELETE, this);
     build_ui();
     attach_keyboard();
     timer_ = lv_timer_create(poll_timer, 20, this);
     refresh(kTopicAll);
+}
+
+void App::on_display_deleted(lv_event_t* e)
+{
+    auto* app = static_cast<App*>(lv_event_get_user_data(e));
+    app->display_gone_ = true;
+    if (app->timer_ != nullptr) {
+        lv_timer_pause(app->timer_);
+    }
 }
 
 void App::build_ui()
@@ -102,6 +112,9 @@ void App::rebuild_async(void* self)
 {
     auto* app = static_cast<App*>(self);
     app->rebuild_scheduled_ = false;
+    if (app->display_gone_) {
+        return;
+    }
     app->destroy_ui();
     app->build_ui();
     app->refresh(kTopicAll);
@@ -125,6 +138,9 @@ void App::attach_keyboard()
 void App::on_key(lv_event_t* e)
 {
     auto* app = static_cast<App*>(lv_event_get_user_data(e));
+    if (app->display_gone_) {
+        return;
+    }
     const std::uint32_t key = lv_event_get_key(e);
     app->idle().wake();
     if (key >= '0' && key <= '9') {
@@ -145,6 +161,9 @@ bool App::online() const
 
 void App::poll()
 {
+    if (display_gone_) {
+        return;
+    }
     if (ipc_) {
         ipc_->poll(steady_ms());
     }

@@ -76,7 +76,9 @@ void AssignDialog::select_printer(const std::string& key)
 void AssignDialog::refresh_async(void* self)
 {
     auto* dialog = static_cast<AssignDialog*>(self);
-    dialog->refresh(dialog->app_.state());
+    if (dialog->app_.alive()) {
+        dialog->refresh(dialog->app_.state());
+    }
 }
 
 void AssignDialog::refresh(const State& state)

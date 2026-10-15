@@ -587,7 +587,11 @@ Append dated notes here (verified API details, gotchas, measurements).
   `LV_USE_WINDOWS` requires `LV_USE_OS LV_OS_WINDOWS`; `lv_init()` installs the
   Windows tick and exits the process when the last window closes.
   `LV_LABEL_LONG_MODE_DOTS` only truncates with a fixed label height. The
-  Windows keypad delivers characters from `WM_CHAR` only.
+  Windows keypad delivers characters from `WM_CHAR` only. Closing the window
+  deletes the display and every widget (`LV_EVENT_DELETE` on the display)
+  up to 200 ms before the driver calls `exit(0)`; the app stops polling at
+  that event (2026-10-14 fix for a use-after-free seen as `lv_layer_sys`
+  warnings on close).
 - 2026-10-13: Pinned UI dependencies (SHA-256 in `ui/CMakeLists.txt`): LVGL
   v9.6.0 tarball (111 MB), nlohmann/json v3.12.0, doctest v2.5.3. A clean
   configure verified the downloads. Full Windows build of LVGL + UI takes a few
