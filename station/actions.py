@@ -139,6 +139,7 @@ class Actions:
             "set_setting": self.set_setting,
             "cancel_countdown": self.cancel_countdown,
             "dismiss_prompt": self.dismiss_prompt,
+            "clear_spool": self.clear_spool,
         }
 
     async def handle(self, action: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -616,3 +617,10 @@ class Actions:
     async def dismiss_prompt(self, args: dict[str, Any]) -> Outcome:
         self._clear_prompt()
         return Outcome(True, "Dismissed")
+
+    async def clear_spool(self, args: dict[str, Any]) -> Outcome:
+        """Deselect the current spool (numpad C); the scale check no longer refers to it."""
+        if self.store.spool is not None:
+            self.store.set_spool(None)
+            self.refresh_scale()
+        return Outcome(True, "Spool cleared")

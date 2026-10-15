@@ -98,6 +98,30 @@ async def test_ui_lane_assignment_needs_explicit_confirm(station: Station, tmp_p
 
 
 @pytest.mark.e2e
+async def test_ui_numpad_clear_deselects_the_spool(station: Station, tmp_path: Path) -> None:
+    exe = find_ui()
+    if exe is None:
+        pytest.skip("station-ui is not built")
+    script = tmp_path / "clear.script"
+    script.write_text(
+        'request sim.scale {"grams": 640}\n'
+        "type 97\nkey enter\nwait 600\nshot selected\n"
+        "tap 54 396\nwait 600\nshot cleared\n"
+        "tap 383 332\nwait 600\n",
+        encoding="utf-8",
+    )
+    process = await asyncio.create_subprocess_exec(
+        str(exe), "--snapshot", str(tmp_path / "shots"), "--connect", "--port", str(station.ipc_port),
+        "--script", str(script), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await asyncio.wait_for(process.communicate(), 90)
+    assert process.returncode == 0, stderr.decode(errors="replace")
+    assert station.store.spool is None and station.store.scale.check is None
+    assert station.store.activity == []
+    assert station.sim_spoolman.spools[97]["used_weight"] == pytest.approx(545.3)
+
+
+@pytest.mark.e2e
 async def test_ui_weigh_load_and_undo(station: Station, tmp_path: Path) -> None:
     exe = find_ui()
     if exe is None:

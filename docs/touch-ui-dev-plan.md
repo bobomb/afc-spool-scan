@@ -261,6 +261,7 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `set_setting` | `key`, `value` | Persist a setting → `settings` event |
 | `cancel_countdown` | — | Cancel a pending scan-mode countdown |
 | `dismiss_prompt` | — | Clear `scan.prompt` without saving the weight |
+| `clear_spool` | — | Deselect the current spool (`spool` → `null`, scale check reset); numpad C / Esc |
 | `sim.scale` / `sim.scan` / `sim.printer` / `sim.spoolman` | see `simcontrol.py` | Drive simulated components (`simctl`) |
 
 `target` is a printer key (`kilo`, `yankee`) or `both`; omitted means the

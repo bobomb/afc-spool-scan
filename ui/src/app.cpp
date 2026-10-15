@@ -405,6 +405,11 @@ void App::entry_backspace()
 void App::entry_clear()
 {
     entry_.clear();
+    if (state().spool && online()) {
+        request("clear_spool", json::object(), [this](const Result& result) {
+            if (!result.ok) show_result(result);
+        });
+    }
     refresh(kTopicSpool);
 }
 

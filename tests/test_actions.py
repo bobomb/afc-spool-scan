@@ -295,6 +295,20 @@ async def test_empty_spool_dry_run_when_writes_off(station: Station) -> None:
     assert sim_spool(station, 97)["filament"]["spool_weight"] == 180.0
 
 
+async def test_clear_spool_deselects_and_resets_scale_check(station: Station) -> None:
+    await set_scale(station, 640.0)
+    await act(station, "lookup", spool_id=97)
+    assert station.store.scale.check == "ok" and station.store.scale.tare_g == 180.0
+    result = await act(station, "clear_spool")
+    assert result == {"ok": True, "message": "Spool cleared"}
+    assert station.store.spool is None
+    scale = station.store.scale
+    assert (scale.check, scale.tare_g, scale.expected_g, scale.grams) == (None, None, None, 640.0)
+    assert (await act(station, "clear_spool"))["ok"] is True
+    assert station.store.activity == [] and station.cues.played == []
+    assert sim_spool(station, 97)["used_weight"] == 545.3
+
+
 async def test_set_setting_side_effects(station: Station) -> None:
     await act(station, "lookup", spool_id=97)
     assert station.store.spool.low_stock is False
