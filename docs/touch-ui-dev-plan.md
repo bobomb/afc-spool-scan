@@ -526,6 +526,11 @@ within a phase unless noted. Each task ends with tests/build passing.
 - [ ] **P5** Panel bring-up (product plan Phase 0) when the panel is
   connected: DRM connector, touch device, backlight, rotation; then enable
   `spool-station-ui.service`.
+  *2026-10-14 read-only inspection: DSI-1 on `/dev/dri/card1`, touch at
+  `/dev/input/by-path/platform-fe205000.i2c-event`, backlight
+  `/sys/class/backlight/10-0045` (product plan §2.1). spoolpi lacks
+  `libdrm-dev`, `libevdev-dev` and `python3-dev` (P1 installs them); its
+  checkout is still at `c58d3bb`. Next: build and run the UI on the panel.*
 
 ### C — Continuous integration (optional)
 

@@ -8,7 +8,8 @@ Type=simple
 WorkingDirectory=%h/afc-spool-scan
 # Needs DRM master and /dev/input access (groups video, render, input). Whether a
 # user service can hold DRM master on spoolpi is verified in dev plan task P2/P5.
-ExecStart=%h/afc-spool-scan/ui/build/pi/station-ui
+# Touch: the panel's FT5x06 by stable path (event5 on 2026-10-14).
+ExecStart=%h/afc-spool-scan/ui/build/pi/station-ui --drm-card /dev/dri/card1 --touch /dev/input/by-path/platform-fe205000.i2c-event
 Restart=always
 RestartSec=2
 StandardOutput=journal

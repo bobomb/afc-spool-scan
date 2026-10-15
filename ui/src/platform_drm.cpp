@@ -83,7 +83,10 @@ private:
         auto* self = static_cast<DrmPlatform*>(user_data);
         if (type == LV_EVDEV_TYPE_ABS && self->pointer_ == nullptr) {
             self->attach_pointer(indev);
+            return;
         }
+        // Discovery opens every /dev/input node (QR scanner, HDMI-CEC remotes); keep only the touchscreen.
+        lv_evdev_delete(indev);
     }
 
     void attach_pointer(lv_indev_t* indev)

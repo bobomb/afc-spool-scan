@@ -46,13 +46,25 @@ hosts the USB QR scanner, DYMO scale and Spoolman) to:
 | Touch | Capacitive; manual shows an FT5x06 controller (`generic ft5x06`, I2C `0x38`) |
 | Interface | Raspberry Pi MIPI DSI, 15-pin 1.0 mm FFC; plug-and-play, no driver install |
 | Power | 5 V, 510 mA max; via pogo pins (Pi mounted on the panel) or 2-pin cable to Pi header pins 4 (5 V) and 6 (GND) |
-| Backlight | Hardware button: short press +10% (cycles), 3 s press turns off; software control not documented |
+| Backlight | Hardware button: short press +10% (cycles), 3 s press turns off; software control via `/sys/class/backlight/10-0045` (0–255, group `video`) — verified 2026-10-14 |
 
-State on spoolpi (2026-10-13, panel not yet connected):
+State on spoolpi (2026-10-14, panel connected; read-only inspection):
 
-- `config.txt` already has `display_auto_detect=1` and `dtoverlay=vc4-kms-v3d`.
-- No DSI DRM connector, `/sys/class/backlight` entry or touch input device
-  yet.
+- Auto-detected with the existing `display_auto_detect=1` and
+  `dtoverlay=vc4-kms-v3d`; no overlay change was needed. It enumerates like
+  the official Raspberry Pi 7" display (DSI bridge + `panel_disp`).
+- DRM: `/dev/dri/card1` (vc4-drm) `DSI-1` connected, one mode `800x480`;
+  `card0` is the v3d render node. The console runs on `fb0` (vc4drmfb,
+  800×480, 16 bpp) with a getty on tty1.
+- Touch: `10-0038 generic ft5x06 (00)` (`edt_ft5x06`, I2C 0x38) at
+  `/dev/input/event5`, stable path
+  `/dev/input/by-path/platform-fe205000.i2c-event`; multi-touch ABS axes.
+- Backlight: `/sys/class/backlight/10-0045`, `max_brightness` 255,
+  `brightness` writable by group `video` — software dimming is available.
+- `pi` is in `video`, `render` and `input`. Power: `throttled=0x0`
+  shortly after boot (recheck under load). 3.8 GB free on `/` (87% used).
+- Still to verify: rendering and touch alignment with the LVGL UI, DRM master
+  from a user service, and the console cursor on tty1.
 
 Notes:
 
@@ -315,7 +327,7 @@ Detailed tasks: dev plan §8.
 
 | Phase | Scope | Exit criteria | Status |
 |---|---|---|---|
-| 0. Display bring-up | Connect Hosyond panel; confirm auto-detect (fallback `dtoverlay=vc4-kms-dsi-7inch`); verify DSI DRM connector, FT5x06 touch event device, `/sys/class/backlight` availability and power headroom; LVGL DRM + evdev hello-world | Touch + render verified on spoolpi; backlight capability recorded in §2.1 | Deferred (software first) |
+| 0. Display bring-up | Connect Hosyond panel; confirm auto-detect (fallback `dtoverlay=vc4-kms-dsi-7inch`); verify DSI DRM connector, FT5x06 touch event device, `/sys/class/backlight` availability and power headroom; LVGL DRM + evdev hello-world | Touch + render verified on spoolpi; backlight capability recorded in §2.1 | In progress: panel, touch device and backlight detected (§2.1); LVGL render and touch test pending |
 | 1. Station service | Scale poller, QR scanner (python-evdev), Moonraker subscriptions, Spoolman client, core actions, audio, activity log, IPC; replaces scanner service | Scan parity with current behaviour; unit tests for decoding, QR parsing, actions | Implemented and tested with simulated hardware/printers/Spoolman; parity on spoolpi pending cutover (P4) |
 | 2. UI MVP | Main screen: scale, numpad, spool lookup card, target selector, Weigh / Weigh + Load / Load, result banner, health indicators | All core functions usable by touch | Implemented; verified in the Windows simulator and headless screenshots |
 | 3. Printer dashboard | Printers screen per §5.2; pending spool + Clear; tap lane → assign | Live lane state for both printers | Implemented against simulated printers; live printers not yet connected |
@@ -334,8 +346,8 @@ Detailed tasks: dev plan §8.
 8. IPC transport: TCP localhost NDJSON proposed (§3.2); confirm.
 9. ~~AFC command for clearing a pending next spool.~~ Resolved:
    `SET_NEXT_SPOOL_ID` without `SPOOL_ID` (§6.1).
-10. Does the panel expose software backlight control? (verify in Phase 0;
-    affects brightness setting and idle dimming)
+10. ~~Does the panel expose software backlight control?~~ Resolved
+    2026-10-14: yes, `/sys/class/backlight/10-0045` (§2.1).
 11. Mounting orientation (landscape assumed).
 
 ## Decision log
