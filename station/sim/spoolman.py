@@ -1,6 +1,7 @@
 """In-memory fake Spoolman (REST subset) seeded from fixtures.
 
 Measure and PATCH follow Spoolman's own rules (tare: spool, filament, vendor).
+Filaments are embedded in the spool fixtures; a filament PATCH updates every copy.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from aiohttp import web
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 PATCHABLE = {"spool_weight", "archived", "used_weight", "remaining_weight", "initial_weight", "location", "comment"}
+FILAMENT_PATCHABLE = {"spool_weight", "weight", "comment"}
 
 
 def load_spool_fixtures(path: Path = FIXTURES / "spoolman" / "spools.json") -> list[dict[str, Any]]:
@@ -98,6 +100,28 @@ class SimSpoolman:
         self._recompute(spool)
         return copy.deepcopy(spool)
 
+    def filament(self, filament_id: int) -> dict[str, Any] | None:
+        for spool in self.spools.values():
+            filament = spool.get("filament") or {}
+            if filament.get("id") == filament_id:
+                return copy.deepcopy(filament)
+        return None
+
+    def patch_filament(self, filament_id: int, fields: dict[str, Any]) -> dict[str, Any]:
+        """Update a filament; every spool embedding it sees the change, as in Spoolman."""
+        unknown = set(fields) - FILAMENT_PATCHABLE
+        if unknown:
+            raise ValueError(f"Unsupported fields: {', '.join(sorted(unknown))}")
+        updated: dict[str, Any] | None = None
+        for spool in self.spools.values():
+            filament = spool.get("filament") or {}
+            if filament.get("id") == filament_id:
+                filament.update(fields)
+                updated = filament
+        if updated is None:
+            raise KeyError(filament_id)
+        return copy.deepcopy(updated)
+
     @web.middleware
     async def _middleware(self, request: web.Request, handler: Any) -> web.StreamResponse:
         body = None
@@ -156,12 +180,25 @@ class SimSpoolman:
         except ValueError as error:
             return _json_error(400, str(error))
 
+    async def _patch_filament(self, request: web.Request) -> web.Response:
+        raw = request.match_info["filament_id"]
+        if not raw.isdigit() or self.filament(int(raw)) is None:
+            return _json_error(404, f"No filament with ID {raw} found.")
+        body = await self._body(request)
+        if not isinstance(body, dict):
+            return _json_error(400, "Expected an object")
+        try:
+            return web.json_response(self.patch_filament(int(raw), body))
+        except ValueError as error:
+            return _json_error(400, str(error))
+
     def app(self) -> web.Application:
         app = web.Application(middlewares=[self._middleware])
         app.router.add_get("/api/v1/health", self._health)
         app.router.add_get("/api/v1/spool/{spool_id}", self._get)
         app.router.add_put("/api/v1/spool/{spool_id}/measure", self._measure)
         app.router.add_patch("/api/v1/spool/{spool_id}", self._patch)
+        app.router.add_patch("/api/v1/filament/{filament_id}", self._patch_filament)
         return app
 
     async def start(self, host: str = "127.0.0.1", port: int = 0) -> str:

@@ -16,3 +16,11 @@ TEST_CASE("idle levels follow the settings")
     CHECK(IdleManager::level_for(4000000, 0, 0, true) == Level::Awake);
     CHECK(IdleManager::level_for(4000000, 120, 0, true) == Level::Dim);
 }
+
+TEST_CASE("idle levels map to backlight percentages")
+{
+    using Level = IdleManager::Level;
+    CHECK(IdleManager::brightness_for(Level::Awake) == 100);
+    CHECK(IdleManager::brightness_for(Level::Dim) == 25);
+    CHECK(IdleManager::brightness_for(Level::Off) == 0);
+}

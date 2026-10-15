@@ -55,7 +55,7 @@
       "used_weight_g": 545.3,
       "tare_source": "spool",
       "location": "Dry box A",
-      "last_used": "2026-10-14T04:33:09Z",
+      "last_used": "2026-10-15T15:05:17Z",
       "archived": false,
       "low_stock": false,
       "message": null
@@ -294,7 +294,7 @@
         "spool_id": 60,
         "printers": [],
         "ok": true,
-        "message": "empty spool 176.5 g recorded; archived",
+        "message": "empty 176.5 g set as spool + filament tare; archived",
         "code": null,
         "dry_run": false,
         "undone": false,

@@ -491,17 +491,33 @@ class Actions:
                 if error.code == "spoolman_error":
                     self._record("empty_spool", spool_id, StepResult(error.message, ok=False, code=error.code))
                 raise
+            filament = data.get("filament") or {}
+            filament_id = filament.get("id") if isinstance(filament.get("id"), int) else None
+            target = "spool + filament tare" if filament_id is not None else "spool tare"
             if result.dry_run:
-                step = StepResult(f"Dry run: would record {fmt_g(grams)} g tare and archive", dry_run=True)
+                step = StepResult(f"Dry run: would set {fmt_g(grams)} g as {target} and archive", dry_run=True)
             else:
                 if result.spool is not None:
                     self._publish_spool(result.spool)
                 previous = {key: data.get(key) for key in ("spool_weight", "used_weight", "archived")}
-                step = StepResult(f"empty spool {fmt_g(grams)} g recorded; archived",
-                                  undo=[UndoStep(kind="spool_patch", spool_id=spool_id, fields=previous)])
-            self.cues.play("success")
+                undo = [UndoStep(kind="spool_patch", spool_id=spool_id, fields=previous)]
+                message = f"empty {fmt_g(grams)} g set as {target}; archived"
+                ok, code = True, None
+                if filament_id is not None and filament.get("spool_weight") != grams:
+                    try:
+                        await self.spoolman.patch_filament(filament_id, {"spool_weight": grams})
+                    except SpoolmanError as error:
+                        ok, code = False, "spoolman_error"
+                        message = (f"empty {fmt_g(grams)} g set as spool tare; archived; "
+                                   f"filament tare not updated: {error}")
+                    else:
+                        undo.append(UndoStep(kind="filament_patch", filament_id=filament_id,
+                                             fields={"spool_weight": filament.get("spool_weight")}))
+                step = StepResult(message, ok=ok, code=code, undo=undo)
+            self.cues.play("success" if step.ok else "error")
             activity_id = self._record("empty_spool", spool_id, step)
-            return Outcome(True, f"Spool {spool_id}: {step.message}", activity_id=activity_id, dry_run=step.dry_run)
+            return Outcome(step.ok, f"Spool {spool_id}: {step.message}", code=step.code, activity_id=activity_id,
+                           dry_run=step.dry_run)
 
     async def _apply_undo(self, step: UndoStep) -> bool:
         """Apply one inverse step; returns True when it was only a dry run."""
@@ -511,6 +527,9 @@ class Actions:
             if result.spool is not None and self.store.spool is not None and self.store.spool.id == step.spool_id:
                 self._publish_spool(result.spool)
             return result.dry_run
+        if step.kind == "filament_patch":
+            assert step.filament_id is not None
+            return (await self.spoolman.patch_filament(step.filament_id, dict(step.fields or {}))).dry_run
         if step.kind == "pending":
             return (await self.printers.get(step.printer or "").set_next_spool(step.spool_id)).dry_run
         if step.kind == "lane":

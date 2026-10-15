@@ -26,8 +26,9 @@ def utc_now_iso() -> str:
 class UndoStep:
     """One inverse operation; executed newest-first when undoing.
 
-    kind: "spool_patch" (spool_id, fields), "pending" (printer, spool_id = previous
-    pending or None), "lane" (printer, lane, spool_id = previous lane spool or None).
+    kind: "spool_patch" (spool_id, fields), "filament_patch" (filament_id, fields),
+    "pending" (printer, spool_id = previous pending or None), "lane" (printer, lane,
+    spool_id = previous lane spool or None).
     """
 
     kind: str
@@ -35,6 +36,7 @@ class UndoStep:
     printer: str | None = None
     lane: str | None = None
     fields: dict[str, Any] | None = None
+    filament_id: int | None = None
 
 
 @dataclass

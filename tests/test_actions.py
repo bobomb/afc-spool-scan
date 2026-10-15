@@ -8,6 +8,7 @@ import pytest
 from conftest import wait_until
 
 from station.app import Station
+from station.spoolman import SpoolmanError
 
 
 async def act(station: Station, action: str, **args: Any) -> dict[str, Any]:
@@ -233,14 +234,65 @@ async def test_empty_spool(station: Station) -> None:
     assert warn["code"] == "needs_confirm" and "should weigh about 180 g" in warn["message"]
     await set_scale(station, 176.5)
     result = await act(station, "empty_spool", spool_id=97)
-    assert result["ok"] and result["message"] == "Spool 97: empty spool 176.5 g recorded; archived"
+    assert result["ok"] and result["message"] == "Spool 97: empty 176.5 g set as spool + filament tare; archived"
     spool = sim_spool(station, 97)
     assert (spool["spool_weight"], spool["remaining_weight"], spool["archived"]) == (176.5, 0.0, True)
+    assert spool["filament"]["spool_weight"] == 176.5
+    assert ("PATCH", "/api/v1/filament/11", {"spool_weight": 176.5}) in station.sim_spoolman.requests  # type: ignore[union-attr]
     assert station.store.spool.archived is True
+    assert station.cues.played[-1] == "success"
     await act(station, "undo", activity_id=result["activity_id"])
     spool = sim_spool(station, 97)
     assert (spool["spool_weight"], spool["archived"]) == (180.0, False)
+    assert spool["filament"]["spool_weight"] == 180.0
     assert spool["remaining_weight"] == pytest.approx(454.7)
+
+
+async def test_empty_spool_sets_unset_filament_tare_and_undo_unsets_it(station: Station) -> None:
+    await set_scale(station, 245.0)
+    result = await act(station, "empty_spool", spool_id=92)
+    assert result["ok"] and sim_spool(station, 92)["filament"]["spool_weight"] == 245.0
+    assert station.actions.activity.get(result["activity_id"]).undo[-1].fields == {"spool_weight": None}
+    await act(station, "undo", activity_id=result["activity_id"])
+    assert sim_spool(station, 92)["filament"]["spool_weight"] is None
+    assert sim_spool(station, 92)["spool_weight"] is None
+
+
+async def test_empty_spool_skips_filament_already_at_that_tare(station: Station) -> None:
+    await set_scale(station, 157.0)
+    result = await act(station, "empty_spool", spool_id=84)
+    assert result["message"] == "Spool 84: empty 157 g set as spool + filament tare; archived"
+    assert not [r for r in station.sim_spoolman.requests if r[1].startswith("/api/v1/filament")]  # type: ignore[union-attr]
+    assert [step.kind for step in station.actions.activity.get(result["activity_id"]).undo] == ["spool_patch"]
+
+
+async def test_empty_spool_reports_filament_failure(station: Station, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fail(*args: Any, **kwargs: Any) -> Any:
+        raise SpoolmanError("Spoolman error 500: boom", 500)
+
+    monkeypatch.setattr(station.spoolman, "patch_filament", fail)
+    await set_scale(station, 176.5)
+    result = await act(station, "empty_spool", spool_id=97)
+    assert result["ok"] is False and result["code"] == "spoolman_error"
+    assert result["message"] == ("Spool 97: empty 176.5 g set as spool tare; archived; "
+                                 "filament tare not updated: Spoolman error 500: boom")
+    assert sim_spool(station, 97)["archived"] is True and sim_spool(station, 97)["filament"]["spool_weight"] == 180.0
+    assert station.cues.played[-1] == "error"
+    entry = station.actions.activity.get(result["activity_id"])
+    assert [step.kind for step in entry.undo] == ["spool_patch"] and station.store.activity[0]["undoable"]
+    assert (await act(station, "undo", activity_id=entry.id))["ok"] is True
+    assert sim_spool(station, 97)["archived"] is False
+
+
+async def test_empty_spool_dry_run_when_writes_off(station: Station) -> None:
+    station.spoolman.writes = False
+    await set_scale(station, 176.5)
+    before = len(station.sim_spoolman.requests)  # type: ignore[union-attr]
+    result = await act(station, "empty_spool", spool_id=97)
+    assert result["ok"] and result["dry_run"]
+    assert result["message"] == "Spool 97: Dry run: would set 176.5 g as spool + filament tare and archive"
+    assert [r[0] for r in station.sim_spoolman.requests[before:]] == ["GET"]  # type: ignore[union-attr]
+    assert sim_spool(station, 97)["filament"]["spool_weight"] == 180.0
 
 
 async def test_set_setting_side_effects(station: Station) -> None:

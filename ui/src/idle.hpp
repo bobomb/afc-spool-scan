@@ -17,8 +17,12 @@ public:
     void tick(const Settings& settings, std::uint32_t inactive_ms);
     void wake();
     void force(Level level);
+    // Sets the awake brightness once at startup; the kernel's boot level can be very dim.
+    void start();
     void set_enabled(bool enabled) { enabled_ = enabled; }
     Level level() const { return level_; }
+
+    static int brightness_for(Level level) { return level == Level::Awake ? 100 : level == Level::Dim ? 25 : 0; }
 
     // Pure decision used by tick(); dimming is skipped without a software backlight.
     static Level level_for(std::uint32_t inactive_ms, int dim_s, int off_s, bool has_backlight)

@@ -53,6 +53,7 @@ void App::start()
     lv_display_add_event_cb(platform_.display(), on_display_deleted, LV_EVENT_DELETE, this);
     build_ui();
     attach_keyboard();
+    idle_->start();
     timer_ = lv_timer_create(poll_timer, 20, this);
     refresh(kTopicAll);
 }
@@ -571,8 +572,8 @@ void App::empty_spool()
     ConfirmDialog::Spec spec;
     spec.key = "empty";
     spec.title = "Record spool #" + std::to_string(*id) + " as empty?";
-    spec.message = "The scale weight becomes the empty spool weight, remaining is set to 0 g and the spool is "
-                   "archived. This can be undone.";
+    spec.message = "The scale weight becomes the empty spool weight of this spool and the default for its filament, "
+                   "remaining is set to 0 g and the spool is archived. This can be undone.";
     spec.rows = {{"Scale now", s.scale.present && s.scale.grams ? fmt_grams(*s.scale.grams, 1) + "  (" +
                                                                     scale_status_label(s.scale.status) + ")"
                                                               : "--"}};

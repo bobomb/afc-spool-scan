@@ -112,6 +112,14 @@ class SpoolmanClient:
         data = await self._request("PATCH", f"/spool/{spool_id}", fields)
         return WriteResult(dry_run=False, spool=data if isinstance(data, dict) else None)
 
+    async def patch_filament(self, filament_id: int, fields: dict[str, Any]) -> WriteResult:
+        """PATCH a filament; WriteResult.spool holds the returned filament."""
+        if not self.writes:
+            log.info("Writes off: would PATCH /filament/%d %s", filament_id, fields)
+            return WriteResult(dry_run=True, spool=None)
+        data = await self._request("PATCH", f"/filament/{filament_id}", fields)
+        return WriteResult(dry_run=False, spool=data if isinstance(data, dict) else None)
+
 
 def spool_color(filament: dict[str, Any]) -> str | None:
     multi = filament.get("multi_color_hexes")

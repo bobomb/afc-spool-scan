@@ -256,7 +256,7 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `load` | `spool_id`, `target?` | `SET_NEXT_SPOOL_ID` on target printer(s); track pending |
 | `clear_pending` | `printer` | Clear pending next spool on one printer |
 | `assign_lane` | `spool_id`, `printer`, `lane` | `SET_SPOOL_ID LANE=… SPOOL_ID=…` |
-| `empty_spool` | `spool_id`, `confirm?` | Stable weight → `spool_weight`, archive |
+| `empty_spool` | `spool_id`, `confirm?` | Stable weight → spool and filament `spool_weight`, archive |
 | `undo` | `activity_id` | Revert an undoable activity |
 | `set_setting` | `key`, `value` | Persist a setting → `settings` event |
 | `cancel_countdown` | — | Cancel a pending scan-mode countdown |
@@ -332,7 +332,8 @@ clients.
 - Undo records store previous values: `used_weight` (and `initial_weight` when
   Spoolman reset it) for weigh, previous lane `spool_id` (assign), previous
   pending ID (load/clear), previous `spool_weight`, `used_weight` and
-  `archived` (empty spool). Undo runs the inverse steps newest first. Only
+  `archived` plus the filament's previous `spool_weight` (empty spool).
+  Undo runs the inverse steps newest first. Only
   entries recorded under the current write mode can be undone.
 - Scan handling by `scan_mode`:
   - `immediate`: today's behaviour — weigh if a qualifying weight is present,
@@ -488,6 +489,9 @@ within a phase unless noted. Each task ends with tests/build passing.
   undo restores previous lane spool.
 - [x] **F4** Empty spool (#5): stable > 10 g → `PATCH spool_weight`,
   `remaining_weight: 0`, `archived: true`; undo restores.
+  *2026-10-15: also sets the filament's default `spool_weight`
+  (`PATCH /filament/{id}`, skipped when already equal); undo restores the
+  previous filament value, including unset (product plan §7).*
 - [x] **F5** Sanity check + confirm dialog (#6).
 - [x] **F6** Undo for all undoable actions (#7).
 - [x] **F7** Scan modes `immediate` / `countdown` / `fill` with countdown
@@ -698,3 +702,20 @@ Append dated notes here (verified API details, gotchas, measurements).
   later Load + Undo on Kilo correctly restored "no pending spool", while
   Load + Undo on Yankee restored 46 — matching AFC's own `gcode_store`.
   No audio or other warnings in the journal.
+- 2026-10-15 (reboot): `sudo systemctl reboot` of spoolpi at 10:56. Both
+  user services started unattended at 13.8 s after boot (linger), with no
+  restarts; both printers connected at 18 s, the scanner was opened and the
+  UI took the panel. The DYMO loses power over a reboot and shows "absent"
+  until switched on. Journals are volatile (`/run/log/journal`), so
+  `journalctl --user -u …` finds no files after a reboot; `--user-unit`
+  (used by `tail-logs.sh` and the docs) works for `adm` members. The
+  backlight came up at the kernel default 12/255 and the UI only wrote it on
+  idle changes, so the panel stayed dim until the first dim/wake; the UI now
+  sets the awake level at startup.
+- 2026-10-15 (empty spool tare): Decided that Empty spool also sets the
+  filament's default `spool_weight` (product plan §7). Spoolman's filament
+  PATCH accepts `spool_weight: null` (only density and diameter refuse
+  null), so undo can restore an unset default. A failed filament PATCH
+  after the spool PATCH reports `spoolman_error` with the spool part kept
+  and undoable. The confirm dialog now sizes its message from the wrapped
+  text (it had a fixed two-line slot).

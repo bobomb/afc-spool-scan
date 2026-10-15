@@ -9,20 +9,23 @@ void ConfirmDialog::show(Spec spec)
     spec_ = std::move(spec);
     Theme& theme = app_.theme();
     const int rows = static_cast<int>(spec_.rows.size());
-    const int height = 170 + rows * 28 + (spec_.message.empty() ? 0 : 56);
-    lv_obj_t* dialog = ui::modal(lv_layer_top(), theme, 560, std::min(height, 440), &dimmer_);
+    lv_obj_t* dialog = ui::modal(lv_layer_top(), theme, 560, 170 + rows * 28, &dimmer_);
 
     lv_obj_t* title = ui::label(dialog, theme.normal(), spec_.danger ? theme.error() : theme.text(), spec_.title);
     lv_obj_set_size(title, 528, 28);
     lv_label_set_long_mode(title, LV_LABEL_LONG_MODE_DOTS);
     int y = 38;
+    int message_h = 0;
     if (!spec_.message.empty()) {
         lv_obj_t* message = ui::label(dialog, theme.small(), theme.muted(), spec_.message);
         lv_obj_set_pos(message, 0, y);
         lv_obj_set_width(message, 528);
         lv_label_set_long_mode(message, LV_LABEL_LONG_MODE_WRAP);
-        y += 56;
+        lv_obj_update_layout(message);
+        message_h = std::max(56, static_cast<int>(lv_obj_get_height(message)) + 16);
+        y += message_h;
     }
+    lv_obj_set_height(dialog, std::min(170 + rows * 28 + message_h, 440));
     for (const auto& [name, value] : spec_.rows) {
         lv_obj_t* left = ui::label(dialog, theme.small(), theme.muted(), name);
         lv_obj_set_pos(left, 0, y);

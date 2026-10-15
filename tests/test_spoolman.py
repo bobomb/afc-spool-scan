@@ -77,11 +77,36 @@ async def test_writes_off_is_a_dry_run(spoolman) -> None:  # noqa: ANN001
     before = len(sim.requests)
     assert (await client.measure(97, 984.0)).dry_run is True
     assert (await client.patch(97, {"archived": True})).dry_run is True
+    assert (await client.patch_filament(11, {"spool_weight": 1.0})).dry_run is True
     with pytest.raises(SpoolmanError, match="writes are off"):
         await client._request("PUT", "/spool/97/measure", {"weight": 1})  # noqa: SLF001
     assert len(sim.requests) == before
     assert sim.spools[97]["archived"] is False
+    assert sim.spools[97]["filament"]["spool_weight"] == 180.0
     assert (await client.get_spool(97))["id"] == 97
+
+
+async def test_patch_filament_updates_every_spool_of_that_filament() -> None:
+    spools = load_spool_fixtures()
+    twin = {**spools[0], "id": 500, "filament": dict(spools[0]["filament"])}
+    sim = SimSpoolman(spools + [twin])
+    url = await sim.start()
+    try:
+        async with aiohttp.ClientSession() as session:
+            client = SpoolmanClient(url, session, writes=True)
+            filament_id = spools[0]["filament"]["id"]
+            result = await client.patch_filament(filament_id, {"spool_weight": 171.0})
+            assert result.dry_run is False and result.spool["spool_weight"] == 171.0
+            assert sim.requests[-1] == ("PATCH", f"/api/v1/filament/{filament_id}", {"spool_weight": 171.0})
+            for spool_id in (spools[0]["id"], 500):
+                assert (await client.get_spool(spool_id))["filament"]["spool_weight"] == 171.0
+            assert (await client.patch_filament(filament_id, {"spool_weight": None})).spool["spool_weight"] is None
+            with pytest.raises(SpoolNotFound):
+                await client.patch_filament(9999, {"spool_weight": 1.0})
+            with pytest.raises(SpoolmanError, match="Unsupported fields: material"):
+                await client.patch_filament(filament_id, {"material": "PLA"})
+    finally:
+        await sim.stop()
 
 
 async def test_offline_and_unreachable(spoolman) -> None:  # noqa: ANN001

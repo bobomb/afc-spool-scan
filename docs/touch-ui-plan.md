@@ -170,7 +170,7 @@ Rules carried over from the current scanner behaviour:
 | 1 | **Target printer selection** | Kilo / Yankee / Both. Show the pending next-spool per printer and allow **Clear pending**. Fixes stale pending IDs left on the printer not loaded. |
 | 2 | **Look up (no action)** | Enter/scan ID → show vendor, filament name, material, color, remaining, spool weight, location, last used. |
 | 3 | **Assign to specific lane** | `SET_SPOOL_ID LANE=laneN SPOOL_ID=X` on a chosen printer/lane; for lanes tagged wrongly or loaded without a scan. Only when explicitly chosen (§4.1: the default is next-spool). |
-| 5 | **Record empty spool** | Weigh the empty core, store it as the spool's `spool_weight` (tare), then archive the spool. |
+| 5 | **Record empty spool** | Weigh the empty core, store it as the spool's `spool_weight` (tare) and as its filament's default `spool_weight`, then archive the spool. |
 | 6 | **Weight sanity check** | Before saving, show gross, tare, net and the delta from Spoolman's expected weight; warn above a threshold (likely wrong spool or missing tare). |
 | 7 | **Undo and recent activity** | Activity list of recent actions; undo restores previous Spoolman values / lane assignment / pending spool. |
 | 8 | **Scan behaviour mode** | Configurable behaviour when a QR is scanned while the UI is running (see §7). |
@@ -308,7 +308,7 @@ Status byte values to surface in the UI:
 | Low-stock threshold | **Open** | e.g. < 100 g remaining |
 | Undo depth | **Open** | e.g. last 20 actions, in memory + persisted |
 | Idle blank timeout | **Open** | e.g. 2 min dim, 5 min off |
-| Empty spool: also update filament default `spool_weight`? | **Open** | Spool-only vs spool + filament |
+| Empty spool: also update filament default `spool_weight`? | **Decided** 2026-10-15 | Yes: spool + filament; undo restores both |
 | Lane motion commands from UI (eject/unload) | **Open** | Not included unless decided |
 | Button labels | **Open** | Keep "Weigh / Weigh + Load / Load" or rename "Load" → "Queue" |
 | Remote access (phone/PC) | **Open** | Not provided by LVGL UI; service could expose a page later |
@@ -335,7 +335,7 @@ Detailed tasks: dev plan §8.
 | 2. UI MVP | Main screen: scale, numpad, spool lookup card, target selector, Weigh / Weigh + Load / Load, result banner, health indicators | All core functions usable by touch | Done: Weigh, Load and Undo used by touch on the panel with live services (2026-10-15) |
 | 3. Printer dashboard | Printers screen per §5.2; pending spool + Clear; tap lane → assign | Live lane state for both printers | Live on the panel with both printers (2026-10-15) |
 | 4. Extended workflows | Assign to lane, empty spool, sanity check, undo + Log screen, low-stock, scan mode setting | Functions #1–3, #5–9 complete | Implemented; undo verified live; assign lane, empty spool and scan modes not yet used on live services |
-| 5. Polish | Idle blank/wake, Settings screen, theme/skin, packaging, docs, push to fork | Runs unattended after reboot | Idle, Settings, light/dark theme done; deployed as enabled user services with linger (start at boot); reboot not yet exercised |
+| 5. Polish | Idle blank/wake, Settings screen, theme/skin, packaging, docs, push to fork | Runs unattended after reboot | Done 2026-10-15: reboot tested; both services started unattended and connected |
 
 ## 10. Open questions
 
@@ -343,7 +343,8 @@ Detailed tasks: dev plan §8.
 2. Target printer default.
 3. Scan mode default.
 4. Thresholds: sanity-check delta, low stock, idle timeouts.
-5. Empty spool: update filament default tare too?
+5. ~~Empty spool: update filament default tare too?~~ Decided 2026-10-15:
+   yes (§7).
 6. Allow lane motion commands from the UI?
 7. Button labels ("Load" vs "Queue").
 8. IPC transport: TCP localhost NDJSON proposed (§3.2); confirm.
@@ -368,3 +369,4 @@ Detailed tasks: dev plan §8.
 | 2026-10-13 | Panel bring-up deferred; develop software first on Windows with simulated hardware and the LVGL Windows simulator; deliver via fork branch `touch-ui`. |
 | 2026-10-13 | UI language changed from C to C++20 (LVGL v9.6 C API, nlohmann/json); Rust bindings considered and not chosen (no maintained LVGL 9.6 binding). |
 | 2026-10-14 | Default assignment is the next loaded spool (`SET_NEXT_SPOOL_ID`), as the scripts do; lane assignment (`SET_SPOOL_ID`) only when explicitly chosen and confirmed in the Assign dialog. |
+| 2026-10-15 | Empty spool also sets the filament's default `spool_weight` to the measured weight (§4.2 #5, §7). |

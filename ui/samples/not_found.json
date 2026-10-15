@@ -276,7 +276,7 @@
         "spool_id": 60,
         "printers": [],
         "ok": true,
-        "message": "empty spool 176.5 g recorded; archived",
+        "message": "empty 176.5 g set as spool + filament tare; archived",
         "code": null,
         "dry_run": false,
         "undone": false,

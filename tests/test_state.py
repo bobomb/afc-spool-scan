@@ -112,3 +112,18 @@ def test_activity_log_skips_corrupt_lines(tmp_path: Path) -> None:
     log.load()
     assert [entry.id for entry in log.entries] == ["a-3"]
     assert log.add("load", 1, [], True, "m").id == "a-4"
+
+
+def test_activity_log_round_trips_filament_undo(tmp_path: Path) -> None:
+    path = tmp_path / "activity.jsonl"
+    log = ActivityLog(path)
+    steps = [UndoStep(kind="spool_patch", spool_id=97, fields={"spool_weight": 180.0}),
+             UndoStep(kind="filament_patch", filament_id=11, fields={"spool_weight": None})]
+    entry = log.add("empty_spool", 97, [], True, "empty", undo=steps)
+    reloaded = ActivityLog(path)
+    reloaded.load()
+    assert reloaded.get(entry.id).undo == steps
+    old = '{"id":"a-1","at":"t","action":"weigh","ok":true,"message":"m","undo":[{"kind":"spool_patch","spool_id":1}]}'
+    path.write_text(old + "\n", encoding="utf-8")
+    reloaded.load()
+    assert reloaded.get("a-1").undo[0].filament_id is None

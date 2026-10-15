@@ -29,12 +29,19 @@ void IdleManager::force(Level level)
     apply(level);
 }
 
+void IdleManager::start()
+{
+    if (app_.platform().has_backlight()) {
+        app_.platform().set_backlight(brightness_for(level_));
+    }
+}
+
 void IdleManager::apply(Level level)
 {
     level_ = level;
     Platform& platform = app_.platform();
     if (platform.has_backlight()) {
-        platform.set_backlight(level == Level::Awake ? 100 : level == Level::Dim ? 25 : 0);
+        platform.set_backlight(brightness_for(level));
     }
     app_.set_blank(level == Level::Off);
 }
