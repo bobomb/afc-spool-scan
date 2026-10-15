@@ -523,17 +523,16 @@ within a phase unless noted. Each task ends with tests/build passing.
   `try-restart`). Fixed first: Windows PowerShell 5.1 aborted on `git fetch`
   stderr. Defaults to `spoolpi.local`, which the PC's SSH config and
   `known_hosts` cover.*
-- [ ] **P4** Cutover: add `PRINTERS`/`STATION_*` keys to spoolpi's
+- [x] **P4** Cutover: add `PRINTERS`/`STATION_*` keys to spoolpi's
   `config.env`; disable `usb-qr-scanner.service`, enable
   `spool-station.service`; verify a real scan at parity. Rollback: disable
   `spool-station.service`, re-enable `usb-qr-scanner.service`.
   *Cut over 2026-10-15 10:27 (config backup
   `~/afc-spool-scan.config.env.bak-20261015`). Pre-flight with the
-  production config (writes off) and post-switch checks passed: scanner
-  opened and grabbed, both printers connected, Spoolman healthy, scale
-  absent (off). The real-kernel scan path was verified with a uinput
-  keyboard (shifted Spoolman codes and URLs decode). Remaining: a physical
-  scan at parity, with and without a weight.*
+  production config (writes off) and post-switch checks passed. Parity
+  confirmed by the user at 10:45: a scan of spool 46 on the scale saved
+  992.2 g and set the next spool on both printers; Weigh, Load and Undo from
+  the panel also worked (see §10).*
 - [x] **P5** Panel bring-up (product plan Phase 0) when the panel is
   connected: DRM connector, touch device, backlight, rotation; then enable
   `spool-station-ui.service`.
@@ -687,3 +686,15 @@ Append dated notes here (verified API details, gotchas, measurements).
   yielding overflows the evdev client buffer (~64 events) and drops the
   start, which a real scanner at USB speed does not do. The temporary clone
   `~/afc-spool-scan-touch` was removed after the cutover.
+- 2026-10-15 (P4 parity): First real use. The DYMO appeared as
+  `/dev/hidraw1` (group `input` via `99-dymo-scale.rules`; `hidraw0` is
+  another root-only HID device) and was picked up within seconds of being
+  switched on. Scan of spool 46 on the scale: 992.2 g saved, AFC replied
+  `Spool ID '89' being overwritten for next load: '46'` on Kilo (the
+  pending 89 came from a bash-script scan the night before) and
+  `Spool ID set for next load: '46'` on Yankee. The user then loaded spool 46
+  into Kilo; AFC consumed the pending ID (`Weight remaining for SpoolID
+  46: 852.2` = 992.2 g − 140 g tare), the service cleared its pending, and a
+  later Load + Undo on Kilo correctly restored "no pending spool", while
+  Load + Undo on Yankee restored 46 — matching AFC's own `gcode_store`.
+  No audio or other warnings in the journal.

@@ -331,10 +331,10 @@ Detailed tasks: dev plan §8.
 | Phase | Scope | Exit criteria | Status |
 |---|---|---|---|
 | 0. Display bring-up | Connect Hosyond panel; confirm auto-detect (fallback `dtoverlay=vc4-kms-dsi-7inch`); verify DSI DRM connector, FT5x06 touch event device, `/sys/class/backlight` availability and power headroom; LVGL DRM + evdev hello-world | Touch + render verified on spoolpi; backlight capability recorded in §2.1 | Done 2026-10-15 (render, touch alignment, backlight dim/blank/wake; §2.1) |
-| 1. Station service | Scale poller, QR scanner (python-evdev), Moonraker subscriptions, Spoolman client, core actions, audio, activity log, IPC; replaces scanner service | Scan parity with current behaviour; unit tests for decoding, QR parsing, actions | In production on spoolpi since 2026-10-15 (P4); physical scan at parity still to confirm |
-| 2. UI MVP | Main screen: scale, numpad, spool lookup card, target selector, Weigh / Weigh + Load / Load, result banner, health indicators | All core functions usable by touch | Implemented; verified in the Windows simulator and headless screenshots |
-| 3. Printer dashboard | Printers screen per §5.2; pending spool + Clear; tap lane → assign | Live lane state for both printers | Implemented against simulated printers; live printers not yet connected |
-| 4. Extended workflows | Assign to lane, empty spool, sanity check, undo + Log screen, low-stock, scan mode setting | Functions #1–3, #5–9 complete | Implemented (simulated services) |
+| 1. Station service | Scale poller, QR scanner (python-evdev), Moonraker subscriptions, Spoolman client, core actions, audio, activity log, IPC; replaces scanner service | Scan parity with current behaviour; unit tests for decoding, QR parsing, actions | Done: in production on spoolpi since 2026-10-15; scan + weigh parity confirmed |
+| 2. UI MVP | Main screen: scale, numpad, spool lookup card, target selector, Weigh / Weigh + Load / Load, result banner, health indicators | All core functions usable by touch | Done: Weigh, Load and Undo used by touch on the panel with live services (2026-10-15) |
+| 3. Printer dashboard | Printers screen per §5.2; pending spool + Clear; tap lane → assign | Live lane state for both printers | Live on the panel with both printers (2026-10-15) |
+| 4. Extended workflows | Assign to lane, empty spool, sanity check, undo + Log screen, low-stock, scan mode setting | Functions #1–3, #5–9 complete | Implemented; undo verified live; assign lane, empty spool and scan modes not yet used on live services |
 | 5. Polish | Idle blank/wake, Settings screen, theme/skin, packaging, docs, push to fork | Runs unattended after reboot | Idle, Settings, light/dark theme done; deployed as enabled user services with linger (start at boot); reboot not yet exercised |
 
 ## 10. Open questions
