@@ -354,6 +354,10 @@ Detailed tasks: dev plan §8.
     2026-10-14: yes, `/sys/class/backlight/10-0045` (§2.1).
 11. Mounting orientation (landscape assumed; landscape verified on the
     panel as currently placed, 2026-10-15).
+12. Main screen re-layout to reduce clutter (2026-10-15). Mockups:
+    A spool first with the keypad on demand, B Identify → Check → Act
+    columns, C printer cards as the Load target, D side navigation rail
+    with collapsed status. Pick one direction or a combination.
 
 ## Decision log
 
