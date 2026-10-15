@@ -241,6 +241,8 @@ int run_snapshot(App& app, HeadlessPlatform& platform, const Args& args)
 
 int main(int argc, char** argv)
 {
+    // Line-buffer stdout so LVGL logs reach the journal promptly under systemd.
+    std::setvbuf(stdout, nullptr, _IOLBF, 1024);
     Args args;
     if (!parse_args(argc, argv, args)) {
         usage();

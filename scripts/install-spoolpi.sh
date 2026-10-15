@@ -31,7 +31,7 @@ done
 if (( ! UPDATE )); then
     log "Installing build and runtime packages"
     sudo apt-get update
-    sudo apt-get install -y build-essential cmake ninja-build pkg-config libdrm-dev libevdev-dev python3-venv python3-dev
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential cmake ninja-build pkg-config libdrm-dev libevdev-dev python3-venv python3-dev
 fi
 
 if [[ ! -x "$VENV/bin/python" ]]; then

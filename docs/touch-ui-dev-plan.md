@@ -473,12 +473,10 @@ within a phase unless noted. Each task ends with tests/build passing.
 - [x] **U6** Log screen (§5.3) with Undo.
 - [x] **U7** Settings screen (§5.4) wired to `set_setting`.
 - [x] **U8** Snapshot mode (§7) and a sample state file per screen.
-- [ ] **U9** `platform_drm.cpp` (DRM + evdev); builds on spoolpi via the `pi`
+- [x] **U9** `platform_drm.cpp` (DRM + evdev); builds on spoolpi via the `pi`
   preset; snapshot mode runs there.
-  *`platform_drm.cpp` written (DRM fbdev buffers, evdev auto-discovery or
-  `--touch`, sysfs backlight). Compiles and passes CTest (unit + snapshot
-  mode) in CI's `pi` job on x86-64 Ubuntu; still to build and run on spoolpi
-  (arm64).*
+  *Built on spoolpi (arm64) on 2026-10-15; 13/13 CTest and snapshot mode run
+  there, and the UI drives the panel (see P5).*
 
 ### F — Features (service + UI)
 
@@ -501,19 +499,23 @@ within a phase unless noted. Each task ends with tests/build passing.
 
 ### P — spoolpi deployment
 
-- [ ] **P1** `scripts/install-spoolpi.sh`: apt deps (`build-essential cmake
+- [x] **P1** `scripts/install-spoolpi.sh`: apt deps (`build-essential cmake
   ninja-build pkg-config libdrm-dev libevdev-dev python3-venv python3-dev`),
   venv at `~/afc-spool-scan/.venv`, `pip install -e ".[linux]"`, build UI with
   the `pi` preset. Idempotent; `--update` skips apt.
-  *Written (`bash -n` clean); not run on spoolpi. `libevdev-dev` added after CI
-  showed LVGL 9.6's evdev driver links libevdev.*
+  *Run on spoolpi 2026-10-15 in a separate clone `~/afc-spool-scan-touch`
+  (production checkout untouched): 6 m 48 s first run, 10.6 s `--update`
+  re-run with nothing to rebuild. See §10.*
 - [ ] **P2** `systemd/spool-station.service` (user service, like the current
   scanner service) and `spool-station-ui.service`. UI needs DRM master and
   `/dev/input` access as `pi` (groups `video`, `render`, `input`);
   verify whether a user service can hold DRM master or a system service with
   `User=` is required; disable the tty1 getty/console cursor if they
   interfere.
-  *Units and `systemd/README.md` written; DRM master question open.*
+  *Units and `systemd/README.md` written. DRM master: a uid 1000 process
+  started outside any VT/logind session became master of `card1` on first
+  open (debugfs `clients`), so a user service is expected to work; confirm
+  when the unit is enabled. The getty on tty1 did not interfere.*
 - [ ] **P3** `scripts/deploy-spoolpi.ps1`: from Windows, push the branch, then
   `ssh pi@192.0.2.10` to `git pull --ff-only fork touch-ui`,
   run `install-spoolpi.sh --update` and restart services.
@@ -530,7 +532,13 @@ within a phase unless noted. Each task ends with tests/build passing.
   `/dev/input/by-path/platform-fe205000.i2c-event`, backlight
   `/sys/class/backlight/10-0045` (product plan §2.1). spoolpi lacks
   `libdrm-dev`, `libevdev-dev` and `python3-dev` (P1 installs them); its
-  checkout is still at `c58d3bb`. Next: build and run the UI on the panel.*
+  checkout is still at `c58d3bb`. 2026-10-15: the UI ran on the panel from
+  `~/afc-spool-scan-touch` against a simulated service — DRM master on
+  `card1`, primary plane scanning out an 800×480 XR24 framebuffer allocated
+  by `station-ui`, touch device open (axes 0–799 × 0–479, no calibration),
+  backlight dim to 25% (63/255), blank (0) and wake on a scale change
+  verified. Remaining: tap test for alignment/orientation by eye, then
+  enable `spool-station-ui.service` at cutover.*
 
 ### C — Continuous integration (optional)
 
@@ -647,3 +655,14 @@ Append dated notes here (verified API details, gotchas, measurements).
   13/13 CTest each, and the UI end-to-end tests against the simulated service
   on Linux. The headless job uploads the snapshot PNGs as the `ui-snapshots`
   artifact. GCC `-Wall -Wextra` warnings in our code are fixed.
+- 2026-10-15 (P1, U9, P5): First install on spoolpi, in a separate clone
+  `~/afc-spool-scan-touch` (branch `touch-ui`); the production checkout,
+  `usb-qr-scanner.service` and systemd units were not touched. `apt` pulled
+  20 new packages and upgraded 10 (libdrm2 and the Python 3.13 point release,
+  required by the `-dev` packages). The UI build took ~6 min (LVGL ~540
+  objects, 4 cores, peak 68 °C, `throttled=0x0`); disk use ~0.5 GB (3.3 GB
+  free after). On arm64: 13/13 CTest and 178/178 pytest (incl. the hidraw
+  pipe test and UI end-to-end tests). The UI took DRM master as uid 1000 and
+  the panel scanned out its framebuffer; `station-ui` stdout is block
+  buffered when not on a terminal, so it is now line buffered for the
+  journal.

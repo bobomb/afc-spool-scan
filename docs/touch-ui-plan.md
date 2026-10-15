@@ -63,8 +63,10 @@ State on spoolpi (2026-10-14, panel connected; read-only inspection):
   `brightness` writable by group `video` — software dimming is available.
 - `pi` is in `video`, `render` and `input`. Power: `throttled=0x0`
   shortly after boot (recheck under load). 3.8 GB free on `/` (87% used).
-- Still to verify: rendering and touch alignment with the LVGL UI, DRM master
-  from a user service, and the console cursor on tty1.
+- Verified 2026-10-15 with the LVGL UI: rendering on DSI-1 as uid 1000 (DRM
+  master on first open), touch device 0–799 × 0–479 (no calibration),
+  backlight dim/blank/wake. Still to verify by eye: touch alignment and
+  orientation.
 
 Notes:
 
@@ -327,7 +329,7 @@ Detailed tasks: dev plan §8.
 
 | Phase | Scope | Exit criteria | Status |
 |---|---|---|---|
-| 0. Display bring-up | Connect Hosyond panel; confirm auto-detect (fallback `dtoverlay=vc4-kms-dsi-7inch`); verify DSI DRM connector, FT5x06 touch event device, `/sys/class/backlight` availability and power headroom; LVGL DRM + evdev hello-world | Touch + render verified on spoolpi; backlight capability recorded in §2.1 | In progress: panel, touch device and backlight detected (§2.1); LVGL render and touch test pending |
+| 0. Display bring-up | Connect Hosyond panel; confirm auto-detect (fallback `dtoverlay=vc4-kms-dsi-7inch`); verify DSI DRM connector, FT5x06 touch event device, `/sys/class/backlight` availability and power headroom; LVGL DRM + evdev hello-world | Touch + render verified on spoolpi; backlight capability recorded in §2.1 | Render, touch device and backlight verified on spoolpi (2026-10-15); tap test by eye pending |
 | 1. Station service | Scale poller, QR scanner (python-evdev), Moonraker subscriptions, Spoolman client, core actions, audio, activity log, IPC; replaces scanner service | Scan parity with current behaviour; unit tests for decoding, QR parsing, actions | Implemented and tested with simulated hardware/printers/Spoolman; parity on spoolpi pending cutover (P4) |
 | 2. UI MVP | Main screen: scale, numpad, spool lookup card, target selector, Weigh / Weigh + Load / Load, result banner, health indicators | All core functions usable by touch | Implemented; verified in the Windows simulator and headless screenshots |
 | 3. Printer dashboard | Printers screen per §5.2; pending spool + Clear; tap lane → assign | Live lane state for both printers | Implemented against simulated printers; live printers not yet connected |
