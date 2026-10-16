@@ -31,6 +31,13 @@ std::string fmt_delta(double grams)
     return (rounded < 0 ? "-" : "+") + fmt_number(std::fabs(rounded), 0) + " g";
 }
 
+std::string fmt_percent(double pct)
+{
+    if (pct > 0 && pct < 1) return "<1%";
+    const double clamped = pct < 0 ? 0 : pct > 100 ? 100 : pct;
+    return fmt_number(std::round(clamped), 0) + "%";
+}
+
 std::string scale_status_label(const std::string& status)
 {
     if (status == "stable") return "Ready";

@@ -38,19 +38,19 @@ SettingsScreen::SettingsScreen(App& app, lv_obj_t* parent) : app_(app)
 {
     Theme& theme = app.theme();
     root_ = ui::container(parent);
-    lv_obj_set_pos(root_, 0, layout::kHeaderH);
-    lv_obj_set_size(root_, layout::kWidth, layout::kBodyH);
+    lv_obj_set_pos(root_, layout::kContentX, 0);
+    lv_obj_set_size(root_, layout::kContentW, layout::kBodyH);
 
     list_ = ui::panel(root_, theme);
-    lv_obj_set_pos(list_, layout::kPad, 4);
-    lv_obj_set_size(list_, layout::kWidth - 2 * layout::kPad, layout::kBodyH - 8);
+    lv_obj_set_pos(list_, layout::kMargin, 12);
+    lv_obj_set_size(list_, layout::kContentW - 2 * layout::kMargin, layout::kBodyH - 16);
     lv_obj_set_style_pad_all(list_, 6, 0);
     lv_obj_set_scrollable(list_, true);
     lv_obj_set_scroll_dir(list_, LV_DIR_VER);
     lv_obj_set_flex_flow(list_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list_, 4, 0);
 
-    target_row_ = row("Target printer", "Used by Load, Weigh + Load and scans");
+    target_row_ = row("Load to", "Same as the printer cards on Station");
     add_segment("scan_mode", "Scan mode", "What a QR scan does",
                 {{"immediate", "Immediate"}, {"countdown", "Countdown"}, {"fill", "Fill only"}});
     add_segment("theme", "Theme", "Display colours", {{"dark", "Dark"}, {"light", "Light"}});
@@ -70,7 +70,7 @@ lv_obj_t* SettingsScreen::row(const std::string& title, const std::string& hint)
 {
     Theme& theme = app_.theme();
     lv_obj_t* row = ui::container(list_);
-    lv_obj_set_size(row, layout::kWidth - 2 * layout::kPad - 12, 62);
+    lv_obj_set_size(row, layout::kContentW - 2 * layout::kMargin - 12, 62);
     lv_obj_set_style_radius(row, 8, 0);
     lv_obj_set_style_bg_color(row, theme.surface_alt(), 0);
     lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
@@ -89,7 +89,7 @@ void SettingsScreen::add_segment(const std::string& key, const std::string& titl
     Theme& theme = app_.theme();
     lv_obj_t* parent = row(title, hint);
     lv_obj_t* group = ui::container(parent);
-    lv_obj_set_size(group, 390, 50);
+    lv_obj_set_size(group, 360, 50);
     lv_obj_align(group, LV_ALIGN_RIGHT_MID, -6, 0);
     lv_obj_set_flex_flow(group, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(group, 6, 0);
@@ -150,7 +150,7 @@ void SettingsScreen::rebuild_targets(const State& state)
     }
     Theme& theme = app_.theme();
     group = ui::container(target_row_);
-    lv_obj_set_size(group, 390, 50);
+    lv_obj_set_size(group, 360, 50);
     lv_obj_align(group, LV_ALIGN_RIGHT_MID, -6, 0);
     lv_obj_set_flex_flow(group, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(group, 6, 0);

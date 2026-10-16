@@ -33,7 +33,7 @@ public:
     App& operator=(const App&) = delete;
 
     void start();
-    // Loads a sample state file (snapshot mode): {"hello", "snapshot", "connected", "entry"}.
+    // Loads a sample state file (snapshot mode): {"hello", "snapshot", "connected", "keypad"}.
     void load_sample(const json& sample);
     void poll();
 
@@ -52,10 +52,17 @@ public:
     const std::string& entry() const { return entry_; }
     void entry_digit(char digit);
     void entry_backspace();
+    // Clears the typed digits and deselects the current spool (numpad Clear / Esc).
     void entry_clear();
     void entry_submit();
     void handle_key(const std::string& key);
+    // The selected spool when Spoolman found it.
     std::optional<int> spool_id() const;
+    void open_keypad();
+    void close_keypad();
+    void open_more();
+    // Includes or excludes a printer from the Load target (printer card tap).
+    void toggle_target(const std::string& key);
 
     void weigh(bool confirm = false);
     void weigh_load(bool confirm = false);
@@ -115,7 +122,7 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* key_catcher_ = nullptr;
     lv_group_t* key_group_ = nullptr;
-    std::unique_ptr<Header> header_;
+    std::unique_ptr<SideRail> rail_;
     std::unique_ptr<MainScreen> main_;
     std::unique_ptr<PrintersScreen> printers_;
     std::unique_ptr<LogScreen> log_;
@@ -125,6 +132,8 @@ private:
     std::unique_ptr<AssignDialog> assign_;
     std::unique_ptr<CountdownOverlay> countdown_;
     std::unique_ptr<StatusOverlay> status_;
+    std::unique_ptr<KeypadSheet> keypad_;
+    std::unique_ptr<MoreMenu> more_;
 };
 
 }  // namespace station

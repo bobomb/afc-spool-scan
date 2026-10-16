@@ -1,6 +1,9 @@
 #include "ui.hpp"
 
+#include <algorithm>
+
 #include "format.hpp"
+#include "view_model.hpp"
 
 namespace station::ui {
 namespace {
@@ -61,6 +64,10 @@ lv_obj_t* button(lv_obj_t* parent, Theme& theme, const std::string& text, Button
     lv_obj_add_style(obj, theme.button_pressed(), LV_STATE_PRESSED);
     lv_obj_add_style(obj, theme.button_checked(), LV_STATE_CHECKED);
     lv_obj_add_style(obj, theme.button_disabled(), LV_STATE_DISABLED);
+    if (style == ButtonStyle::Ghost) {
+        lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, LV_STATE_PRESSED);
+    }
     lv_obj_set_scroll_on_focus(obj, false);
     if (!text.empty()) {
         lv_obj_t* text_label = lv_label_create(obj);
@@ -173,6 +180,57 @@ lv_color_t swatch_color(const std::string& hex, Theme& theme)
 {
     const std::uint32_t fallback = theme.palette().surface_alt;
     return lv_color_hex(parse_hex_color(hex, fallback));
+}
+
+lv_color_t fill(lv_obj_t* obj, const std::vector<std::uint32_t>& colors, lv_grad_dsc_t& grad, Theme& theme,
+                std::uint32_t backdrop)
+{
+    lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+    if (colors.size() < 2) {
+        const std::uint32_t color = colors.empty() ? 0x808080 : colors.front();
+        lv_obj_set_style_bg_grad(obj, nullptr, 0);
+        lv_obj_set_style_bg_color(obj, lv_color_hex(color), 0);
+        lv_obj_set_style_border_color(obj, theme.border(), 0);
+        lv_obj_set_style_border_width(obj, contrast_ratio(color, backdrop) < 1.35 ? 1 : 0, 0);
+        return lv_color_hex(mark_color({color}));
+    }
+    lv_obj_set_style_border_width(obj, 0, 0);
+    const int count = std::min<int>(static_cast<int>(colors.size()), LV_GRADIENT_MAX_STOPS);
+    lv_color_t stops[LV_GRADIENT_MAX_STOPS];
+    for (int i = 0; i < count; ++i) stops[i] = lv_color_hex(colors[static_cast<std::size_t>(i)]);
+    lv_grad_init_stops(&grad, stops, nullptr, nullptr, count);
+    lv_grad_linear_init(&grad, LV_GRAD_LEFT, LV_GRAD_TOP, LV_GRAD_RIGHT, LV_GRAD_BOTTOM, LV_GRAD_EXTEND_PAD);
+    lv_obj_set_style_bg_color(obj, stops[0], 0);
+    lv_obj_set_style_bg_grad(obj, &grad, 0);
+    return lv_color_hex(mark_color(std::vector<std::uint32_t>(colors.begin(), colors.begin() + count)));
+}
+
+lv_obj_t* ring(lv_obj_t* parent, int size, int width)
+{
+    lv_obj_t* arc = lv_arc_create(parent);
+    lv_obj_remove_style_all(arc);
+    lv_obj_set_size(arc, size, size);
+    lv_arc_set_rotation(arc, 270);
+    lv_arc_set_bg_angles(arc, 0, 360);
+    lv_arc_set_range(arc, 0, 1000);
+    lv_arc_set_value(arc, 0);
+    lv_obj_set_style_arc_width(arc, width, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(arc, width, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_rounded(arc, false, LV_PART_MAIN);
+    lv_obj_set_style_arc_rounded(arc, false, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_opa(arc, LV_OPA_30, LV_PART_MAIN);
+    lv_obj_set_clickable(arc, false);
+    return arc;
+}
+
+void set_ring(lv_obj_t* ring, std::optional<double> pct, lv_color_t mark)
+{
+    lv_obj_set_style_arc_color(ring, mark, LV_PART_MAIN);
+    lv_obj_set_style_arc_color(ring, mark, LV_PART_INDICATOR);
+    const double value = pct ? std::clamp(*pct, 0.0, 100.0) * 10.0 : 0.0;
+    lv_arc_set_value(ring, static_cast<int32_t>(value + 0.5));
+    lv_obj_set_style_arc_opa(ring, static_cast<lv_opa_t>(pct && value >= 1 ? LV_OPA_COVER : LV_OPA_TRANSP),
+                             LV_PART_INDICATOR);
 }
 
 }  // namespace station::ui

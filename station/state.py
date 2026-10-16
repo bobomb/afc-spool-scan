@@ -72,6 +72,7 @@ class SpoolInfo:
     archived: bool = False
     low_stock: bool = False
     message: str | None = None
+    colors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -88,6 +89,8 @@ class LaneState:
     load: bool = False
     tool_loaded: bool = False
     low_stock: bool = False
+    remaining_pct: float | None = None
+    colors: list[str] = field(default_factory=list)
 
 
 @dataclass

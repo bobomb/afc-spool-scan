@@ -9,6 +9,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from .activity import ActivityLog, UndoStep
+from .catalog import SpoolCatalog
 from .config import Config
 from .moonraker import MoonrakerClient, PrinterCommandError, PrinterOffline
 from .printers import PrinterManager, UnknownPrinter
@@ -115,6 +116,7 @@ class Actions:
         scale: ScaleSource,
         cues: Cues,
         sim: Any | None = None,
+        catalog: SpoolCatalog | None = None,
     ) -> None:
         self.config = config
         self.store = store
@@ -125,6 +127,7 @@ class Actions:
         self.scale = scale
         self.cues = cues
         self.sim = sim
+        self.catalog = catalog
         self.scan_flow: Any | None = None
         self._lock = asyncio.Lock()
         self._handlers: dict[str, Callable[[dict[str, Any]], Awaitable[Outcome]]] = {
@@ -168,6 +171,8 @@ class Actions:
         info = spool_info_from_api(data, self.settings["low_stock_g"])
         self.store.set_spool(info)
         self.refresh_scale()
+        if self.catalog is not None:
+            self.catalog.put(data)
         return info
 
     def _publish_activity(self) -> None:

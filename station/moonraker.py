@@ -13,6 +13,7 @@ from typing import Any
 
 import aiohttp
 
+from .catalog import SpoolMeta
 from .config import PrinterConfig
 from .state import LaneState, PrinterState
 
@@ -94,6 +95,7 @@ class MoonrakerClient:
         on_change: Callable[[PrinterState], None],
         writes: bool,
         low_stock_g: Callable[[], float] = lambda: 100.0,
+        spool_meta: Callable[[int], SpoolMeta | None] = lambda spool_id: None,
         url: str | None = None,
         request_timeout: float = 10.0,
         backoff: tuple[float, float] = (1.0, 30.0),
@@ -104,6 +106,7 @@ class MoonrakerClient:
         self.on_change = on_change
         self.writes = writes
         self.low_stock_g = low_stock_g
+        self.spool_meta = spool_meta
         self.url = url or printer.websocket_url
         self.request_timeout = request_timeout
         self.backoff = backoff
@@ -296,13 +299,19 @@ class MoonrakerClient:
             raw = self._status.get(self._lane_objects[lane], {})
             spool_id = _int_or_none(raw.get("spool_id"))
             remaining = _float_or_none(raw.get("weight")) if spool_id is not None else None
+            color = normalize_color(raw.get("color"))
+            meta = self.spool_meta(spool_id) if spool_id is not None else None
+            pct = None
+            if meta is not None and meta.initial_g and remaining is not None:
+                pct = round(max(0.0, min(100.0, remaining / meta.initial_g * 100.0)), 1)
+            colors = list(meta.colors) if meta is not None and meta.colors else ([color] if color else [])
             lanes.append(
                 LaneState(
                     lane=lane,
                     map=raw.get("map") or None,
                     spool_id=spool_id,
                     material=raw.get("material") or None,
-                    color=normalize_color(raw.get("color")),
+                    color=color,
                     remaining_g=remaining,
                     filament_status=raw.get("filament_status") or None,
                     status=raw.get("status") or None,
@@ -310,6 +319,8 @@ class MoonrakerClient:
                     load=bool(raw.get("load")),
                     tool_loaded=bool(raw.get("tool_loaded")),
                     low_stock=remaining is not None and remaining < threshold,
+                    remaining_pct=pct,
+                    colors=colors,
                 )
             )
         message = afc.get("message")

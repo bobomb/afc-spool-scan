@@ -68,6 +68,8 @@ struct SpoolInfo {
     std::string name;
     std::string material;
     std::string color;
+    // Every filament colour (Spoolman multi_color_hexes); `color` is the first.
+    std::vector<std::string> colors;
     std::optional<double> remaining_g;
     std::optional<double> spool_weight_g;
     std::optional<double> expected_gross_g;
@@ -87,7 +89,10 @@ struct Lane {
     std::optional<int> spool_id;
     std::string material;
     std::string color;
+    std::vector<std::string> colors;
     std::optional<double> remaining_g;
+    // Remaining as a share of the spool's initial weight in Spoolman (0-100).
+    std::optional<double> remaining_pct;
     std::string filament_status;
     std::string status;
     bool prep = false;

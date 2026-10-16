@@ -32,10 +32,11 @@ def find_ui() -> Path | None:
 
 FLOW = """
 request sim.scale {"grams": 640}
+tap 300 76
 type 97
 key enter
 wait 500
-tap 554 332
+tap 646 394
 wait 1200
 shot weighed
 tap 732 452
@@ -54,8 +55,8 @@ async def test_ui_confirmation_applies_to_the_original_spool(station: Station, t
     script = tmp_path / "confirm.script"
     script.write_text(
         'request sim.scale {"grams": 984}\n'
-        "type 97\nkey enter\nwait 500\n"
-        "tap 383 332\nwait 800\nshot confirm\n"
+        "tap 300 76\ntype 97\nkey enter\nwait 500\n"
+        "tap 267 394\nwait 800\nshot confirm\n"
         'request set_setting {"key": "scan_mode", "value": "fill"}\n'
         'request sim.scan {"code": "web+spoolman:s-86"}\nwait 800\n'
         "tap 514 377\nwait 1000\nshot saved\n",
@@ -80,10 +81,10 @@ async def test_ui_lane_assignment_needs_explicit_confirm(station: Station, tmp_p
         pytest.skip("station-ui is not built")
     script = tmp_path / "assign.script"
     script.write_text(
-        "type 97\nkey enter\nwait 400\n"
-        "screen printers\ntap 202 376\nwait 400\nshot dialog\n"
+        "tap 300 76\ntype 97\nkey enter\nwait 400\n"
+        "screen printers\ntap 260 328\nwait 400\nshot dialog\n"
         "tap 196 404\nwait 500\n"
-        "tap 202 376\nwait 400\ntap 554 404\nwait 800\n",
+        "tap 260 328\nwait 400\ntap 554 404\nwait 800\n",
         encoding="utf-8",
     )
     process = await asyncio.create_subprocess_exec(
@@ -105,9 +106,9 @@ async def test_ui_numpad_clear_deselects_the_spool(station: Station, tmp_path: P
     script = tmp_path / "clear.script"
     script.write_text(
         'request sim.scale {"grams": 640}\n'
-        "type 97\nkey enter\nwait 600\nshot selected\n"
-        "tap 54 396\nwait 600\nshot cleared\n"
-        "tap 383 332\nwait 600\n",
+        "tap 300 76\ntype 97\nkey enter\nwait 600\nshot selected\n"
+        "tap 300 76\nwait 300\ntap 280 398\nwait 300\ntap 560 52\nwait 600\nshot cleared\n"
+        "tap 267 394\nwait 600\n",
         encoding="utf-8",
     )
     process = await asyncio.create_subprocess_exec(
@@ -119,6 +120,31 @@ async def test_ui_numpad_clear_deselects_the_spool(station: Station, tmp_path: P
     assert station.store.spool is None and station.store.scale.check is None
     assert station.store.activity == []
     assert station.sim_spoolman.spools[97]["used_weight"] == pytest.approx(545.3)
+
+
+@pytest.mark.e2e
+async def test_ui_printer_cards_change_the_load_target(station: Station, tmp_path: Path) -> None:
+    exe = find_ui()
+    if exe is None:
+        pytest.skip("station-ui is not built")
+    script = tmp_path / "target.script"
+    script.write_text(
+        "tap 300 76\ntype 93\nkey enter\nwait 500\n"
+        "tap 614 200\nwait 600\nshot kilo-only\n"
+        "tap 258 200\nwait 600\n"
+        "tap 425 394\nwait 900\n",
+        encoding="utf-8",
+    )
+    process = await asyncio.create_subprocess_exec(
+        str(exe), "--snapshot", str(tmp_path / "shots"), "--connect", "--port", str(station.ipc_port),
+        "--script", str(script), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    _, stderr = await asyncio.wait_for(process.communicate(), 90)
+    assert process.returncode == 0, stderr.decode(errors="replace")
+    assert station.store.settings["target"] == "kilo"
+    assert station.sim_printers.printers["kilo"].next_spool_id == 93
+    assert station.sim_printers.printers["yankee"].next_spool_id is None
+    assert [(e["action"], e["spool_id"]) for e in station.store.activity] == [("load", 93)]
 
 
 @pytest.mark.e2e

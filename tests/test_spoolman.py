@@ -9,6 +9,7 @@ from station.spoolman import (
     SpoolmanError,
     SpoolNotFound,
     spool_color,
+    spool_colors,
     spool_info_from_api,
     spool_tare,
 )
@@ -148,3 +149,7 @@ def test_tare_and_color_helpers() -> None:
     assert spool_tare({"filament": {"vendor": {"empty_spool_weight": None}}}) == (None, None)
     assert spool_color({"color_hex": "ff00aa"}) == "#FF00AA"
     assert spool_color({"color_hex": ""}) is None
+    assert spool_colors({"multi_color_hexes": "c94ce0,#33b5e5, f2c14e", "color_hex": "000000"}) == [
+        "#C94CE0", "#33B5E5", "#F2C14E"]
+    assert spool_colors({"color_hex": "ff00aa"}) == ["#FF00AA"]
+    assert spool_colors({}) == [] and spool_colors({"multi_color_hexes": " "}) == []

@@ -3,6 +3,7 @@
 #include <cstdio>
 
 #include "format.hpp"
+#include "view_model.hpp"
 
 namespace station {
 namespace {
@@ -37,6 +38,8 @@ App::App(Platform& platform, Options options) : platform_(platform), options_(st
     assign_ = std::make_unique<AssignDialog>(*this);
     countdown_ = std::make_unique<CountdownOverlay>(*this);
     status_ = std::make_unique<StatusOverlay>(*this);
+    keypad_ = std::make_unique<KeypadSheet>(*this);
+    more_ = std::make_unique<MoreMenu>(*this);
 }
 
 App::~App()
@@ -84,7 +87,7 @@ void App::build_ui()
     printers_ = std::make_unique<PrintersScreen>(*this, root_);
     log_ = std::make_unique<LogScreen>(*this, root_);
     settings_ = std::make_unique<SettingsScreen>(*this, root_);
-    header_ = std::make_unique<Header>(*this, root_);
+    rail_ = std::make_unique<SideRail>(*this, root_);
     banner_ = std::make_unique<ResultBanner>(*this, root_);
     banner_->show(banner_message_.text.empty() ? BannerMessage{BannerMessage::Kind::Idle, "Ready", ""}
                                                : banner_message_);
@@ -96,8 +99,10 @@ void App::destroy_ui()
     confirm_->close();
     assign_->close();
     countdown_->close();
+    keypad_->close();
+    more_->close();
     status_->reset();
-    header_.reset();
+    rail_.reset();
     main_.reset();
     printers_.reset();
     log_.reset();
@@ -185,9 +190,6 @@ void App::load_sample(const json& sample)
     if (!connected) {
         topics |= model_.set_connected(false);
     }
-    if (sample.contains("entry") && sample["entry"].is_string()) {
-        entry_ = sample["entry"].get<std::string>();
-    }
     last_scan_at_ = state().scan.at;
     if (!state().activity.empty()) {
         last_activity_top_ = state().activity.front().id;
@@ -202,6 +204,10 @@ void App::load_sample(const json& sample)
         theme_name_ = state().settings.theme;
         destroy_ui();
         build_ui();
+    }
+    if (sample.contains("keypad") && sample["keypad"].is_string()) {
+        entry_ = sample["keypad"].get<std::string>();
+        keypad_->show();
     }
     refresh(topics | kTopicAll);
 }
@@ -288,7 +294,8 @@ void App::refresh(std::uint32_t topics)
         last_scan_at_ = s.scan.at;
         idle_->wake();
         if (s.scan.spool_id) {
-            entry_ = std::to_string(*s.scan.spool_id);
+            entry_.clear();
+            close_keypad();
             show(ScreenId::Main);
         } else {
             banner({BannerMessage::Kind::Warn, "Ignored QR code: " + s.scan.last_code, ""});
@@ -310,8 +317,8 @@ void App::refresh(std::uint32_t topics)
         }
     }
 
-    if (header_) header_->update(s, is_online);
-    if (main_) main_->update(s, topics, is_online, entry_);
+    if (rail_) rail_->update(s, is_online);
+    if (main_) main_->update(s, topics, is_online);
     if (printers_ && (topics & (kTopicPrinters | kTopicConnection | kTopicService | kTopicSettings))) {
         printers_->update(s, is_online);
     }
@@ -337,7 +344,9 @@ void App::refresh(std::uint32_t topics)
     if (!is_online) {
         confirm_->close();
         assign_->close();
+        more_->close();
     }
+    keypad_->update(entry_);
     sync_prompt();
 }
 
@@ -378,11 +387,12 @@ void App::show(ScreenId screen)
 {
     screen_ = screen;
     if (!main_) return;
+    more_->close();
     ui::set_hidden(main_->root(), screen != ScreenId::Main);
     ui::set_hidden(printers_->root(), screen != ScreenId::Printers);
     ui::set_hidden(log_->root(), screen != ScreenId::Log);
     ui::set_hidden(settings_->root(), screen != ScreenId::Settings);
-    header_->set_active(screen);
+    rail_->set_active(screen);
 }
 
 void App::entry_digit(char digit)
@@ -391,37 +401,44 @@ void App::entry_digit(char digit)
         return;
     }
     entry_.push_back(digit);
-    refresh(kTopicSpool);
+    keypad_->update(entry_);
 }
 
 void App::entry_backspace()
 {
     if (!entry_.empty()) {
         entry_.pop_back();
-        refresh(kTopicSpool);
+        keypad_->update(entry_);
     }
 }
 
 void App::entry_clear()
 {
     entry_.clear();
+    keypad_->update(entry_);
     if (state().spool && online()) {
         request("clear_spool", json::object(), [this](const Result& result) {
             if (!result.ok) show_result(result);
         });
     }
-    refresh(kTopicSpool);
 }
 
 void App::entry_submit()
 {
-    const auto id = spool_id();
-    if (!id) {
+    int id = 0;
+    try {
+        id = entry_.empty() ? 0 : std::stoi(entry_);
+    } catch (...) {
+        id = 0;
+    }
+    if (id <= 0) {
         banner({BannerMessage::Kind::Warn, "Type a spool ID first", ""});
         return;
     }
-    banner({BannerMessage::Kind::Info, "Looking up spool #" + std::to_string(*id) + "...", ""});
-    request("lookup", {{"spool_id", *id}});
+    entry_.clear();
+    close_keypad();
+    banner({BannerMessage::Kind::Info, "Looking up spool #" + std::to_string(id) + "...", ""});
+    request("lookup", {{"spool_id", id}});
 }
 
 void App::handle_key(const std::string& key)
@@ -431,9 +448,10 @@ void App::handle_key(const std::string& key)
     }
     if (key.size() == 1 && key[0] >= '0' && key[0] <= '9') {
         if (screen_ != ScreenId::Main) show(ScreenId::Main);
+        open_keypad();
         entry_digit(key[0]);
     } else if (key == "enter") {
-        entry_submit();
+        if (keypad_->open()) entry_submit();
     } else if (key == "backspace") {
         entry_backspace();
     } else if (key == "clear") {
@@ -443,18 +461,43 @@ void App::handle_key(const std::string& key)
 
 std::optional<int> App::spool_id() const
 {
-    if (!entry_.empty()) {
-        try {
-            const int id = std::stoi(entry_);
-            if (id > 0) return id;
-        } catch (...) {
-        }
-        return std::nullopt;
-    }
     if (state().spool && state().spool->found) {
         return state().spool->id;
     }
     return std::nullopt;
+}
+
+void App::open_keypad()
+{
+    more_->close();
+    keypad_->show();
+    keypad_->update(entry_);
+}
+
+void App::close_keypad()
+{
+    entry_.clear();
+    keypad_->close();
+}
+
+void App::open_more()
+{
+    const auto id = spool_id();
+    if (id) more_->show(*id);
+}
+
+void App::toggle_target(const std::string& key)
+{
+    std::vector<std::string> keys;
+    for (const Printer& printer : state().printers) keys.push_back(printer.key);
+    const auto next = station::toggle_target(state().settings.target, keys, key);
+    if (!next) {
+        banner({BannerMessage::Kind::Warn, "Keep at least one printer included", ""});
+        return;
+    }
+    if (*next != state().settings.target) {
+        set_setting("target", *next);
+    }
 }
 
 void App::request(const std::string& action, const json& args, ResultHandler done)

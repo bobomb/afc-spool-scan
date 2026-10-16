@@ -53,6 +53,18 @@ double number_or(const json& data, const char* key, double fallback)
     return number(data, key).value_or(fallback);
 }
 
+std::vector<std::string> strings(const json& data, const char* key)
+{
+    std::vector<std::string> out;
+    const json& value = field(data, key);
+    if (value.is_array()) {
+        for (const json& item : value) {
+            if (item.is_string() && !item.get<std::string>().empty()) out.push_back(item.get<std::string>());
+        }
+    }
+    return out;
+}
+
 }  // namespace
 
 ScaleState parse_scale(const json& data)
@@ -114,6 +126,8 @@ std::optional<SpoolInfo> parse_spool(const json& data)
     spool.name = str(data, "name");
     spool.material = str(data, "material");
     spool.color = str(data, "color");
+    spool.colors = strings(data, "colors");
+    if (spool.colors.empty() && !spool.color.empty()) spool.colors.push_back(spool.color);
     spool.remaining_g = number(data, "remaining_g");
     spool.spool_weight_g = number(data, "spool_weight_g");
     spool.expected_gross_g = number(data, "expected_gross_g");
@@ -161,7 +175,10 @@ Printer parse_printer(const json& data)
             lane.spool_id = integer(item, "spool_id");
             lane.material = str(item, "material");
             lane.color = str(item, "color");
+            lane.colors = strings(item, "colors");
+            if (lane.colors.empty() && !lane.color.empty()) lane.colors.push_back(lane.color);
             lane.remaining_g = number(item, "remaining_g");
+            lane.remaining_pct = number(item, "remaining_pct");
             lane.filament_status = str(item, "filament_status");
             lane.status = str(item, "status");
             lane.prep = boolean(item, "prep");

@@ -14,6 +14,8 @@ std::string fmt_number(double value, int decimals);
 std::string fmt_grams(std::optional<double> grams, int decimals = 0);
 // "+349 g" / "-12 g".
 std::string fmt_delta(double grams);
+// "70%"; values between 0 and 1 show "<1%" so a nearly empty spool never reads 0%.
+std::string fmt_percent(double pct);
 std::string scale_status_label(const std::string& status);
 std::string print_state_label(const std::string& state, std::optional<double> progress);
 std::string action_label(const std::string& action);

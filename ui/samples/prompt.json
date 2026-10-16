@@ -60,10 +60,13 @@
       "used_weight_g": 545.3,
       "tare_source": "spool",
       "location": "Dry box A",
-      "last_used": "2026-10-15T15:05:17Z",
+      "last_used": "2026-10-16T01:59:55Z",
       "archived": false,
       "low_stock": false,
-      "message": null
+      "message": null,
+      "colors": [
+        "#FFFFFF"
+      ]
     },
     "printers": [
       {
@@ -92,7 +95,11 @@
             "prep": true,
             "load": true,
             "tool_loaded": false,
-            "low_stock": false
+            "low_stock": false,
+            "remaining_pct": 88.8,
+            "colors": [
+              "#F5F5F5"
+            ]
           },
           {
             "lane": "lane2",
@@ -106,7 +113,11 @@
             "prep": true,
             "load": true,
             "tool_loaded": true,
-            "low_stock": false
+            "low_stock": false,
+            "remaining_pct": 61.2,
+            "colors": [
+              "#1A1A1A"
+            ]
           },
           {
             "lane": "lane3",
@@ -120,7 +131,11 @@
             "prep": true,
             "load": true,
             "tool_loaded": false,
-            "low_stock": true
+            "low_stock": true,
+            "remaining_pct": 7.4,
+            "colors": [
+              "#1E5AA8"
+            ]
           },
           {
             "lane": "lane4",
@@ -134,7 +149,9 @@
             "prep": false,
             "load": false,
             "tool_loaded": false,
-            "low_stock": false
+            "low_stock": false,
+            "remaining_pct": null,
+            "colors": []
           }
         ]
       },
@@ -164,7 +181,11 @@
             "prep": true,
             "load": true,
             "tool_loaded": false,
-            "low_stock": false
+            "low_stock": false,
+            "remaining_pct": 95.0,
+            "colors": [
+              "#D32F2F"
+            ]
           },
           {
             "lane": "lane2",
@@ -178,7 +199,11 @@
             "prep": true,
             "load": true,
             "tool_loaded": true,
-            "low_stock": false
+            "low_stock": false,
+            "remaining_pct": 32.0,
+            "colors": [
+              "#F57C00"
+            ]
           },
           {
             "lane": "lane3",
@@ -192,7 +217,13 @@
             "prep": true,
             "load": true,
             "tool_loaded": false,
-            "low_stock": false
+            "low_stock": false,
+            "remaining_pct": 70.1,
+            "colors": [
+              "#C94CE0",
+              "#33B5E5",
+              "#F2C14E"
+            ]
           },
           {
             "lane": "lane4",
@@ -206,7 +237,11 @@
             "prep": true,
             "load": true,
             "tool_loaded": false,
-            "low_stock": true
+            "low_stock": true,
+            "remaining_pct": 4.5,
+            "colors": [
+              "#8A8D91"
+            ]
           }
         ]
       }
@@ -348,6 +383,5 @@
   },
   "screens": [
     "main"
-  ],
-  "entry": "97"
+  ]
 }

@@ -24,7 +24,8 @@ const char* kSnapshot = R"({
      "afc_state": "Idle", "afc_error": null, "current_load": "lane2", "pending_spool": 97,
      "pending_confirmed": true,
      "lanes": [{"lane": "lane1", "map": "T0", "spool_id": 84, "material": "PLA", "color": "#FFFFFF",
-                "remaining_g": 888.0, "filament_status": "Ready", "tool_loaded": false, "low_stock": false},
+                "remaining_g": 888.0, "filament_status": "Ready", "tool_loaded": false, "low_stock": false,
+                "remaining_pct": 88.8, "colors": ["#FFFFFF", "#33B5E5"]},
                {"lane": "lane4", "map": "T3", "spool_id": null, "material": null, "color": null,
                 "remaining_g": null, "filament_status": "Not Ready", "tool_loaded": false}]}
   ],
@@ -56,7 +57,13 @@ TEST_CASE("snapshot populates the full state")
     REQUIRE(s.spool);
     CHECK(s.spool->vendor == "Sunlu");
     CHECK(s.spool->location.empty());
+    CHECK(s.spool->colors == std::vector<std::string>{"#FFFFFF"});
     REQUIRE(s.printers.size() == 1);
+    REQUIRE(s.printers[0].lanes.size() == 2);
+    CHECK(*s.printers[0].lanes[0].remaining_pct == doctest::Approx(88.8));
+    CHECK(s.printers[0].lanes[0].colors == std::vector<std::string>{"#FFFFFF", "#33B5E5"});
+    CHECK_FALSE(s.printers[0].lanes[1].remaining_pct.has_value());
+    CHECK(s.printers[0].lanes[1].colors.empty());
     CHECK(s.printers[0].pending_spool == 97);
     REQUIRE(s.printers[0].lanes.size() == 2);
     CHECK(s.printers[0].lanes[0].spool_id == 84);

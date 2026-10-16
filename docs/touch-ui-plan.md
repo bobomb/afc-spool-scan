@@ -184,28 +184,66 @@ Rules carried over from the current scanner behaviour:
 |---|---|---|
 | 4 | Unload and return to shelf (weigh on removal, clear lane, set location) | Not wanted. |
 
-## 5. Screens and layout — **Proposed**
+## 5. Screens and layout — **Decided** (re-layout 2026-10-15; §5.2–5.4 Proposed)
 
 Resolution 800×480 landscape (Hosyond panel, §2.1). Minimum touch target
-64 px (≈ 12 mm on this panel).
+64 px (≈ 12 mm on this panel), 60 px for the action bar.
 
-### 5.1 Main
+### 5.0 Frame
+
+A 72 px side rail on the left: **Station**, **Printers**, **Log** and, at the
+bottom, **Settings**. Above Settings, one status line replaces the per-service
+dots: "All OK", or the most serious problem first ("Yankee offline", "Scale
+off", "Spoolman down") with "+N" for the rest, and "SIM" / "DRY RUN" when
+applicable. The last result with **Undo** runs along the bottom of every
+screen.
+
+### 5.1 Station (main)
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ ●Spoolman ●Kilo ●Yankee ●Scale   [Main][Printers][Log]  ⚙  │
-├───────────────────────┬──────────────────────────────────────┤
-│ SCALE  984.0 g ✓      │ SPOOL [ 97              ⌫ ]          │
-│ filament ≈ 804 g      │ ■ Sunlu ABS White · 455 g left       │
-├───────────────────────┤ ⚠ measured differs by +349 g         │
-│   7     8     9       ├──────────────────────────────────────┤
-│   4     5     6       │ Target: [Kilo] [Yankee] [Both]      │
-│   1     2     3       │ [WEIGH] [WEIGH + LOAD] [LOAD]        │
-│   C     0     ⏎       │ [Assign lane…] [Empty spool]         │
-├───────────────────────┴──────────────────────────────────────┤
-│ ✓ Spool 97: 984 g saved · next spool set on Kilo   [Undo]  │
-└──────────────────────────────────────────────────────────────┘
+┌────┬─────────────────────────────────────────────────────────┐
+│ ⌂  │ ┌──────┐ #93 · Polymaker                │ ON SCALE   ⌨ │
+│Stat│ │ 70%  │ Panchroma Silk Rainbow         │ 841.0 g      │
+│ 🖶 │ │ left │ PLA · Dry box B                │ ✓ Matches    │
+│Prnt│ └──────┘ 701 g left · tare 140 g        │   Spoolman   │
+│ ☰  │ LOAD TO · tap a printer to include or exclude it        │
+│Log │ ┌ Kilo  Complete      ✓ ┐ ┌ Yankee  Printing 42%   ✓ ┐ │
+│    │ │ [89%][61%][ 7%][ – ]  │ │ [95%][32%][ ? ][ 5%]     │ │
+│ ●  │ │  PLA  PLA PETG Empty  │ │  PLA PETG Untag ABS      │ │
+│AllOK│ │ ↓ Next spool #93      │ │ ↓ Next spool #93          │ │
+│    │ [More] [ Weigh ] [ Load ] [     Weigh + Load      ]    │
+│ ⚙  │ ✓ Spool 93: 841 g saved; next spool set on…   [Undo]   │
+└────┴─────────────────────────────────────────────────────────┘
 ```
+
+- **Top box (selected spool + scale).** A rounded tile filled with the
+  filament colour (a diagonal gradient through every colour of a
+  multi-colour spool) carries a ring of remaining filament (% of the
+  spool's initial weight) with "70% left". Next to it: spool #, vendor,
+  name, material, location, remaining and tare; on the right the scale
+  weight and the Spoolman check ("Matches Spoolman", "Off by +349 g",
+  "Scale empty", "Scale off"). Tapping anywhere on the box opens the
+  keypad. With no spool selected the box shows a dashed "Type ID" tile,
+  "Scan a spool / or tap here to type its ID"; an unknown ID shows "Not
+  found in Spoolman".
+- **Load-to printer cards.** One card per printer replaces the Target
+  selector. Tapping a card includes or excludes that printer (both included
+  means Both; the last included printer cannot be removed); the same setting
+  is on Settings. An excluded card dims and reads "Not included · tap to
+  include". The pending next spool is at the bottom of each card.
+- **Lane tiles.** Each lane is a rounded tile filled with the lane spool's
+  colour(s), with its remaining ring, %, material and spool # in white or
+  near-black, whichever has the higher contrast (WCAG) on that fill. Low
+  stock is an amber "LOW" pill next to the spool #, below the ring. The lane
+  loaded in the tool has a blue outline. Empty lanes are a hollow outline;
+  untagged lanes a grey tile with "?".
+- **Action bar.** **More** (Assign to lane…, Record empty spool), **Weigh**,
+  **Load** and **Weigh + Load** (primary). All four are disabled until a
+  spool is selected.
+- **Keypad.** A sheet over the screen: digits, backspace, **Clear** (also
+  deselects the spool, like Esc), **Look up**; × or a tap outside closes it.
+  A digit on a hardware keyboard opens it with that digit typed. A scan
+  closes it and selects the scanned spool.
 
 ### 5.2 Printers
 
@@ -225,19 +263,20 @@ undoable entries.
 
 ### 5.4 Settings
 
-Target printer default, scan mode, thresholds, idle timeout, brightness
-(only if a software backlight is available, §2.1), theme/skin.
-Implemented without the brightness control, which waits for Phase 0 to show
-whether `/sys/class/backlight` exists.
+Load to (same as the printer cards), scan mode, thresholds, idle timeout,
+brightness (only if a software backlight is available, §2.1), theme/skin.
+Implemented without the brightness control.
 
 ### 5.5 Styling
 
 - Custom LVGL theme extending the default theme (primary/secondary palette,
-  font sizes small/normal/large, large digits for scale weight).
-- State styles: pressed feedback, `CHECKED` outline for the selected target.
-- Lane swatches use AFC lane `color` values.
+  Montserrat 12–48, large digits for scale weight).
+- No borders for grouping: filled surfaces and spacing; only the main action
+  is filled blue; sentence-case buttons.
+- Filament colours come from Spoolman (`color_hex`, or every colour of
+  `multi_color_hexes`), falling back to the AFC lane `color`.
 - Use shadows/blur sparingly for render performance.
-- **Open:** dark, light, or both with a toggle.
+- Dark default with a light theme in Settings.
 
 ## 6. Data sources
 
@@ -354,14 +393,9 @@ Detailed tasks: dev plan §8.
     2026-10-14: yes, `/sys/class/backlight/10-0045` (§2.1).
 11. Mounting orientation (landscape assumed; landscape verified on the
     panel as currently placed, 2026-10-15).
-12. Main screen re-layout to reduce clutter (2026-10-15). Mockups:
-    A spool first with the keypad on demand, B Identify → Check → Act
-    columns, C printer cards as the Load target, D side navigation rail
-    with collapsed status. The user prefers C with D's side rail. Lanes are
-    tiles filled with the filament colour, with the remaining ring, % and
-    material on top in white or near-black (whichever contrasts more); the
-    selected spool uses the same filled tile (mockups E3, E5). Awaiting
-    go-ahead to build.
+12. ~~Main screen re-layout to reduce clutter.~~ Decided 2026-10-15:
+    option C (printer cards as the Load target) with D's side rail, filled
+    lane and spool tiles, tap the top box for the keypad, More menu (§5).
 
 ## Decision log
 
@@ -378,3 +412,4 @@ Detailed tasks: dev plan §8.
 | 2026-10-13 | UI language changed from C to C++20 (LVGL v9.6 C API, nlohmann/json); Rust bindings considered and not chosen (no maintained LVGL 9.6 binding). |
 | 2026-10-14 | Default assignment is the next loaded spool (`SET_NEXT_SPOOL_ID`), as the scripts do; lane assignment (`SET_SPOOL_ID`) only when explicitly chosen and confirmed in the Assign dialog. |
 | 2026-10-15 | Empty spool also sets the filament's default `spool_weight` to the measured weight (§4.2 #5, §7). |
+| 2026-10-15 | Main screen re-layout (§5): side rail with one status line; top box with the selected spool as a filament-coloured tile (gradient for multi-colour spools) with remaining ring, tap to open the keypad; printer cards are the Load target (any subset of printers); lanes as filament-coloured tiles with remaining ring and contrast-picked text; More menu for Assign lane and Empty spool. |

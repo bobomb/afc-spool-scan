@@ -16,8 +16,8 @@ void StatusOverlay::set_offline(bool offline, const std::string& text)
     }
     if (offline_ == nullptr) {
         offline_ = ui::container(lv_layer_sys());
-        lv_obj_set_size(offline_, layout::kWidth, layout::kHeight - layout::kHeaderH);
-        lv_obj_set_pos(offline_, 0, layout::kHeaderH);
+        lv_obj_set_size(offline_, layout::kContentW, layout::kHeight);
+        lv_obj_set_pos(offline_, layout::kContentX, 0);
         lv_obj_set_style_bg_color(offline_, theme.bg(), 0);
         lv_obj_set_style_bg_opa(offline_, LV_OPA_80, 0);
         lv_obj_set_clickable(offline_, true);

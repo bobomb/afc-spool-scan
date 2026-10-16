@@ -48,17 +48,27 @@ def atomic_write_text(path: Path, text: str) -> None:
 class Settings:
     def __init__(self, path: Path | None, targets: Sequence[str]) -> None:
         self.path = path
-        self.targets = ("both", *targets)
+        self.printer_keys = tuple(targets)
         self.values: dict[str, Any] = dict(DEFAULTS)
+
+    def _validate_target(self, value: Any) -> str:
+        """'both', or printer keys (comma-separated) normalised to config order; all of them is 'both'."""
+        text = value.strip().lower() if isinstance(value, str) else ""
+        if text == "both":
+            return text
+        names = [name.strip() for name in text.split(",") if name.strip()]
+        if not names or len(set(names)) != len(names) or any(name not in self.printer_keys for name in names):
+            choices = ", ".join(("both", *self.printer_keys))
+            raise SettingsError(f"target must be 'both' or a comma-separated list of: {choices}")
+        if set(names) == set(self.printer_keys):
+            return "both"
+        return ",".join(key for key in self.printer_keys if key in names)
 
     def validate(self, key: str, value: Any) -> Any:
         if key not in DEFAULTS:
             raise SettingsError(f"unknown setting {key!r}")
         if key == "target":
-            text = str(value).lower() if isinstance(value, str) else None
-            if text not in self.targets:
-                raise SettingsError(f"target must be one of {', '.join(self.targets)}")
-            return text
+            return self._validate_target(value)
         if key == "scan_mode":
             if value not in SCAN_MODES:
                 raise SettingsError(f"scan_mode must be one of {', '.join(SCAN_MODES)}")

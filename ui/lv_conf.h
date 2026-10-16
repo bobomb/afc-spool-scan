@@ -43,12 +43,18 @@
 #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
 #define LV_LOG_PRINTF 1
 
-#define LV_FONT_MONTSERRAT_14 0
+#define LV_FONT_MONTSERRAT_12 1
+#define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1
+#define LV_FONT_MONTSERRAT_18 1
 #define LV_FONT_MONTSERRAT_22 1
 #define LV_FONT_MONTSERRAT_28 1
 #define LV_FONT_MONTSERRAT_48 1
 #define LV_FONT_DEFAULT LV_FONT_DEFAULT_MONTSERRAT_16
+
+/* Multi-colour spools fill their tile with a diagonal gradient of up to four colours. */
+#define LV_GRADIENT_MAX_STOPS 4
+#define LV_USE_DRAW_SW_COMPLEX_GRADIENTS 1
 
 #define LV_USE_THEME_DEFAULT 1
 #define LV_THEME_DEFAULT_DARK 1

@@ -15,6 +15,7 @@ from . import __version__
 from .actions import Actions
 from .activity import ActivityLog
 from .audio import Audio
+from .catalog import SpoolCatalog
 from .config import Config
 from .ipc import PROTOCOL, IpcServer
 from .printers import PrinterManager
@@ -67,6 +68,7 @@ class Station:
         self.scanner: Any = None
         self.printers: PrinterManager | None = None
         self.spoolman: SpoolmanClient | None = None
+        self.catalog: SpoolCatalog | None = None
         self.actions: Actions | None = None
         self.scan_flow: ScanFlow | None = None
         self.ipc: IpcServer | None = None
@@ -89,6 +91,10 @@ class Station:
 
     def _on_spoolman_health(self, healthy: bool) -> None:
         self.store.set_health(replace(self.store.health, spoolman=healthy))
+
+    def _on_catalog_update(self) -> None:
+        if self.printers is not None:
+            self.printers.refresh()
 
     def _on_scan(self, code: str) -> None:
         if self.scan_flow is not None:
@@ -140,10 +146,11 @@ class Station:
 
         self.spoolman = SpoolmanClient(spoolman_url, self.session, writes=config.writes_enabled("spoolman"),
                                        on_health=self._on_spoolman_health)
+        self.catalog = SpoolCatalog(self.spoolman, self._on_catalog_update)
         self.printers = PrinterManager(
             config.printers, self.session, on_change=self.store.set_printer,
             writes=config.writes_enabled("printers"), low_stock_g=lambda: self.settings["low_stock_g"],
-            urls=urls, backoff=self.printer_backoff, publish_delay=self.publish_delay,
+            spool_meta=self.catalog.get, urls=urls, backoff=self.printer_backoff, publish_delay=self.publish_delay,
         )
         self._create_hardware()
         assert self.scale is not None
@@ -162,6 +169,7 @@ class Station:
         self.actions = Actions(
             config=config, store=self.store, settings=self.settings, activity=self.activity,
             spoolman=self.spoolman, printers=self.printers, scale=self.scale, cues=audio, sim=sim,
+            catalog=self.catalog,
         )
         self.scan_flow = ScanFlow(self.actions, self.store, self.settings, config.spoolman_prefix,
                                   tick_s=self.countdown_tick_s)
@@ -192,7 +200,7 @@ class Station:
             self._health_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._health_task
-        for component in (self.scan_flow, self.scanner, self.scale, self.printers):
+        for component in (self.scan_flow, self.scanner, self.scale, self.printers, self.catalog):
             if component is not None:
                 await component.stop()
         if self.sim_printers is not None:

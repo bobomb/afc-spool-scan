@@ -22,15 +22,18 @@ enum class ScreenId { Main, Printers, Log, Settings };
 namespace layout {
 inline constexpr int kWidth = 800;
 inline constexpr int kHeight = 480;
-inline constexpr int kHeaderH = 56;
-inline constexpr int kBannerH = 52;
-inline constexpr int kBodyH = kHeight - kHeaderH - kBannerH;
+inline constexpr int kRailW = 72;
+inline constexpr int kContentX = kRailW;
+inline constexpr int kContentW = kWidth - kRailW;
+inline constexpr int kBannerH = 56;
+inline constexpr int kBodyH = kHeight - kBannerH;
 inline constexpr int kPad = 8;
+inline constexpr int kMargin = 16;
 }  // namespace layout
 
 namespace ui {
 
-enum class ButtonStyle { Normal, Primary, Danger, Segment };
+enum class ButtonStyle { Normal, Primary, Danger, Segment, Ghost };
 
 lv_obj_t* container(lv_obj_t* parent);
 lv_obj_t* panel(lv_obj_t* parent, Theme& theme);
@@ -49,6 +52,15 @@ void set_checked(lv_obj_t* obj, bool checked);
 // Full-screen dimmer on `layer` with a centered dialog panel; returns the panel.
 lv_obj_t* modal(lv_obj_t* layer, Theme& theme, int width, int height, lv_obj_t** dimmer);
 lv_color_t swatch_color(const std::string& hex, Theme& theme);
+// Fills `obj` with one colour, or a diagonal gradient through several (kept in `grad`, which must
+// outlive the style); a fill too close to `backdrop` gets a thin edge. Returns the white or
+// near-black mark colour that reads best on it.
+lv_color_t fill(lv_obj_t* obj, const std::vector<std::uint32_t>& colors, lv_grad_dsc_t& grad, Theme& theme,
+                std::uint32_t backdrop);
+// Remaining-filament ring: an lv_arc without knob, not clickable.
+lv_obj_t* ring(lv_obj_t* parent, int size, int width);
+// Shows `pct` (0-100) in `mark`, over a 30% track of the same colour; no value draws the track only.
+void set_ring(lv_obj_t* ring, std::optional<double> pct, lv_color_t mark);
 
 }  // namespace ui
 
@@ -59,90 +71,110 @@ struct BannerMessage {
     std::string activity_id;
 };
 
-class Header {
+// Navigation (Station, Printers, Log, Settings) and the one-line connection summary.
+class SideRail {
 public:
-    Header(App& app, lv_obj_t* parent);
+    SideRail(App& app, lv_obj_t* parent);
     void update(const State& state, bool online);
     void set_active(ScreenId screen);
 
 private:
     struct Item {
-        lv_obj_t* dot;
-        lv_obj_t* label;
+        ScreenId screen;
+        lv_obj_t* root;
+        lv_obj_t* icon;
+        lv_obj_t* text;
     };
-    void rebuild_items(const std::vector<std::string>& names);
-
     App& app_;
-    lv_obj_t* health_ = nullptr;
-    lv_obj_t* badge_ = nullptr;
-    lv_obj_t* tabs_[3] = {};
-    lv_obj_t* gear_ = nullptr;
-    std::vector<std::string> names_;
     std::vector<Item> items_;
+    lv_obj_t* badge_ = nullptr;
+    lv_obj_t* status_dot_ = nullptr;
+    lv_obj_t* status_text_ = nullptr;
 };
 
-class ScaleTile {
+// Top box of the station screen: selected spool tile, details and the scale. Tap to type an ID.
+class SpoolHero {
 public:
-    ScaleTile(App& app, lv_obj_t* parent, int x, int y, int w, int h);
+    SpoolHero(App& app, lv_obj_t* parent, int x, int y, int w, int h);
     void update(const State& state, bool online);
 
 private:
     App& app_;
-    lv_obj_t* chip_ = nullptr;
-    lv_obj_t* weight_ = nullptr;
-    lv_obj_t* unit_ = nullptr;
-    lv_obj_t* detail_ = nullptr;
-};
-
-class Numpad {
-public:
-    Numpad(App& app, lv_obj_t* parent, int x, int y, int w, int h);
-
-private:
-    static void on_event(lv_event_t* e);
-    App& app_;
-    lv_obj_t* matrix_ = nullptr;
-};
-
-class SpoolCard {
-public:
-    SpoolCard(App& app, lv_obj_t* parent, int x, int y, int w);
-    void update(const State& state, const std::string& entry);
-    static constexpr int kEntryH = 56;
-    static constexpr int kCardH = 110;
-
-private:
-    App& app_;
-    lv_obj_t* digits_ = nullptr;
-    lv_obj_t* placeholder_ = nullptr;
-    lv_obj_t* backspace_ = nullptr;
-    lv_obj_t* card_ = nullptr;
-    lv_obj_t* swatch_ = nullptr;
+    lv_obj_t* root_ = nullptr;
+    lv_obj_t* tile_ = nullptr;
+    lv_obj_t* ring_ = nullptr;
+    lv_obj_t* pct_ = nullptr;
+    lv_obj_t* sub_ = nullptr;
     lv_obj_t* line1_ = nullptr;
     lv_obj_t* tags_ = nullptr;
-    lv_obj_t* line2_ = nullptr;
+    lv_obj_t* title_ = nullptr;
     lv_obj_t* line3_ = nullptr;
     lv_obj_t* line4_ = nullptr;
+    lv_obj_t* weight_ = nullptr;
+    lv_obj_t* unit_ = nullptr;
+    lv_obj_t* check_ = nullptr;
+    lv_grad_dsc_t grad_{};
 };
 
-class TargetSelector {
+// A printer on the station screen: tap to include or exclude it from Load; lanes as filled tiles.
+class TargetCard {
 public:
-    TargetSelector(App& app, lv_obj_t* parent, int x, int y, int w, int h);
-    void update(const State& state, bool online);
+    TargetCard(App& app, lv_obj_t* parent, int x, int y, int w, int h);
+    void update(const Printer& printer, bool included, bool online);
+    // Owner deletes this before destroying the card: its click handler and tile gradients point into it.
+    lv_obj_t* root() const { return root_; }
 
 private:
-    struct Option {
-        std::string key;
-        lv_obj_t* button;
-        lv_obj_t* title;
-        lv_obj_t* detail;
+    struct LaneTile {
+        lv_obj_t* root;
+        lv_obj_t* ring;
+        lv_obj_t* pct;
+        lv_obj_t* material;
+        lv_obj_t* id;
+        lv_obj_t* low;
+        lv_grad_dsc_t grad;
     };
-    void rebuild(const State& state);
+    void build_tiles(std::size_t count);
 
     App& app_;
-    lv_obj_t* row_ = nullptr;
-    std::vector<Option> options_;
-    std::vector<std::string> keys_;
+    std::string key_;
+    int width_ = 0;
+    lv_obj_t* root_ = nullptr;
+    lv_obj_t* dot_ = nullptr;
+    lv_obj_t* name_ = nullptr;
+    lv_obj_t* state_ = nullptr;
+    lv_obj_t* select_ = nullptr;
+    lv_obj_t* lanes_box_ = nullptr;
+    lv_obj_t* footer_ = nullptr;
+    std::vector<std::unique_ptr<LaneTile>> tiles_;
+};
+
+class KeypadSheet {
+public:
+    explicit KeypadSheet(App& app) : app_(app) {}
+    void show();
+    void close();
+    bool open() const { return dimmer_ != nullptr; }
+    void update(const std::string& entry);
+
+private:
+    App& app_;
+    lv_obj_t* dimmer_ = nullptr;
+    lv_obj_t* digits_ = nullptr;
+    lv_obj_t* lookup_ = nullptr;
+};
+
+// Less frequent spool actions, above the More button.
+class MoreMenu {
+public:
+    explicit MoreMenu(App& app) : app_(app) {}
+    void show(int spool_id);
+    void close();
+    bool open() const { return catcher_ != nullptr; }
+
+private:
+    App& app_;
+    lv_obj_t* catcher_ = nullptr;
 };
 
 class ResultBanner {
@@ -272,17 +304,20 @@ private:
 class MainScreen {
 public:
     MainScreen(App& app, lv_obj_t* parent);
-    void update(const State& state, std::uint32_t topics, bool online, const std::string& entry);
+    void update(const State& state, std::uint32_t topics, bool online);
     lv_obj_t* root() const { return root_; }
 
 private:
     App& app_;
     lv_obj_t* root_ = nullptr;
-    std::unique_ptr<ScaleTile> scale_;
-    std::unique_ptr<Numpad> numpad_;
-    std::unique_ptr<SpoolCard> card_;
-    std::unique_ptr<TargetSelector> target_;
-    std::vector<lv_obj_t*> actions_;
+    std::unique_ptr<SpoolHero> hero_;
+    lv_obj_t* targets_label_ = nullptr;
+    lv_obj_t* no_printers_ = nullptr;
+    std::vector<std::unique_ptr<TargetCard>> cards_;
+    lv_obj_t* more_ = nullptr;
+    lv_obj_t* weigh_ = nullptr;
+    lv_obj_t* load_ = nullptr;
+    lv_obj_t* weigh_load_ = nullptr;
 };
 
 class PrintersScreen {

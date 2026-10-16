@@ -3,57 +3,74 @@
 #   python -m station --hardware sim --printers sim --spoolman sim --writes off
 #   station-ui --snapshot out/tour --connect --script ui/scripts/tour.script
 #
-# Coordinates are for the 800x480 layout. Requests go through the UI's own
-# IPC connection, so sim.* actions only work while the service is simulated.
+# Coordinates are for the 800x480 layout: side rail x 0-72 (Station y 42, Printers 110,
+# Log 178, Settings 438), top spool box y 12-140, printer cards y 174-352 (Kilo x 88-428,
+# Yankee x 444-784), action bar y 364-424 (More 136, Weigh 267, Load 425, Weigh + Load 646).
+# Requests go through the UI's own IPC connection, so sim.* actions only work while the
+# service is simulated.
 
 screen main
-request sim.scale {"grams": 640}
+request sim.scale {"grams": 0}
 wait 400
 shot 01-start
 
-# Type a spool ID, look it up, then Weigh + Load to both printers.
+# Tap the top box, type a spool ID, look it up.
+tap 300 76
+wait 300
 type 97
-key enter
-wait 500
-shot 02-lookup
-tap 554 332
-wait 900
-shot 03-weigh-load
+shot 02-keypad
+tap 520 398
+wait 600
+request sim.scale {"grams": 640}
+wait 400
+shot 03-lookup
 
-# Printers: pending spool on both; tap Kilo lane4 to assign the spool.
-tap 590 28
+# Exclude Yankee from Load by tapping its card, then include it again.
+tap 614 200
+wait 600
+shot 04-kilo-only
+tap 614 200
+wait 600
+
+# Weigh + Load to both printers.
+tap 646 394
+wait 900
+shot 05-weigh-load
+
+# Printers screen; tap Kilo lane4 to assign the spool.
+tap 36 110
 wait 300
-shot 04-printers
-tap 202 376
+shot 06-printers
+tap 260 328
 wait 300
-shot 05-assign-dialog
+shot 07-assign-dialog
 tap 554 404
 wait 900
-shot 06-assigned
+shot 08-assigned
 
-# Log, then undo the assignment from the banner.
-tap 694 28
+# Log, then undo the assignment from the result line.
+tap 36 178
 wait 300
-shot 07-log
+shot 09-log
 tap 732 452
 wait 900
-shot 08-undo
+shot 10-undo
 
 # Sanity check: 984 g is far from the expected 634.7 g, so Weigh asks first.
-tap 486 28
+tap 36 42
 request sim.scale {"grams": 984}
 wait 400
-tap 383 332
+tap 267 394
 wait 700
-shot 09-confirm
+shot 11-confirm
 tap 514 377
 wait 900
-shot 10-confirmed
+shot 12-confirmed
 
 # A scan in immediate mode with a suspicious weight prompts on screen.
 request sim.scan {"code": "WEB+SPOOLMAN:S-86"}
 wait 1200
-shot 11-scan-prompt
+shot 13-scan-prompt
 tap 236 377
 wait 600
 
@@ -61,46 +78,64 @@ wait 600
 request set_setting {"key": "scan_mode", "value": "countdown"}
 request sim.scan {"code": "web+spoolman:s-90"}
 wait 1600
-shot 12-countdown
+shot 14-countdown
 tap 400 342
 wait 600
-shot 13-countdown-cancelled
+shot 15-countdown-cancelled
 request set_setting {"key": "scan_mode", "value": "immediate"}
 
-# Record spool 93 as empty (141 g core, known tare 140 g).
-key clear
+# A multi-colour spool fills its tile with a gradient.
+tap 300 76
+wait 300
 type 93
-key enter
+tap 520 398
+wait 800
+shot 16-multicolor
+
+# More: record spool 93 as empty (141 g core, known tare 140 g).
 request sim.scale {"grams": 141}
 wait 500
-tap 672 396
+tap 136 394
+wait 300
+shot 17-more-menu
+tap 224 320
 wait 400
-shot 14-empty-dialog
+shot 18-empty-dialog
 tap 514 349
 wait 900
-shot 15-empty-recorded
+shot 19-empty-recorded
+
+# Clear deselects the spool.
+tap 300 76
+wait 300
+tap 280 398
+wait 300
+tap 560 52
+wait 600
+shot 20-no-spool
 
 # A printer drops off the network.
 request sim.printer {"printer": "yankee", "op": "disconnect"}
 wait 600
-tap 590 28
+shot 21-printer-offline
+tap 36 110
 wait 300
-shot 16-printer-offline
+shot 22-printers-offline
 request sim.printer {"printer": "yankee", "op": "connect"}
 
 # Light theme from Settings.
-tap 770 28
+tap 36 438
 wait 300
-tap 684 229
+tap 683 181
 wait 1500
-shot 17-light-settings
-tap 486 28
+shot 23-light-settings
+tap 36 42
 wait 300
-shot 18-light-main
+shot 24-light-main
 request set_setting {"key": "theme", "value": "dark"}
 wait 1200
 
 # Idle blanking.
 idle off
-shot 19-blank
+shot 25-blank
 idle wake

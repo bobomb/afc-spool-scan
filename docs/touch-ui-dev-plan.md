@@ -84,6 +84,7 @@ afc-spool-scan/
 │  ├─ settings.py              UI-changeable settings (JSON)
 │  ├─ audio.py                 wraps audible-cue.py; no-op on Windows
 │  ├─ spoolman.py              Spoolman REST client
+│  ├─ catalog.py               cached Spoolman details (initial weight, colours) for lanes
 │  ├─ moonraker.py             Moonraker WebSocket client
 │  ├─ printers.py              all printers, target resolution
 │  ├─ scale/{dymo.py,source.py,hidraw.py,sim.py}
@@ -96,7 +97,7 @@ afc-spool-scan/
 ├─ tests/                      pytest
 ├─ ui/                         LVGL C++ application
 │  ├─ CMakeLists.txt, CMakePresets.json, lv_conf.h
-│  ├─ src/{main.cpp, app.cpp, platform_*.cpp, ipc_client.cpp, model.cpp, theme.cpp, screens/, widgets/}
+│  ├─ src/{main.cpp, app.cpp, platform_*.cpp, ipc_client.cpp, model.cpp, view_model.cpp, theme.cpp, screens/, widgets/, fonts/}
 │  ├─ tests/                   doctest unit tests
 │  ├─ samples/*.json           sample states for snapshot mode
 │  └─ scripts/tour.script      scripted screenshot tour
@@ -240,8 +241,8 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `service` | `version`, `protocol`, `hardware`, `printers`, `spoolman`, `writes`, `dry_run` (writes off with a live service) |
 | `scale` | `stable`; derived against the current spool: `tare_g`, `net_g`, `expected_g`, `delta_g`, `check` (`ok`, `warn`, `tare_unknown` or null) — the sanity rule stays in the service |
 | `scan` | `countdown` `{spool_id, action, remaining_s}` (published each second) and `prompt` `{kind: "confirm_weigh", spool_id, message, gross_g, tare_g, net_g, expected_g, delta_g}` when an immediate scan skipped saving a suspicious weight |
-| `spool` | `found` (false → `{id, found, message}` only), `initial_weight_g`, `used_weight_g`, `tare_source` (`spool`, `filament`, `vendor`) |
-| `printers[]` | `key`, `klippy_state`, `filename`, `pending_confirmed`; lanes add `status`, `prep`, `load` |
+| `spool` | `found` (false → `{id, found, message}` only), `initial_weight_g`, `used_weight_g`, `tare_source` (`spool`, `filament`, `vendor`), `colors` (every filament colour, from `multi_color_hexes`; `color` is the first) |
+| `printers[]` | `key`, `klippy_state`, `filename`, `pending_confirmed`; lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known) and `colors` (Spoolman colours, else the AFC lane `color`) |
 | `health` | `scale_status` |
 | `activity[]` | `code`, `dry_run`, `undone`; `action` may also be `scan`, `clear_pending`, `undo` |
 | `result` | `code`, `dry_run`, `data` (e.g. sanity figures with `needs_confirm`) |
@@ -261,11 +262,13 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `set_setting` | `key`, `value` | Persist a setting → `settings` event |
 | `cancel_countdown` | — | Cancel a pending scan-mode countdown |
 | `dismiss_prompt` | — | Clear `scan.prompt` without saving the weight |
-| `clear_spool` | — | Deselect the current spool (`spool` → `null`, scale check reset); numpad C / Esc |
+| `clear_spool` | — | Deselect the current spool (`spool` → `null`, scale check reset); keypad Clear / Esc |
 | `sim.scale` / `sim.scan` / `sim.printer` / `sim.spoolman` | see `simcontrol.py` | Drive simulated components (`simctl`) |
 
-`target` is a printer key (`kilo`, `yankee`) or `both`; omitted means the
-`target` setting. When the sanity check (§6.4) fails, the result is
+`target` (argument and setting) is `both` or one or more printer keys,
+comma-separated (`kilo`, `kilo,yankee`); the setting is normalised to config
+order and to `both` when every printer is listed. Omitted means the `target`
+setting. When the sanity check (§6.4) fails, the result is
 `{"ok":false,"code":"needs_confirm","message":"…","data":{…}}` and the UI
 re-sends with `"confirm":true`. `empty_spool` also answers `needs_confirm`
 when the measured weight is far from the known tare. Error `code`s:
@@ -378,15 +381,20 @@ settings so they can change without code edits:
   uses `LV_USE_OS LV_OS_WINDOWS` (required by `LV_USE_WINDOWS`).
 - Widgets are refreshed from the model by topic bitmask (no observer subjects
   were needed).
-- Fonts: Montserrat 16/22/28/48 (48 for scale digits); LVGL symbols for icons.
-  The built-in fonts are ASCII + symbols only, so the UI avoids characters
-  such as `≈`, `·` or `⚠` (uses `~`, `|`, `LV_SYMBOL_WARNING`).
+- Fonts: Montserrat 12/14/16/18/22/28/48 (48 for scale digits); LVGL symbols
+  for icons, plus `ui/src/fonts/station_icons_22.c` (the Font Awesome printer
+  glyph, generated with `lv_font_conv`; regenerate command in its header).
+  The built-in fonts are ASCII + U+00B0 + U+2022 + symbols only;
+  `display_text()` maps anything else.
 - Theme: default theme extended with custom styles; minimum touch target
-  64 px; pressed and `CHECKED` state styles; lane swatches from AFC colours.
+  64 px; pressed and `CHECKED` state styles. Filament tiles use the Spoolman
+  colours (a diagonal gradient for multi-colour spools,
+  `LV_GRADIENT_MAX_STOPS 4` with complex SW gradients) and draw text and
+  rings in white or near-black by WCAG contrast (`view_model.cpp`).
   Changing the `theme` setting rebuilds the widget tree.
-- In the simulator, PC keyboard digits/Backspace/Enter/Esc drive the numpad
-  (keypad indev bound to a private group; buttons stay out of the default
-  group).
+- In the simulator, PC keyboard digits open the keypad sheet;
+  Backspace/Enter/Esc edit, look up or clear (keypad indev bound to a
+  private group; buttons stay out of the default group).
 - Snapshot mode: `station-ui --snapshot <dir> --state <file.json>` renders the
   screens listed in the sample (`ui/samples/*.json`, generated by
   `scripts/make-ui-samples.py` from the simulated service) to PNG without a
@@ -479,6 +487,13 @@ within a phase unless noted. Each task ends with tests/build passing.
   preset; snapshot mode runs there.
   *Built on spoolpi (arm64) on 2026-10-15; 13/13 CTest and snapshot mode run
   there, and the UI drives the panel (see P5).*
+- [x] **U10** Station screen re-layout (product plan §5, decided
+  2026-10-15): side rail with one status line, top spool box (filament tile
+  with remaining ring, tap → keypad sheet), printer cards as the Load target
+  with filament-coloured lane tiles, More menu, action bar. Service adds
+  lane `remaining_pct`/`colors`, spool `colors` and multi-printer targets.
+  *Done 2026-10-15; replaces the header, numpad, scale tile, spool card and
+  target selector widgets; see §10.*
 
 ### F — Features (service + UI)
 
@@ -720,6 +735,17 @@ Append dated notes here (verified API details, gotchas, measurements).
   after the spool PATCH reports `spoolman_error` with the spool part kept
   and undoable. The confirm dialog now sizes its message from the wrapped
   text (it had a fixed two-line slot).
+- 2026-10-15 (re-layout, U10): Lane tiles need each spool's initial weight
+  and colours, which AFC does not publish; `station/catalog.py` caches them
+  from Spoolman (10 min TTL, failures retried after 30 s, filled for free by
+  every look up/weigh) and fetches missing ones in the background, so the
+  printer state never waits on Spoolman and shows `remaining_pct: null` until
+  known. LVGL's `lv_obj_set_style_bg_grad` keeps a pointer to the gradient
+  descriptor, so each tile owns its `lv_grad_dsc_t`. `LV_LABEL_LONG_MODE_DOTS`
+  needs a fixed label height or it wraps ("Untagged" in a 71 px tile).
+  `lv_font_conv` output has the generating machine's paths in its header;
+  the committed font has them removed, and the placeholder test now also
+  rejects user-profile and `/home/<user>` paths.
 - 2026-10-15 (history rewrite): The fork-only commits of `touch-ui` and
   `spool-weight` were rewritten with git-filter-repo to remove real host
   names, IPs and the SSH user. Placeholders: station host `spoolpi`,

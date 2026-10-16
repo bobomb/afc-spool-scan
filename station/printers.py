@@ -24,6 +24,7 @@ class PrinterManager:
         on_change: Callable[[PrinterState], None],
         writes: bool,
         low_stock_g: Callable[[], float],
+        spool_meta: Callable[[int], SpoolMeta | None] = lambda spool_id: None,
         urls: dict[str, str] | None = None,
         backoff: tuple[float, float] = (1.0, 30.0),
         publish_delay: float = 0.05,
@@ -32,7 +33,7 @@ class PrinterManager:
         self.clients: dict[str, MoonrakerClient] = {
             config.key: MoonrakerClient(
                 config, session, on_change=on_change, writes=writes, low_stock_g=low_stock_g,
-                url=urls.get(config.key), backoff=backoff, publish_delay=publish_delay,
+                spool_meta=spool_meta, url=urls.get(config.key), backoff=backoff, publish_delay=publish_delay,
             )
             for config in configs
         }
@@ -60,11 +61,16 @@ class PrinterManager:
         return client
 
     def resolve(self, target: str) -> list[MoonrakerClient]:
+        """'both' (every printer), one printer key, or a comma-separated list of keys."""
         if not isinstance(target, str):
-            raise UnknownPrinter("target must be a printer name or 'both'")
+            raise UnknownPrinter("target must be 'both' or printer names")
         if target.strip().lower() == "both":
             return list(self.clients.values())
-        return [self.get(target)]
+        names = [name for name in target.split(",") if name.strip()]
+        if not names:
+            raise UnknownPrinter("target must be 'both' or printer names")
+        wanted = {self.get(name).key for name in names}
+        return [client for key, client in self.clients.items() if key in wanted]
 
     def refresh(self) -> None:
         for client in self.clients.values():

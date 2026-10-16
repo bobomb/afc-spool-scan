@@ -95,8 +95,10 @@ python -m station --hardware sim --printers live --spoolman live --writes off
 The simulators can also replay data captured from the real printers and
 Spoolman (`scripts/capture-fixtures.py`, read-only):
 `python -m station --sim-fixtures station/sim/fixtures/captured`.
-In the simulator window the PC keyboard digits, Backspace, Enter and Esc
-drive the numpad.
+In the simulator window a PC keyboard digit opens the keypad with that digit;
+Backspace, Enter and Esc edit, look up and clear (Esc also deselects the
+spool). Tap the top box to open the keypad, and tap a printer card to include
+or exclude it from Load.
 
 Headless screenshots (no window, no service needed):
 
@@ -106,8 +108,9 @@ Headless screenshots (no window, no service needed):
 ```
 
 `scripts/make-ui-samples.py` regenerates `ui/samples/` from the simulator.
-Deployment to spoolpi (`scripts/install-spoolpi.sh`, `systemd/`,
-`scripts/deploy-spoolpi.ps1`) is prepared but not yet done.
+Deployment to spoolpi: `scripts/deploy-spoolpi.ps1` (pushes, then runs
+`scripts/install-spoolpi.sh --update` there and restarts the units in
+`systemd/`).
 
 ## Requirements
 

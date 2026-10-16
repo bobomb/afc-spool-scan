@@ -13,6 +13,7 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 PRIVATE_IP = re.compile(r"\b(?:192\.168|172\.(?:1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}\b")
 LOCAL_HOST = re.compile(r"\b([\w-]+)\.local\b")
+USER_PATH = re.compile(r"\b[A-Za-z]:[\\/]+Users[\\/]+[^\\/\s\"']+|/home/(?!pi\b)[\w.-]+")
 PLACEHOLDER_HOSTS = {"spoolpi", "kilo", "yankee"}
 
 
@@ -33,4 +34,5 @@ def test_tracked_files_use_placeholder_hosts() -> None:
         problems += [f"{name}: {ip}" for ip in PRIVATE_IP.findall(text)]
         problems += [f"{name}: {host}.local" for host in LOCAL_HOST.findall(text)
                      if host.lower() not in PLACEHOLDER_HOSTS]
+        problems += [f"{name}: {path}" for path in USER_PATH.findall(text)]
     assert not problems, problems

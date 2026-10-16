@@ -15,6 +15,11 @@ TEST_CASE("weights and deltas")
     CHECK(fmt_delta(349.3) == "+349 g");
     CHECK(fmt_delta(-12.6) == "-13 g");
     CHECK(fmt_delta(-0.2) == "+0 g");
+    CHECK(fmt_percent(70.1) == "70%");
+    CHECK(fmt_percent(99.6) == "100%");
+    CHECK(fmt_percent(0.4) == "<1%");
+    CHECK(fmt_percent(0) == "0%");
+    CHECK(fmt_percent(130) == "100%");
     CHECK(fmt_number(-0.04, 1) == "0.0");
 }
 

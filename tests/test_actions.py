@@ -154,6 +154,33 @@ async def test_load_single_target_and_setting_default(station: Station) -> None:
     assert sim_printer(station, "yankee").next_spool_id is None
     explicit = await act(station, "load", spool_id=90, target="YANKEE")
     assert explicit["ok"] and sim_printer(station, "yankee").next_spool_id == 90
+    listed = await act(station, "load", spool_id=86, target="yankee,kilo")
+    assert listed["message"] == "Spool 86: next spool set on Kilo, Yankee"
+    await act(station, "set_setting", key="target", value="yankee,kilo")
+    assert station.store.settings["target"] == "both"
+    assert (await act(station, "load", spool_id=97, target="kilo,prusa"))["code"] == "invalid_args"
+
+
+async def test_lanes_carry_remaining_percent_and_colours(station: Station) -> None:
+    def lane(printer: str, index: int):  # noqa: ANN202
+        return station.store.printers[printer].lanes[index]
+
+    await wait_until(lambda: lane("kilo", 0).remaining_pct is not None)
+    first = lane("kilo", 0)
+    spool = sim_spool(station, first.spool_id)
+    initial = spool.get("initial_weight") or spool["filament"]["weight"]
+    assert first.remaining_pct == round(first.remaining_g / initial * 100, 1)
+    assert first.colors == [first.color]
+    empty = next(item for item in station.store.printers["kilo"].lanes if item.spool_id is None)
+    assert empty.remaining_pct is None and empty.colors == []
+    data = station.store.snapshot()["printers"][0]["lanes"][0]
+    assert {"remaining_pct", "colors"} <= set(data)
+
+
+async def test_lookup_publishes_all_colours(station: Station) -> None:
+    await act(station, "lookup", spool_id=93)
+    assert station.store.spool.colors == ["#C94CE0", "#33B5E5", "#F2C14E"]
+    assert station.store.spool.color == "#C94CE0"
 
 
 async def test_load_partial_failure_when_printer_offline(station: Station) -> None:

@@ -8,17 +8,17 @@ LogScreen::LogScreen(App& app, lv_obj_t* parent) : app_(app)
 {
     Theme& theme = app.theme();
     root_ = ui::container(parent);
-    lv_obj_set_pos(root_, 0, layout::kHeaderH);
-    lv_obj_set_size(root_, layout::kWidth, layout::kBodyH);
+    lv_obj_set_pos(root_, layout::kContentX, 0);
+    lv_obj_set_size(root_, layout::kContentW, layout::kBodyH);
 
     lv_obj_t* title = ui::label(root_, theme.normal(), theme.text(), "Recent activity");
-    lv_obj_set_pos(title, layout::kPad + 4, 8);
+    lv_obj_set_pos(title, layout::kMargin + 4, 14);
     count_ = ui::label(root_, theme.small(), theme.muted(), "");
-    lv_obj_align(count_, LV_ALIGN_TOP_RIGHT, -layout::kPad - 4, 12);
+    lv_obj_align(count_, LV_ALIGN_TOP_RIGHT, -layout::kMargin - 4, 18);
 
     list_ = ui::panel(root_, theme);
-    lv_obj_set_pos(list_, layout::kPad, 42);
-    lv_obj_set_size(list_, layout::kWidth - 2 * layout::kPad, layout::kBodyH - 46);
+    lv_obj_set_pos(list_, layout::kMargin, 50);
+    lv_obj_set_size(list_, layout::kContentW - 2 * layout::kMargin, layout::kBodyH - 54);
     lv_obj_set_style_pad_all(list_, 6, 0);
     lv_obj_set_scrollable(list_, true);
     lv_obj_set_scroll_dir(list_, LV_DIR_VER);
@@ -36,7 +36,7 @@ void LogScreen::update(const State& state, bool online)
     ui::set_hidden(empty_, !state.activity.empty());
     ui::set_hidden(list_, state.activity.empty());
     int undoable = 0;
-    const int row_w = layout::kWidth - 2 * layout::kPad - 12;
+    const int row_w = layout::kContentW - 2 * layout::kMargin - 12;
     for (const ActivityEntry& entry : state.activity) {
         undoable += entry.undoable && !entry.undone;
         lv_obj_t* row = ui::container(list_);

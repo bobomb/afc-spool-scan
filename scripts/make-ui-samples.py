@@ -73,19 +73,25 @@ async def build() -> dict[str, Any]:
             await act("lookup", spool_id=97)
             await act("sim.scale", grams=984.0)
             await wait_until(lambda: station.store.printers["yankee"].afc_error is not None)
+            await wait_until(lambda: all(lane.remaining_pct is not None for p in station.store.printers.values()
+                                         for lane in p.lanes if lane.spool_id is not None))
             snapshot = copy.deepcopy(station.store.snapshot())
             snapshot["scan"].update(last_code="WEB+SPOOLMAN:S-97", spool_id=97, at="2026-10-13T20:59:58Z")
+            await act("lookup", spool_id=93)
+            await act("sim.scale", grams=841.0)
+            multicolor = {"spool": copy.deepcopy(station.store.snapshot()["spool"]),
+                          "scale": copy.deepcopy(station.store.snapshot()["scale"])}
             hello = {"type": "hello", "protocol": 1, "service_version": __version__, "hardware": "sim",
                      "printers": "sim", "spoolman": "sim", "writes": False}
-            return {"hello": hello, "snapshot": json.loads(json.dumps(snapshot))}
+            return {"hello": hello, "snapshot": json.loads(json.dumps(snapshot)),
+                    "multicolor": json.loads(json.dumps(multicolor))}
         finally:
             await station.stop()
 
 
-def sample(base: dict[str, Any], screens: list[str], entry: str = "97", **changes: Any) -> dict[str, Any]:
-    data = copy.deepcopy(base)
+def sample(base: dict[str, Any], screens: list[str], **changes: Any) -> dict[str, Any]:
+    data = {key: copy.deepcopy(value) for key, value in base.items() if key != "multicolor"}
     data["screens"] = screens
-    data["entry"] = entry
     for key, value in changes.items():
         data[key] = value
     return data
@@ -100,6 +106,13 @@ def main() -> int:
         "log": sample(base, ["log"]),
         "settings": sample(base, ["settings"]),
     }
+
+    multicolor = sample(base, ["main"])
+    multicolor["snapshot"].update(base["multicolor"])
+    samples["multicolor"] = multicolor
+
+    keypad = sample(base, ["main"], keypad="93")
+    samples["keypad"] = keypad
 
     prompt = sample(base, ["main"])
     prompt["snapshot"]["scan"]["prompt"] = {
@@ -118,7 +131,7 @@ def main() -> int:
     light["snapshot"]["settings"]["theme"] = "light"
     samples["light"] = light
 
-    empty = sample(base, ["main"], entry="")
+    empty = sample(base, ["main"])
     empty["snapshot"]["spool"] = None
     empty["snapshot"]["scale"] = {"present": True, "status": "zero", "grams": 0.0, "source_unit": "g",
                                   "stable": False, "tare_g": None, "net_g": None, "expected_g": None,
@@ -126,17 +139,17 @@ def main() -> int:
     empty["snapshot"]["activity"] = []
     samples["empty"] = empty
 
-    low = sample(base, ["main"], entry="86")
+    low = sample(base, ["main"])
     low["snapshot"]["spool"] = {**snap["spool"], "id": 86, "vendor": "eSun", "name": "PETG Solid Blue",
-                                "material": "PETG", "color": "#1E5AA8", "remaining_g": 74.2,
+                                "material": "PETG", "color": "#1E5AA8", "colors": ["#1E5AA8"], "remaining_g": 74.2,
                                 "spool_weight_g": 224.0, "expected_gross_g": 298.2, "location": "Kilo",
-                                "low_stock": True}
+                                "initial_weight_g": 1000.0, "low_stock": True}
     low["snapshot"]["scale"] = {"present": True, "status": "motion", "grams": 301.6, "source_unit": "oz",
                                 "stable": False, "tare_g": 224.0, "net_g": 77.6, "expected_g": 298.2,
                                 "delta_g": 3.4, "check": "ok"}
     samples["low_stock"] = low
 
-    missing = sample(base, ["main"], entry="999")
+    missing = sample(base, ["main"])
     missing["snapshot"]["spool"] = {"id": 999, "found": False, "message": "Spool 999 not found"}
     missing["snapshot"]["scale"] = {"present": False, "status": "absent", "grams": None, "source_unit": None,
                                     "stable": False, "tare_g": None, "net_g": None, "expected_g": None,

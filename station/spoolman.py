@@ -122,12 +122,19 @@ class SpoolmanClient:
 
 
 def spool_color(filament: dict[str, Any]) -> str | None:
+    colors = spool_colors(filament)
+    return colors[0] if colors else None
+
+
+def spool_colors(filament: dict[str, Any]) -> list[str]:
+    """All filament colours as #RRGGBB (Spoolman multi_color_hexes, else color_hex)."""
     multi = filament.get("multi_color_hexes")
-    raw = multi.split(",")[0] if isinstance(multi, str) and multi else filament.get("color_hex")
-    if not isinstance(raw, str) or not raw.strip():
-        return None
-    raw = raw.strip().lstrip("#")[:6]
-    return f"#{raw.upper()}"
+    raw = multi.split(",") if isinstance(multi, str) and multi.strip() else [filament.get("color_hex")]
+    colors = []
+    for item in raw:
+        if isinstance(item, str) and item.strip().lstrip("#"):
+            colors.append("#" + item.strip().lstrip("#")[:6].upper())
+    return colors
 
 
 def spool_tare(data: dict[str, Any]) -> tuple[float | None, str | None]:
@@ -163,6 +170,7 @@ def spool_info_from_api(data: dict[str, Any], low_stock_g: float) -> SpoolInfo:
         name=filament.get("name"),
         material=filament.get("material"),
         color=spool_color(filament),
+        colors=spool_colors(filament),
         remaining_g=remaining,
         spool_weight_g=None if tare is None else round(tare, 1),
         expected_gross_g=None if tare is None or remaining is None else round(tare + remaining, 1),

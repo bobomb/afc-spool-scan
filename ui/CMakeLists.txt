@@ -65,6 +65,7 @@ add_library(station_core STATIC
   src/png_writer.cpp
   src/protocol.cpp
   src/script.cpp
+  src/view_model.cpp
 )
 target_include_directories(station_core PUBLIC src)
 target_link_libraries(station_core PUBLIC nlohmann_json::nlohmann_json)
@@ -94,15 +95,16 @@ set(STATION_UI_SOURCES
   src/widgets/assign_dialog.cpp
   src/widgets/confirm_dialog.cpp
   src/widgets/countdown_overlay.cpp
-  src/widgets/header.cpp
-  src/widgets/numpad.cpp
+  src/widgets/keypad_sheet.cpp
+  src/widgets/more_menu.cpp
   src/widgets/printer_card.cpp
   src/widgets/result_banner.cpp
-  src/widgets/scale_tile.cpp
-  src/widgets/spool_card.cpp
+  src/widgets/side_rail.cpp
+  src/widgets/spool_hero.cpp
   src/widgets/status_overlay.cpp
-  src/widgets/target_selector.cpp
+  src/widgets/target_card.cpp
   src/widgets/ui_helpers.cpp
+  src/fonts/station_icons_22.c
 )
 if(NOT STATION_UI_BACKEND STREQUAL "headless")
   list(APPEND STATION_UI_SOURCES src/platform_${STATION_UI_BACKEND}.cpp)
@@ -134,6 +136,7 @@ if(STATION_UI_TESTS)
     tests/test_png.cpp
     tests/test_protocol.cpp
     tests/test_script.cpp
+    tests/test_view_model.cpp
   )
   target_link_libraries(station-ui-tests PRIVATE station_core doctest::doctest)
   target_compile_options(station-ui-tests PRIVATE ${STATION_WARNINGS})

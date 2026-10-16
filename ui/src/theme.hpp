@@ -5,6 +5,11 @@
 
 #include "lvgl.h"
 
+extern "C" {
+LV_FONT_DECLARE(station_icons_22)
+}
+#define STATION_SYMBOL_PRINTER "\xEF\x80\xAF"
+
 namespace station {
 
 struct Palette {
@@ -46,10 +51,15 @@ public:
     lv_color_t info() const { return color(palette_.info); }
     lv_color_t disabled() const { return color(palette_.disabled); }
 
+    const lv_font_t* tiny() const { return &lv_font_montserrat_12; }
+    const lv_font_t* caption() const { return &lv_font_montserrat_14; }
     const lv_font_t* small() const { return &lv_font_montserrat_16; }
+    const lv_font_t* medium() const { return &lv_font_montserrat_18; }
     const lv_font_t* normal() const { return &lv_font_montserrat_22; }
     const lv_font_t* large() const { return &lv_font_montserrat_28; }
     const lv_font_t* huge() const { return &lv_font_montserrat_48; }
+    // Side rail icons not in the built-in symbol set (STATION_SYMBOL_*).
+    const lv_font_t* icons() const { return &station_icons_22; }
 
     lv_style_t* card() { return &card_; }
     lv_style_t* button() { return &button_; }

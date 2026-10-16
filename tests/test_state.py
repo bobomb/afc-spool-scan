@@ -64,6 +64,17 @@ def test_settings_defaults_and_validation(tmp_path: Path) -> None:
     assert reloaded["sanity_threshold_pct"] == 12.5
 
 
+def test_settings_target_subsets() -> None:
+    settings = Settings(None, ["kilo", "yankee", "zulu"])
+    assert settings.validate("target", "Yankee, kilo") == "kilo,yankee"
+    assert settings.validate("target", "zulu") == "zulu"
+    assert settings.validate("target", "kilo,yankee,zulu") == "both"
+    assert settings.validate("target", " BOTH ") == "both"
+    for bad in ("", ",", "kilo,kilo", "kilo,prusa", None, 3):
+        with pytest.raises(SettingsError):
+            settings.validate("target", bad)
+
+
 def test_settings_ignore_invalid_stored_values(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
     path.write_text(json.dumps({"target": "gone", "theme": "light", "junk": 1}), encoding="utf-8")
