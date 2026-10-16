@@ -208,7 +208,7 @@ screen.
 │Prnt│ └──────┘ 701 g left · tare 140 g        │   Spoolman   │
 │ ☰  │ LOAD TO · tap a printer to include or exclude it        │
 │Log │ ┌ Kilo  Complete      ✓ ┐ ┌ Yankee  Printing 42%   ✓ ┐ │
-│    │ │ [89%][61%][ 7%][ – ]  │ │ [95%][32%][ ? ][ 5%]     │ │
+│    │ │ [888g][612g][74g][ – ]│ │ [950g][321g][ ? ][45g]   │ │
 │ ●  │ │  PLA  PLA PETG Empty  │ │  PLA PETG Untag ABS      │ │
 │AllOK│ │ ↓ Next spool #93      │ │ ↓ Next spool #93          │ │
 │    │ [More] [ Weigh ] [ Load ] [     Weigh + Load      ]    │
@@ -232,8 +232,9 @@ screen.
   is on Settings. An excluded card dims and reads "Not included · tap to
   include". The pending next spool is at the bottom of each card.
 - **Lane tiles.** Each lane is a rounded tile filled with the lane spool's
-  colour(s), with its remaining ring, %, material and spool # in white or
-  near-black, whichever has the higher contrast (WCAG) on that fill. Low
+  colour(s), with its remaining ring (share of the initial weight), grams
+  left in the ring ("852 g", "1.2 kg" above 1 kg), material and spool # in
+  white or near-black, whichever has the higher contrast (WCAG) on that fill. Low
   stock is an amber "LOW" pill next to the spool #, below the ring. The lane
   loaded in the tool has a blue outline. Empty lanes are a hollow outline;
   untagged lanes a grey tile with "?".
@@ -413,3 +414,4 @@ Detailed tasks: dev plan §8.
 | 2026-10-14 | Default assignment is the next loaded spool (`SET_NEXT_SPOOL_ID`), as the scripts do; lane assignment (`SET_SPOOL_ID`) only when explicitly chosen and confirmed in the Assign dialog. |
 | 2026-10-15 | Empty spool also sets the filament's default `spool_weight` to the measured weight (§4.2 #5, §7). |
 | 2026-10-15 | Main screen re-layout (§5): side rail with one status line; top box with the selected spool as a filament-coloured tile (gradient for multi-colour spools) with remaining ring, tap to open the keypad; printer cards are the Load target (any subset of printers); lanes as filament-coloured tiles with remaining ring and contrast-picked text; More menu for Assign lane and Empty spool. |
+| 2026-10-15 | Lane tiles show grams left in the ring centre instead of the percentage; the ring still shows the share left. |

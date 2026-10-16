@@ -79,8 +79,15 @@ void TargetCard::build_tiles(std::size_t count)
 
         tile->ring = ui::ring(tile->root, ring, 6);
         lv_obj_align(tile->ring, LV_ALIGN_TOP_MID, 0, 7);
-        tile->pct = ui::label(tile->ring, theme.caption(), theme.text(), "");
-        lv_obj_center(tile->pct);
+        lv_obj_t* center = ui::container(tile->ring);
+        lv_obj_set_size(center, ring - 12, ring - 12);
+        lv_obj_center(center);
+        lv_obj_set_flex_flow(center, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(center, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+        tile->value = ui::label(center, theme.caption(), theme.text(), "");
+        tile->unit = ui::label(center, theme.tiny(), theme.text(), "");
+        lv_obj_set_style_margin_top(tile->unit, -4, 0);
+        lv_obj_set_style_translate_y(center, 2, 0);
         tile->material = ui::label(tile->root, theme.caption(), theme.text(), "");
         lv_obj_set_size(tile->material, tile_w - 4, 18);
         lv_obj_set_style_text_align(tile->material, LV_TEXT_ALIGN_CENTER, 0);
@@ -159,9 +166,14 @@ void TargetCard::update(const Printer& printer, bool included, bool online)
             if (colors.empty()) colors.push_back(theme.palette().surface_alt);
             mark = ui::fill(tile.root, colors, tile.grad, theme, theme.palette().surface);
             ui::set_ring(tile.ring, lane.remaining_pct, mark);
-            ui::set_text(tile.pct, lane.remaining_pct ? fmt_percent(*lane.remaining_pct)
-                                   : lane.remaining_g ? fmt_number(*lane.remaining_g, 0) + "g" : "?");
-            lv_obj_set_style_text_font(tile.pct, lane.remaining_pct ? theme.caption() : theme.tiny(), 0);
+            if (lane.remaining_g) {
+                const auto [value, unit] = compact_weight(*lane.remaining_g);
+                ui::set_text(tile.value, value);
+                ui::set_text(tile.unit, unit);
+            } else {
+                ui::set_text(tile.value, "?");
+                ui::set_text(tile.unit, "");
+            }
             lv_obj_set_style_text_font(tile.material, theme.caption(), 0);
             ui::set_text(tile.material, lane.material.empty() ? "--" : lane.material);
             ui::set_text(tile.id, "#" + std::to_string(*lane.spool_id));
@@ -172,13 +184,14 @@ void TargetCard::update(const Printer& printer, bool included, bool online)
             lv_obj_set_style_bg_opa(tile.root, static_cast<lv_opa_t>(untagged ? LV_OPA_COVER : LV_OPA_TRANSP), 0);
             lv_obj_set_style_border_width(tile.root, untagged ? 0 : 2, 0);
             ui::set_ring(tile.ring, std::nullopt, theme.muted());
-            lv_obj_set_style_text_font(tile.pct, theme.caption(), 0);
-            ui::set_text(tile.pct, untagged ? "?" : "-");
+            ui::set_text(tile.value, untagged ? "?" : "-");
+            ui::set_text(tile.unit, "");
             lv_obj_set_style_text_font(tile.material, untagged ? theme.tiny() : theme.caption(), 0);
             ui::set_text(tile.material, untagged ? "Untagged" : "Empty");
             ui::set_text(tile.id, "");
         }
-        lv_obj_set_style_text_color(tile.pct, mark, 0);
+        lv_obj_set_style_text_color(tile.value, mark, 0);
+        lv_obj_set_style_text_color(tile.unit, mark, 0);
         lv_obj_set_style_text_color(tile.material, mark, 0);
         lv_obj_set_style_text_color(tile.id, mark, 0);
         lv_obj_set_style_outline_color(tile.low, mark, 0);

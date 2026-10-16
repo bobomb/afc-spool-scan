@@ -5,6 +5,7 @@
 #include <ctime>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace station {
@@ -16,6 +17,8 @@ std::string fmt_grams(std::optional<double> grams, int decimals = 0);
 std::string fmt_delta(double grams);
 // "70%"; values between 0 and 1 show "<1%" so a nearly empty spool never reads 0%.
 std::string fmt_percent(double pct);
+// Short weight for a small ring: {"852", "g"} below 1 kg, else {"1.2", "kg"} ({"12", "kg"} from 10 kg).
+std::pair<std::string, std::string> compact_weight(double grams);
 std::string scale_status_label(const std::string& status);
 std::string print_state_label(const std::string& state, std::optional<double> progress);
 std::string action_label(const std::string& action);

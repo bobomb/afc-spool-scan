@@ -38,6 +38,16 @@ std::string fmt_percent(double pct)
     return fmt_number(std::round(clamped), 0) + "%";
 }
 
+std::pair<std::string, std::string> compact_weight(double grams)
+{
+    const double rounded = std::round(grams < 0 ? 0 : grams);
+    if (rounded < 1000) {
+        return {fmt_number(rounded, 0), "g"};
+    }
+    const double kg = rounded / 1000.0;
+    return {fmt_number(kg, kg >= 9.95 ? 0 : 1), "kg"};
+}
+
 std::string scale_status_label(const std::string& status)
 {
     if (status == "stable") return "Ready";

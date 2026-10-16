@@ -20,6 +20,13 @@ TEST_CASE("weights and deltas")
     CHECK(fmt_percent(0.4) == "<1%");
     CHECK(fmt_percent(0) == "0%");
     CHECK(fmt_percent(130) == "100%");
+    using Weight = std::pair<std::string, std::string>;
+    CHECK(compact_weight(852.2) == Weight{"852", "g"});
+    CHECK(compact_weight(999.4) == Weight{"999", "g"});
+    CHECK(compact_weight(999.6) == Weight{"1.0", "kg"});
+    CHECK(compact_weight(1260) == Weight{"1.3", "kg"});
+    CHECK(compact_weight(12400) == Weight{"12", "kg"});
+    CHECK(compact_weight(-3) == Weight{"0", "g"});
     CHECK(fmt_number(-0.04, 1) == "0.0");
 }
 

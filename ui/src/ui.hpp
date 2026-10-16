@@ -128,7 +128,8 @@ private:
     struct LaneTile {
         lv_obj_t* root;
         lv_obj_t* ring;
-        lv_obj_t* pct;
+        lv_obj_t* value;
+        lv_obj_t* unit;
         lv_obj_t* material;
         lv_obj_t* id;
         lv_obj_t* low;
