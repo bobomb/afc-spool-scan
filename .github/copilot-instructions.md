@@ -5,6 +5,10 @@ scale, a USB QR scanner and Spoolman, running on `spoolpi` (Raspberry Pi 4,
 Debian 13 Lite). A touch UI (LVGL) and a Python `spool-station` service are
 being built.
 
+Host names, printer names, IPs (192.0.2.x) and the user `pi` in this repo are
+placeholders. Real values live only in git-ignored files: `config.env` on the
+Pi and `deploy.env` on the PC. Never commit real hostnames, IPs or usernames.
+
 - Product decisions (source of truth): [docs/touch-ui-plan.md](../docs/touch-ui-plan.md)
 - Development plan, task list, protocol, runtime modes: [docs/touch-ui-dev-plan.md](../docs/touch-ui-dev-plan.md)
 - Existing scripts and operations: [README.md](../README.md)

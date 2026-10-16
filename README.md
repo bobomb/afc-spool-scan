@@ -187,7 +187,10 @@ by this simple GPIO backend. Set `AUDIO_BACKEND="none"` to disable all cues.
 
 Defaults are defined in the module that uses each setting. Copy
 [config.env.example](config.env.example) to `config.env` to override them from
-one shared configuration file without editing the scripts. Important settings
+one shared configuration file without editing the scripts. Host names, printer
+names and IPs in this repo (`spoolpi`, Kilo, Yankee, 192.0.2.x) are
+placeholders; put real values only in `config.env` (and, on the PC, in
+`deploy.env` from [deploy.env.example](deploy.env.example)). Important settings
 include:
 
 - `EVENT_DEV`: stable `/dev/input/by-id` path for the QR scanner

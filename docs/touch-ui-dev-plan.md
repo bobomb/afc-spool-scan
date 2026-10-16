@@ -720,3 +720,11 @@ Append dated notes here (verified API details, gotchas, measurements).
   after the spool PATCH reports `spoolman_error` with the spool part kept
   and undoable. The confirm dialog now sizes its message from the wrapped
   text (it had a fixed two-line slot).
+- 2026-10-15 (history rewrite): The fork-only commits of `touch-ui` and
+  `spool-weight` were rewritten with git-filter-repo to remove real host
+  names, IPs and the SSH user. Placeholders: station host `spoolpi`,
+  printers Kilo and Yankee (chosen so sorted orders and tests are
+  unchanged), IPs in 192.0.2.0/24, user `pi`. `master` and the
+  upstream base `7b41331` are untouched. The deploy script reads the real
+  host and user from git-ignored `deploy.env`. Real printer names still come
+  from `config.env` on the Pi, so the panel is unchanged.
