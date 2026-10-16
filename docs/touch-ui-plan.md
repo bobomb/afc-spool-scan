@@ -203,9 +203,9 @@ screen.
 ```
 ┌────┬─────────────────────────────────────────────────────────┐
 │ ⌂  │ ┌──────┐ #93 · Polymaker                │ ON SCALE   ⌨ │
-│Stat│ │ 70%  │ Panchroma Silk Rainbow         │ 841.0 g      │
-│ 🖶 │ │ left │ PLA · Dry box B                │ ✓ Matches    │
-│Prnt│ └──────┘ 701 g left · tare 140 g        │   Spoolman   │
+│Stat│ │ 701  │ Panchroma Silk Rainbow         │ 841.0 g      │
+│ 🖶 │ │g left│ PLA · Dry box B                │ ✓ Matches    │
+│Prnt│ └──────┘ 70% left · tare 140 g          │   Spoolman   │
 │ ☰  │ LOAD TO · tap a printer to include or exclude it        │
 │Log │ ┌ Kilo  Complete      ✓ ┐ ┌ Yankee  Printing 42%   ✓ ┐ │
 │    │ │ [888g][612g][74g][ – ]│ │ [950g][321g][ ? ][45g]   │ │
@@ -219,8 +219,9 @@ screen.
 - **Top box (selected spool + scale).** A rounded tile filled with the
   filament colour (a diagonal gradient through every colour of a
   multi-colour spool) carries a ring of remaining filament (% of the
-  spool's initial weight) with "70% left". Next to it: spool #, vendor,
-  name, material, location, remaining and tare; on the right the scale
+  spool's initial weight) with the grams left inside ("701 g left").
+  Next to it: spool #, vendor, name, material, location, the share left
+  ("70% left") and tare; on the right the scale
   weight and the Spoolman check ("Matches Spoolman", "Off by +349 g",
   "Scale empty", "Scale off"). Tapping anywhere on the box opens the
   keypad. With no spool selected the box shows a dashed "Type ID" tile,
@@ -414,4 +415,4 @@ Detailed tasks: dev plan §8.
 | 2026-10-14 | Default assignment is the next loaded spool (`SET_NEXT_SPOOL_ID`), as the scripts do; lane assignment (`SET_SPOOL_ID`) only when explicitly chosen and confirmed in the Assign dialog. |
 | 2026-10-15 | Empty spool also sets the filament's default `spool_weight` to the measured weight (§4.2 #5, §7). |
 | 2026-10-15 | Main screen re-layout (§5): side rail with one status line; top box with the selected spool as a filament-coloured tile (gradient for multi-colour spools) with remaining ring, tap to open the keypad; printer cards are the Load target (any subset of printers); lanes as filament-coloured tiles with remaining ring and contrast-picked text; More menu for Assign lane and Empty spool. |
-| 2026-10-15 | Lane tiles show grams left in the ring centre instead of the percentage; the ring still shows the share left. |
+| 2026-10-15 | Lane tiles and the selected spool tile show grams left in the ring centre instead of the percentage; the ring still shows the share left, and the spool details line shows the percentage. |

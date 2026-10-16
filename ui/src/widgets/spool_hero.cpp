@@ -130,8 +130,14 @@ void SpoolHero::update(const State& state, bool online)
         ui::set_hidden(ring_, false);
         ui::set_ring(ring_, pct, mark);
         lv_obj_set_style_text_font(pct_, theme.normal(), 0);
-        ui::set_text(pct_, pct ? fmt_percent(*pct) : fmt_grams(spool->remaining_g));
-        ui::set_text(sub_, "left");
+        if (spool->remaining_g) {
+            const auto [value, unit] = compact_weight(*spool->remaining_g);
+            ui::set_text(pct_, value);
+            ui::set_text(sub_, unit + " left");
+        } else {
+            ui::set_text(pct_, "?");
+            ui::set_text(sub_, "left");
+        }
         lv_obj_set_style_text_color(pct_, mark, 0);
         lv_obj_set_style_text_color(sub_, mark, 0);
 
@@ -146,7 +152,7 @@ void SpoolHero::update(const State& state, bool online)
         if (!spool->material.empty()) details.push_back(spool->material);
         if (!spool->location.empty()) details.push_back(spool->location);
         ui::set_text(line3_, join(details, "  \xE2\x80\xA2  "));
-        std::string amounts = fmt_grams(spool->remaining_g) + " left  \xE2\x80\xA2  ";
+        std::string amounts = pct ? fmt_percent(*pct) + " left  \xE2\x80\xA2  " : std::string();
         amounts += spool->spool_weight_g ? "tare " + fmt_grams(spool->spool_weight_g) : "tare unknown";
         ui::set_text(line4_, amounts);
         lv_obj_set_style_text_color(line4_, spool->low_stock ? theme.warn() : theme.text(), 0);
