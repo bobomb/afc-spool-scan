@@ -357,7 +357,9 @@ Detailed tasks: dev plan §8.
 12. Main screen re-layout to reduce clutter (2026-10-15). Mockups:
     A spool first with the keypad on demand, B Identify → Check → Act
     columns, C printer cards as the Load target, D side navigation rail
-    with collapsed status. Pick one direction or a combination.
+    with collapsed status. The user prefers C with D's side rail, with each
+    lane shown as a remaining-filament ring (spool colour, % inside,
+    material below); mockup E shown, awaiting go-ahead to build.
 
 ## Decision log
 
