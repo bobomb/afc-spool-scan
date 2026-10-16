@@ -357,9 +357,11 @@ Detailed tasks: dev plan §8.
 12. Main screen re-layout to reduce clutter (2026-10-15). Mockups:
     A spool first with the keypad on demand, B Identify → Check → Act
     columns, C printer cards as the Load target, D side navigation rail
-    with collapsed status. The user prefers C with D's side rail, with each
-    lane shown as a remaining-filament ring (spool colour, % inside,
-    material below); mockup E shown, awaiting go-ahead to build.
+    with collapsed status. The user prefers C with D's side rail. Lanes are
+    tiles filled with the filament colour, with the remaining ring, % and
+    material on top in white or near-black (whichever contrasts more); the
+    selected spool uses the same filled tile (mockups E3, E5). Awaiting
+    go-ahead to build.
 
 ## Decision log
 
