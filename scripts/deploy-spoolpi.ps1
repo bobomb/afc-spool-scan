@@ -8,8 +8,9 @@ checkout from the "fork" remote, runs scripts/install-spoolpi.sh --update and
 restarts the spool station units only if they are already running
 (try-restart), so a deploy before cutover never starts them.
 
-The default target is spoolpi.local, which the PC's ~/.ssh/config maps to the
-right user and key and whose host key is in known_hosts.
+The target host (and optionally the SSH user) comes from deploy.env in the repo
+root (git-ignored; copy deploy.env.example) or from -TargetHost / -User. Without
+a user, ssh takes it from ~/.ssh/config.
 
 .EXAMPLE
 .\scripts\deploy-spoolpi.ps1
@@ -17,8 +18,8 @@ right user and key and whose host key is in known_hosts.
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$TargetHost = 'spoolpi.local',
-    [string]$User = 'pi',
+    [string]$TargetHost,
+    [string]$User,
     [string]$Branch = 'touch-ui',
     [string]$LocalRemote = 'origin',
     [string]$SpoolpiRemote = 'fork',
@@ -48,6 +49,21 @@ if (-not $NoPush) {
     }
 }
 
+# Machine-specific values stay out of the repo, in git-ignored deploy.env.
+$settingsFile = Join-Path (Split-Path -Parent $PSScriptRoot) 'deploy.env'
+if (Test-Path $settingsFile) {
+    foreach ($line in Get-Content $settingsFile) {
+        if ($line -match '^\s*(DEPLOY_HOST|DEPLOY_USER)\s*=\s*"?([^"]*?)"?\s*$') {
+            if ($Matches[1] -eq 'DEPLOY_HOST' -and -not $TargetHost) { $TargetHost = $Matches[2] }
+            if ($Matches[1] -eq 'DEPLOY_USER' -and -not $User) { $User = $Matches[2] }
+        }
+    }
+}
+if (-not $TargetHost) {
+    throw 'No target host: set DEPLOY_HOST in deploy.env (see deploy.env.example) or pass -TargetHost'
+}
+$target = if ($User) { "$User@$TargetHost" } else { $TargetHost }
+
 $remote = @(
     'set -e',
     'cd ~/afc-spool-scan',
@@ -61,7 +77,7 @@ $remote = @(
     'systemctl --user --no-pager status spool-station.service spool-station-ui.service || true'
 ) -join '; '
 
-if ($PSCmdlet.ShouldProcess("$User@$TargetHost", $remote)) {
-    Invoke-Native ssh @('-o', 'BatchMode=yes', "$User@$TargetHost", $remote)
+if ($PSCmdlet.ShouldProcess($target, $remote)) {
+    Invoke-Native ssh @('-o', 'BatchMode=yes', $target, $remote)
     if ($LASTEXITCODE -ne 0) { throw "deploy on $TargetHost failed (exit $LASTEXITCODE)" }
 }

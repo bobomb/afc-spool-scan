@@ -526,8 +526,8 @@ within a phase unless noted. Each task ends with tests/build passing.
   run `install-spoolpi.sh --update` and restart services.
   *Used for the cutover deploy 2026-10-15 (push, pull, venv, UI build,
   `try-restart`). Fixed first: Windows PowerShell 5.1 aborted on `git fetch`
-  stderr. Defaults to `spoolpi.local`, which the PC's SSH config and
-  `known_hosts` cover.*
+  stderr. Host and user come from the git-ignored `deploy.env` (see
+  `deploy.env.example`) or `-TargetHost` / `-User`.*
 - [x] **P4** Cutover: add `PRINTERS`/`STATION_*` keys to spoolpi's
   `config.env`; disable `usb-qr-scanner.service`, enable
   `spool-station.service`; verify a real scan at parity. Rollback: disable
