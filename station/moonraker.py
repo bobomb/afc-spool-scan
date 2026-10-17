@@ -174,8 +174,13 @@ class MoonrakerClient:
             delay = min(delay * 2, self.backoff[1])
 
     def _mark_offline(self, klippy_state: str | None) -> None:
-        if self.state.connected or self.state.klippy_state != klippy_state:
-            self.state = replace(self.state, connected=False, klippy_state=klippy_state)
+        """Offline usually means a shutdown or reboot, which also drops AFC's pending next spool."""
+        pending = self.state.pending_spool
+        if self.state.connected or self.state.klippy_state != klippy_state or pending is not None:
+            if pending is not None:
+                log.info("%s: offline (%s); cleared pending next spool %d", self.printer.name, klippy_state, pending)
+            self.state = replace(self.state, connected=False, klippy_state=klippy_state,
+                                 pending_spool=None, pending_confirmed=False)
             self._publish_now()
 
     def _fail_pending(self, error: Exception) -> None:
@@ -277,9 +282,7 @@ class MoonrakerClient:
             if self._subscribe_task is None or self._subscribe_task.done():
                 self._subscribe_task = asyncio.create_task(self._resubscribe())
         elif method in ("notify_klippy_shutdown", "notify_klippy_disconnected"):
-            klippy_state = "shutdown" if method == "notify_klippy_shutdown" else "disconnected"
-            self.state = replace(self.state, pending_spool=None, pending_confirmed=False)
-            self._mark_offline(klippy_state)
+            self._mark_offline("shutdown" if method == "notify_klippy_shutdown" else "disconnected")
 
     async def _resubscribe(self) -> None:
         try:

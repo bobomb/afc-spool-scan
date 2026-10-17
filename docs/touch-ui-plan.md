@@ -252,7 +252,8 @@ screen.
 Two cards (Kilo, Yankee). Each shows:
 
 - Connection, print state and progress, AFC `current_state`, AFC error message.
-- Pending next spool (tracked by the service) with **Clear**.
+- Pending next spool (tracked by the service) with **Clear**. Cleared when
+  the printer goes offline, since that usually means it shut down or rebooted.
 - Lanes 1–4: color swatch, material, spool ID, remaining g (bar), tool map
   (T0–T3), `filament_status`, loaded lane highlighted, low-stock highlight.
 - Tapping a lane opens **Assign to lane** with the current spool ID; nothing
@@ -416,3 +417,4 @@ Detailed tasks: dev plan §8.
 | 2026-10-15 | Empty spool also sets the filament's default `spool_weight` to the measured weight (§4.2 #5, §7). |
 | 2026-10-15 | Main screen re-layout (§5): side rail with one status line; top box with the selected spool as a filament-coloured tile (gradient for multi-colour spools) with remaining ring, tap to open the keypad; printer cards are the Load target (any subset of printers); lanes as filament-coloured tiles with remaining ring and contrast-picked text; More menu for Assign lane and Empty spool. |
 | 2026-10-15 | Lane tiles and the selected spool tile show grams left in the ring centre instead of the percentage; the ring still shows the share left, and the spool details line shows the percentage. |
+| 2026-10-16 | A printer going offline (unreachable, Klippy shutdown/disconnect) clears its pending next spool in the service, because it usually means the printer shut down or rebooted. |

@@ -183,6 +183,19 @@ async def test_lookup_publishes_all_colours(station: Station) -> None:
     assert station.store.spool.color == "#C94CE0"
 
 
+async def test_printer_going_offline_clears_its_pending_spool(station: Station) -> None:
+    await act(station, "load", spool_id=97)
+    printers = station.store.printers
+    assert printers["kilo"].pending_spool == 97 and printers["yankee"].pending_spool == 97
+    await act(station, "sim.printer", printer="yankee", op="disconnect")
+    await wait_until(lambda: not station.store.printers["yankee"].connected)
+    assert station.store.printers["yankee"].pending_spool is None
+    assert station.store.printers["kilo"].pending_spool == 97
+    await act(station, "sim.printer", printer="yankee", op="connect")
+    await wait_until(lambda: station.store.printers["yankee"].connected, timeout=5)
+    assert station.store.printers["yankee"].pending_spool is None
+
+
 async def test_load_partial_failure_when_printer_offline(station: Station) -> None:
     await act(station, "sim.printer", printer="yankee", op="disconnect")
     await wait_until(lambda: not station.store.printers["yankee"].connected)

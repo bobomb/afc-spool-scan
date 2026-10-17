@@ -207,7 +207,9 @@ class SimPrinter:
                                        "message": {"message": "", "type": ""}}})
 
     async def disconnect(self) -> None:
+        """Simulates a power-off or reboot: Moonraker goes away and AFC forgets the pending spool."""
         self.online = False
+        self.next_spool_id = None
         for ws in list(self.sockets):
             await ws.close()
 

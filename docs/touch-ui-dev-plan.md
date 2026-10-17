@@ -321,8 +321,10 @@ clients.
   from `notify_gcode_response` `Spool ID set for next load: '<id>'` or
   `Spool ID '<old>' being overwritten for next load: '<id>'` (from any
   sender), clear when a lane's `spool_id` changes to that ID, on
-  `clear_pending` (`SET_NEXT_SPOOL_ID` without `SPOOL_ID`) or when Klippy
-  disconnects/restarts.
+  `clear_pending` (`SET_NEXT_SPOOL_ID` without `SPOOL_ID`) or whenever the
+  printer goes offline (Moonraker unreachable, Klippy shutdown, disconnect
+  or not ready): that usually means a shutdown or reboot, which drops AFC's
+  pending spool. It is not restored on reconnect.
 - Reconnect with backoff (1 s → 30 s); mark printer offline meanwhile.
 
 ### 6.4 Rules

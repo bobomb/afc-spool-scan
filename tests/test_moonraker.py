@@ -150,14 +150,27 @@ async def test_writes_off_does_not_send(rig) -> None:  # noqa: ANN001
 
 async def test_disconnect_and_reconnect(rig) -> None:  # noqa: ANN001
     printer, client, published = rig
+    await client.set_next_spool(97)
+    assert client.state.pending_spool == 97
     await printer.disconnect()
     await wait_until(lambda: not client.state.connected)
+    assert (client.state.pending_spool, client.state.pending_confirmed) == (None, False)
+    assert published[-1].connected is False and published[-1].pending_spool is None
     with pytest.raises(PrinterOffline):
         await client.set_next_spool(97)
-    assert published[-1].connected is False
     printer.connect()
     await wait_until(lambda: client.state.connected, timeout=3)
     assert client.state.lanes[0].spool_id == 84
+    assert client.state.pending_spool is None
+
+
+async def test_klippy_shutdown_clears_pending(rig) -> None:  # noqa: ANN001
+    printer, client, published = rig
+    await client.set_next_spool(97)
+    await printer.notify("notify_klippy_shutdown", [])
+    await wait_until(lambda: client.state.klippy_state == "shutdown")
+    assert not client.state.connected and client.state.pending_spool is None
+    assert published[-1].pending_spool is None
 
 
 async def test_low_stock_threshold_refresh(rig) -> None:  # noqa: ANN001
