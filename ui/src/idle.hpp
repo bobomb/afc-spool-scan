@@ -1,5 +1,6 @@
 #pragma once
-// Idle management: dim after idle_dim_s, blank after idle_off_s; wake on touch, scan or scale change.
+// Idle management: dim after idle_dim_s, blank after idle_off_s (the station goes to sleep, see
+// App::on_sleep); wake on touch, scan or scale change.
 
 #include <cstdint>
 

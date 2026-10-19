@@ -52,7 +52,7 @@ async def test_ipc_end_to_end(station: Station) -> None:
     assert snapshot["service"]["dry_run"] is False
     assert [p["name"] for p in snapshot["printers"]] == ["Kilo", "Yankee"]
     assert snapshot["printers"][0]["lanes"][0]["spool_id"] == 84
-    assert snapshot["settings"]["target"] == "both"
+    assert snapshot["settings"]["scan_mode"] == "immediate" and "target" not in snapshot["settings"]
     assert snapshot["health"]["scale"] is True and snapshot["health"]["scanner"] is True
 
     await client.request("sim.scale", grams=640.0)

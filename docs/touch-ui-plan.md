@@ -145,8 +145,8 @@ WPE WebKit (`cog`), Qt/QML (PySide6), Kivy, extending KlipperScreen.
 | Scale display | Live weight in grams (converted from oz if needed), stability/status, estimated net filament |
 | Numeric spool ID entry | On-screen numpad; scanning a QR also fills the ID |
 | Weigh spool | Read stable scale weight; update Spoolman via `PUT /spool/{id}/measure` |
-| Weigh spool + load | Weigh, then send `SET_NEXT_SPOOL_ID` to the target printer(s) |
-| Load spool | Send `SET_NEXT_SPOOL_ID` to the target printer(s) only |
+| Weigh spool + load | Weigh, then send `SET_NEXT_SPOOL_ID` to both printers |
+| Load spool | Send `SET_NEXT_SPOOL_ID` to both printers only |
 | Printer dashboard | Per-printer lane state (see §6) |
 
 Rules carried over from the current scanner behaviour:
@@ -167,7 +167,7 @@ Rules carried over from the current scanner behaviour:
 
 | # | Function | Notes |
 |---|---|---|
-| 1 | **Target printer selection** | Kilo / Yankee / Both. Show the pending next-spool per printer and allow **Clear pending**. Fixes stale pending IDs left on the printer not loaded. |
+| 1 | **Next spool on both printers** | Changed 2026-10-19 (was "Target printer selection: Kilo / Yankee / Both"). Load and Weigh + Load always set the next spool on every printer; printers cannot be deselected. When one printer loads that spool into a lane, the service clears it as next spool on the other printers (undoable, in the Log). The pending next spool per printer is shown with **Clear pending**. |
 | 2 | **Look up (no action)** | Enter/scan ID → show vendor, filament name, material, color, remaining, spool weight, location, last used. |
 | 3 | **Assign to specific lane** | `SET_SPOOL_ID LANE=laneN SPOOL_ID=X` on a chosen printer/lane; for lanes tagged wrongly or loaded without a scan. Only when explicitly chosen (§4.1: the default is next-spool). |
 | 5 | **Record empty spool** | Weigh the empty core, store it as the spool's `spool_weight` (tare) and as its filament's default `spool_weight`, then archive the spool. |
@@ -176,7 +176,7 @@ Rules carried over from the current scanner behaviour:
 | 8 | **Scan behaviour mode** | Configurable behaviour when a QR is scanned while the UI is running (see §7). |
 | 9 | **Low-stock highlighting** | Lanes and looked-up spools below a threshold are highlighted. |
 | 10 | **Health / connection status** | Spoolman, Kilo, Yankee and scale connection indicators; scale status detail. |
-| 11 | **Screen idle management** | Blank/dim after idle; wake on touch, scan or scale change. Dimming needs a software backlight (verify, §2.1); otherwise blank to a black screen. |
+| 11 | **Screen idle management** | Blank/dim after idle; wake on touch, scan or scale change. Dimming needs a software backlight (verify, §2.1); otherwise blank to a black screen. When the screen goes off the station goes to sleep: the selected spool is deselected and the pending next spool is cleared on both printers (added 2026-10-19; undoable, in the Log). |
 
 ### 4.3 Explicitly excluded — **Decided**
 
@@ -206,8 +206,8 @@ screen.
 │Stat│ │ 701  │ Panchroma Silk Rainbow         │ 841.0 g      │
 │ 🖶 │ │g left│ PLA · Dry box B                │ ✓ Matches    │
 │Prnt│ └──────┘ 70% left · tare 140 g          │   Spoolman   │
-│ ☰  │ LOAD TO · tap a printer to include or exclude it        │
-│Log │ ┌ Kilo  Complete      ✓ ┐ ┌ Yankee  Printing 42%   ✓ ┐ │
+│ ☰  │ PRINTERS · Load sets the next spool on both              │
+│Log │ ┌ Kilo  Complete        ┐ ┌ Yankee  Printing 42%     ┐ │
 │    │ │ [888g][612g][74g][ – ]│ │ [950g][321g][ ? ][45g]   │ │
 │ ●  │ │  PLA  PLA PETG Empty  │ │  PLA PETG Untag ABS      │ │
 │AllOK│ │ ↓ Next spool #93      │ │ ↓ Next spool #93          │ │
@@ -227,11 +227,9 @@ screen.
   keypad. With no spool selected the box shows a dashed "Type ID" tile,
   "Scan a spool / or tap here to type its ID"; an unknown ID shows "Not
   found in Spoolman".
-- **Load-to printer cards.** One card per printer replaces the Target
-  selector. Tapping a card includes or excludes that printer (both included
-  means Both; the last included printer cannot be removed); the same setting
-  is on Settings. An excluded card dims and reads "Not included · tap to
-  include". The pending next spool is at the bottom of each card.
+- **Printer cards.** One card per printer, display only: status, lanes and
+  the pending next spool at the bottom. Load always goes to both printers
+  (§4.2 #1), so there is no target selection.
 - **Lane tiles.** Each lane is a rounded tile filled with the lane spool's
   colour(s), with its remaining ring (share of the initial weight), grams
   left in the ring ("852 g", "1.2 kg" above 1 kg), material and spool # in
@@ -253,7 +251,9 @@ Two cards (Kilo, Yankee). Each shows:
 
 - Connection, print state and progress, AFC `current_state`, AFC error message.
 - Pending next spool (tracked by the service) with **Clear**. Cleared when
-  the printer goes offline, since that usually means it shut down or rebooted.
+  the printer goes offline, since that usually means it shut down or
+  rebooted; when another printer loads that spool into a lane; and when the
+  station goes to sleep (§4.2 #1, #11).
 - Lanes 1–4: color swatch, material, spool ID, remaining g (bar), tool map
   (T0–T3), `filament_status`, loaded lane highlighted, low-stock highlight.
 - Tapping a lane opens **Assign to lane** with the current spool ID; nothing
@@ -266,9 +266,9 @@ undoable entries.
 
 ### 5.4 Settings
 
-Load to (same as the printer cards), scan mode, thresholds, idle timeout,
-brightness (only if a software backlight is available, §2.1), theme/skin.
-Implemented without the brightness control.
+Scan mode, thresholds, idle timeout, brightness (only if a software
+backlight is available, §2.1), theme/skin. Implemented without the
+brightness control.
 
 ### 5.5 Styling
 
@@ -344,7 +344,7 @@ Status byte values to surface in the UI:
 |---|---|---|
 | Weight acceptance | Decided | Stable reading > 50 g |
 | Display orientation | Proposed | Landscape, not rotated (works as currently placed, verified 2026-10-15); if the final mount requires it, rotate in LVGL (display + touch) |
-| Target printer default | **Open** | Both / last used / require choice |
+| Target printer default | **Decided** 2026-10-19 | Always both printers; no selection (§4.2 #1) |
 | Scan behaviour mode (#8) | Decided: configurable; **Open:** default | Options: *immediate* (current: weigh if possible + load), *fill + countdown* (fill ID, run default action after cancellable countdown), *fill only* |
 | Sanity-check warning threshold | **Open** | e.g. 50 g or 10% of expected |
 | Low-stock threshold | **Open** | e.g. < 100 g remaining |
@@ -382,7 +382,7 @@ Detailed tasks: dev plan §8.
 ## 10. Open questions
 
 1. Theme: dark, light, or toggle.
-2. Target printer default.
+2. ~~Target printer default.~~ Decided 2026-10-19: always both (§4.2 #1).
 3. Scan mode default.
 4. Thresholds: sanity-check delta, low stock, idle timeouts.
 5. ~~Empty spool: update filament default tare too?~~ Decided 2026-10-15:
@@ -397,7 +397,8 @@ Detailed tasks: dev plan §8.
 11. Mounting orientation (landscape assumed; landscape verified on the
     panel as currently placed, 2026-10-15).
 12. ~~Main screen re-layout to reduce clutter.~~ Decided 2026-10-15:
-    option C (printer cards as the Load target) with D's side rail, filled
+    option C (printer cards as the Load target; selection removed 2026-10-19)
+    with D's side rail, filled
     lane and spool tiles, tap the top box for the keypad, More menu (§5).
 
 ## Decision log
@@ -418,3 +419,5 @@ Detailed tasks: dev plan §8.
 | 2026-10-15 | Main screen re-layout (§5): side rail with one status line; top box with the selected spool as a filament-coloured tile (gradient for multi-colour spools) with remaining ring, tap to open the keypad; printer cards are the Load target (any subset of printers); lanes as filament-coloured tiles with remaining ring and contrast-picked text; More menu for Assign lane and Empty spool. |
 | 2026-10-15 | Lane tiles and the selected spool tile show grams left in the ring centre instead of the percentage; the ring still shows the share left, and the spool details line shows the percentage. |
 | 2026-10-16 | A printer going offline (unreachable, Klippy shutdown/disconnect) clears its pending next spool in the service, because it usually means the printer shut down or rebooted. |
+| 2026-10-19 | Changes §4.2 #1 (was target selection Kilo / Yankee / Both): Load and Weigh + Load always set the next spool on both printers and printers cannot be deselected (the `target` setting and the card toggle are removed). When a printer loads that spool into a lane, the next spool is cleared on the other printers. |
+| 2026-10-19 | §4.2 #11: when the screen goes off the station goes to sleep: deselect the spool and clear the pending next spool on both printers. |

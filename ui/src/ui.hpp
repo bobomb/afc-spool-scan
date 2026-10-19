@@ -116,11 +116,12 @@ private:
     lv_grad_dsc_t grad_{};
 };
 
-// A printer on the station screen: tap to include or exclude it from Load; lanes as filled tiles.
+// A printer on the station screen: status, next spool and lanes as filled tiles. Load always
+// sets the next spool on every printer, so the card is display only.
 class TargetCard {
 public:
     TargetCard(App& app, lv_obj_t* parent, int x, int y, int w, int h);
-    void update(const Printer& printer, bool included, bool online);
+    void update(const Printer& printer, bool online);
     // Owner deletes this before destroying the card: its click handler and tile gradients point into it.
     lv_obj_t* root() const { return root_; }
 
@@ -144,7 +145,6 @@ private:
     lv_obj_t* dot_ = nullptr;
     lv_obj_t* name_ = nullptr;
     lv_obj_t* state_ = nullptr;
-    lv_obj_t* select_ = nullptr;
     lv_obj_t* lanes_box_ = nullptr;
     lv_obj_t* footer_ = nullptr;
     std::vector<std::unique_ptr<LaneTile>> tiles_;
@@ -313,6 +313,7 @@ private:
     lv_obj_t* root_ = nullptr;
     std::unique_ptr<SpoolHero> hero_;
     lv_obj_t* targets_label_ = nullptr;
+    lv_obj_t* targets_hint_ = nullptr;
     lv_obj_t* no_printers_ = nullptr;
     std::vector<std::unique_ptr<TargetCard>> cards_;
     lv_obj_t* more_ = nullptr;
@@ -370,16 +371,13 @@ private:
                      const std::vector<std::pair<std::string, std::string>>& options);
     void add_stepper(const std::string& key, const std::string& title, const std::string& hint, double step,
                      double min, double max);
-    void rebuild_targets(const State& state);
 
     App& app_;
     lv_obj_t* root_ = nullptr;
     lv_obj_t* list_ = nullptr;
-    lv_obj_t* target_row_ = nullptr;
     lv_obj_t* service_ = nullptr;
     std::vector<Segment> segments_;
     std::vector<Stepper> steppers_;
-    std::vector<std::string> target_keys_;
 };
 
 }  // namespace station

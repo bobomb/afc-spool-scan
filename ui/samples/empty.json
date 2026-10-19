@@ -50,7 +50,7 @@
         "afc_state": "Idle",
         "afc_error": null,
         "current_load": "lane2",
-        "pending_spool": 90,
+        "pending_spool": 91,
         "pending_confirmed": true,
         "lanes": [
           {
@@ -224,7 +224,6 @@
     },
     "activity": [],
     "settings": {
-      "target": "both",
       "scan_mode": "immediate",
       "theme": "dark",
       "sanity_threshold_g": 50,

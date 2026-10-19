@@ -33,7 +33,7 @@ const char* kSnapshot = R"({
   "activity": [{"id": "a-41", "at": "2026-10-13T21:00:01Z", "action": "weigh_load", "spool_id": 97,
                 "printers": ["Kilo"], "ok": true, "message": "984 g saved; next spool set",
                 "undoable": true}],
-  "settings": {"target": "both", "scan_mode": "immediate", "theme": "dark", "sanity_threshold_g": 50,
+  "settings": {"scan_mode": "immediate", "theme": "dark", "sanity_threshold_g": 50,
                "sanity_threshold_pct": 10, "low_stock_g": 100, "undo_depth": 20, "idle_dim_s": 120,
                "idle_off_s": 300}
 })";
@@ -112,7 +112,7 @@ TEST_CASE("events replace subtrees and printer events merge by key")
 
     model.apply_event("settings", json::parse(R"({"theme":"light","undo_depth":5})"));
     CHECK(model.state().settings.theme == "light");
-    CHECK(model.state().settings.target == "both");
+    CHECK(model.state().settings.scan_mode == "immediate");
     CHECK(model.apply_event("bogus", json::object()) == 0);
 }
 
@@ -126,7 +126,7 @@ TEST_CASE("tolerates wrong types and missing fields")
     REQUIRE(model.state().printers.size() == 2);
     CHECK(model.state().printers[1].key == "x");
     CHECK(model.state().activity.empty());
-    CHECK(model.state().settings.target == "both");
+    CHECK(model.state().settings.scan_mode == "immediate");
     CHECK(model.apply_snapshot(json::array()) == 0);
 }
 

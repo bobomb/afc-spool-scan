@@ -27,9 +27,7 @@ std::string setting_text(const std::string& key, double value)
 
 const std::string& segment_value(const Settings& settings, const std::string& key)
 {
-    if (key == "scan_mode") return settings.scan_mode;
-    if (key == "theme") return settings.theme;
-    return settings.target;
+    return key == "scan_mode" ? settings.scan_mode : settings.theme;
 }
 
 }  // namespace
@@ -50,7 +48,6 @@ SettingsScreen::SettingsScreen(App& app, lv_obj_t* parent) : app_(app)
     lv_obj_set_flex_flow(list_, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(list_, 4, 0);
 
-    target_row_ = row("Load to", "Same as the printer cards on Station");
     add_segment("scan_mode", "Scan mode", "What a QR scan does",
                 {{"immediate", "Immediate"}, {"countdown", "Countdown"}, {"fill", "Fill only"}});
     add_segment("theme", "Theme", "Display colours", {{"dark", "Dark"}, {"light", "Light"}});
@@ -136,49 +133,8 @@ void SettingsScreen::add_stepper(const std::string& key, const std::string& titl
     steppers_.push_back(stepper);
 }
 
-void SettingsScreen::rebuild_targets(const State& state)
-{
-    lv_obj_t* group = lv_obj_get_child_count(target_row_) > 2 ? lv_obj_get_child(target_row_, -1) : nullptr;
-    if (group != nullptr) {
-        lv_obj_delete(group);
-    }
-    for (auto it = segments_.begin(); it != segments_.end(); ++it) {
-        if (it->key == "target") {
-            segments_.erase(it);
-            break;
-        }
-    }
-    Theme& theme = app_.theme();
-    group = ui::container(target_row_);
-    lv_obj_set_size(group, 360, 50);
-    lv_obj_align(group, LV_ALIGN_RIGHT_MID, -6, 0);
-    lv_obj_set_flex_flow(group, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_column(group, 6, 0);
-    Segment segment{"target", {}};
-    target_keys_.clear();
-    std::vector<std::pair<std::string, std::string>> options;
-    for (const Printer& printer : state.printers) options.emplace_back(printer.key, printer.name);
-    options.emplace_back("both", "Both");
-    for (const auto& [value, text] : options) {
-        lv_obj_t* button = ui::button(group, theme, text, ui::ButtonStyle::Segment);
-        lv_obj_set_height(button, 50);
-        lv_obj_set_flex_grow(button, 1);
-        const std::string choice = value;
-        ui::on_click(button, [this, choice] { app_.set_setting("target", choice); });
-        segment.options.emplace_back(value, button);
-        target_keys_.push_back(value);
-    }
-    segments_.push_back(std::move(segment));
-}
-
 void SettingsScreen::update(const State& state, bool online)
 {
-    std::vector<std::string> keys;
-    for (const Printer& printer : state.printers) keys.push_back(printer.key);
-    keys.push_back("both");
-    if (keys != target_keys_) {
-        rebuild_targets(state);
-    }
     for (Segment& segment : segments_) {
         const std::string& current = segment_value(state.settings, segment.key);
         for (auto& [value, button] : segment.options) {

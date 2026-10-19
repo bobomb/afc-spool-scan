@@ -30,24 +30,6 @@ TEST_CASE("colour strings parse and skip invalid entries")
     CHECK(colors[1] == 0x33B5E5);
 }
 
-TEST_CASE("printer cards toggle the Load target")
-{
-    const std::vector<std::string> keys = {"kilo", "yankee"};
-    CHECK(included_printers("both", keys) == keys);
-    CHECK(included_printers("yankee", keys) == std::vector<std::string>{"yankee"});
-    CHECK(included_printers(" Yankee , kilo", keys) == keys);
-    CHECK(included_printers("gone", keys) == keys);
-    CHECK(toggle_target("both", keys, "kilo") == std::optional<std::string>("yankee"));
-    CHECK(toggle_target("yankee", keys, "kilo") == std::optional<std::string>("both"));
-    CHECK_FALSE(toggle_target("yankee", keys, "yankee").has_value());
-    CHECK(toggle_target("both", keys, "prusa") == std::optional<std::string>("both"));
-
-    const std::vector<std::string> three = {"a", "b", "c"};
-    CHECK(toggle_target("both", three, "b") == std::optional<std::string>("a,c"));
-    CHECK(toggle_target("c,a", three, "b") == std::optional<std::string>("both"));
-    CHECK(toggle_target("a,c", three, "a") == std::optional<std::string>("c"));
-}
-
 TEST_CASE("selected spool remaining percent")
 {
     SpoolInfo spool;

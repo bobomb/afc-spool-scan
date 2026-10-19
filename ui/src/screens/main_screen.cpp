@@ -34,9 +34,9 @@ MainScreen::MainScreen(App& app, lv_obj_t* parent) : app_(app)
     lv_obj_set_flex_flow(targets_label_, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(targets_label_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(targets_label_, 10, 0);
-    lv_obj_t* cap = ui::label(targets_label_, theme.caption(), theme.muted(), "LOAD TO");
+    lv_obj_t* cap = ui::label(targets_label_, theme.caption(), theme.muted(), "PRINTERS");
     lv_obj_set_style_text_letter_space(cap, 1, 0);
-    ui::label(targets_label_, theme.caption(), theme.muted(), "\xE2\x80\xA2  tap a printer to include or exclude it");
+    targets_hint_ = ui::label(targets_label_, theme.caption(), theme.muted(), "");
     no_printers_ = ui::label(root_, theme.normal(), theme.muted(), "No printers configured");
     lv_obj_set_pos(no_printers_, x, kCardsY + 70);
 
@@ -82,14 +82,13 @@ void MainScreen::update(const State& state, std::uint32_t topics, bool online)
     }
     ui::set_hidden(no_printers_, count != 0);
     ui::set_hidden(targets_label_, count == 0);
-    if (rebuilt || (topics & (kTopicPrinters | kTopicSettings | kTopicConnection | kTopicService))) {
-        std::vector<std::string> keys;
-        for (const Printer& printer : state.printers) keys.push_back(printer.key);
-        const std::vector<std::string> included = included_printers(state.settings.target, keys);
+    if (rebuilt) {
+        ui::set_text(targets_hint_, count == 2 ? "\xE2\x80\xA2  Load sets the next spool on both"
+                                               : "\xE2\x80\xA2  Load sets the next spool on every printer");
+    }
+    if (rebuilt || (topics & (kTopicPrinters | kTopicConnection | kTopicService))) {
         for (std::size_t i = 0; i < count; ++i) {
-            const Printer& printer = state.printers[i];
-            const bool in = std::find(included.begin(), included.end(), printer.key) != included.end();
-            cards_[i]->update(printer, in, online);
+            cards_[i]->update(state.printers[i], online);
         }
     }
 

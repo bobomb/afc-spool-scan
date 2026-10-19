@@ -24,27 +24,16 @@ TargetCard::TargetCard(App& app, lv_obj_t* parent, int x, int y, int w, int h) :
     lv_obj_set_style_radius(root_, 16, 0);
     lv_obj_set_style_bg_color(root_, theme.surface(), 0);
     lv_obj_set_style_bg_opa(root_, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(root_, theme.surface_alt(), LV_STATE_PRESSED);
-    lv_obj_set_style_border_color(root_, theme.primary(), 0);
-    ui::on_click(root_, [this] { app_.toggle_target(key_); });
 
     lv_obj_t* head = ui::container(root_);
     lv_obj_set_pos(head, kInset + 2, 10);
-    lv_obj_set_size(head, w - 2 * kInset - 34, 30);
+    lv_obj_set_size(head, w - 2 * kInset, 30);
     lv_obj_set_flex_flow(head, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(head, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(head, 10, 0);
     dot_ = ui::dot(head, 10, theme.muted());
     name_ = ui::label(head, theme.normal(), theme.text(), "");
     state_ = ui::label(head, theme.caption(), theme.muted(), "");
-
-    select_ = ui::container(root_);
-    lv_obj_set_size(select_, 26, 26);
-    lv_obj_set_pos(select_, w - 26 - 14, 12);
-    lv_obj_set_style_radius(select_, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_border_color(select_, theme.border(), 0);
-    lv_obj_t* check = ui::label(select_, theme.caption(), theme.on_primary(), LV_SYMBOL_OK);
-    lv_obj_center(check);
 
     // Room around the tiles for the in-tool outline, which would otherwise be clipped.
     lanes_box_ = ui::container(root_);
@@ -111,7 +100,7 @@ void TargetCard::build_tiles(std::size_t count)
     }
 }
 
-void TargetCard::update(const Printer& printer, bool included, bool online)
+void TargetCard::update(const Printer& printer, bool online)
 {
     Theme& theme = app_.theme();
     key_ = printer.key;
@@ -132,18 +121,9 @@ void TargetCard::update(const Printer& printer, bool included, bool online)
     lv_obj_set_style_text_color(state_, status_color, 0);
     ui::set_text(state_, status);
 
-    lv_obj_set_style_border_width(root_, included ? 2 : 0, 0);
-    lv_obj_set_style_bg_color(select_, theme.primary(), 0);
-    lv_obj_set_style_bg_opa(select_, static_cast<lv_opa_t>(included ? LV_OPA_COVER : LV_OPA_TRANSP), 0);
-    lv_obj_set_style_border_width(select_, included ? 0 : 2, 0);
-    ui::set_hidden(lv_obj_get_child(select_, 0), !included);
-    lv_obj_set_style_opa(lanes_box_, static_cast<lv_opa_t>(included && up ? LV_OPA_COVER : 115), 0);
-    lv_obj_set_clickable(root_, online);
+    lv_obj_set_style_opa(lanes_box_, static_cast<lv_opa_t>(up ? LV_OPA_COVER : 115), 0);
 
-    if (!included) {
-        ui::set_text(footer_, "Not included  \xE2\x80\xA2  tap to include");
-        lv_obj_set_style_text_color(footer_, theme.muted(), 0);
-    } else if (printer.pending_spool) {
+    if (printer.pending_spool) {
         ui::set_text(footer_, LV_SYMBOL_DOWNLOAD "  Next spool #" + std::to_string(*printer.pending_spool) +
                                   (printer.pending_confirmed ? "" : "  (sent)"));
         lv_obj_set_style_text_color(footer_, theme.info(), 0);

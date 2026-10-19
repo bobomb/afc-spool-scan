@@ -60,7 +60,7 @@
       "used_weight_g": 545.3,
       "tare_source": "spool",
       "location": "Dry box A",
-      "last_used": "2026-10-16T01:59:55Z",
+      "last_used": "2026-10-19T19:59:53Z",
       "archived": false,
       "low_stock": false,
       "message": null,
@@ -80,7 +80,7 @@
         "afc_state": "Idle",
         "afc_error": null,
         "current_load": "lane2",
-        "pending_spool": 90,
+        "pending_spool": 91,
         "pending_confirmed": true,
         "lanes": [
           {
@@ -254,23 +254,24 @@
     },
     "activity": [
       {
-        "id": "a-8",
-        "at": "2026-10-13T20:07:12Z",
+        "id": "a-9",
+        "at": "2026-10-13T20:08:12Z",
         "action": "load",
         "spool_id": 91,
         "printers": [
+          "Kilo",
           "Yankee"
         ],
         "ok": true,
-        "message": "next spool set on Yankee",
+        "message": "next spool set on Kilo, Yankee",
         "code": null,
         "dry_run": false,
         "undone": false,
         "undoable": true
       },
       {
-        "id": "a-7",
-        "at": "2026-10-13T20:06:12Z",
+        "id": "a-8",
+        "at": "2026-10-13T20:07:12Z",
         "action": "weigh_load",
         "spool_id": 90,
         "printers": [
@@ -285,12 +286,13 @@
         "undoable": true
       },
       {
-        "id": "a-6",
-        "at": "2026-10-13T20:05:12Z",
+        "id": "a-7",
+        "at": "2026-10-13T20:06:12Z",
         "action": "undo",
         "spool_id": 97,
         "printers": [
-          "Kilo"
+          "Kilo",
+          "Yankee"
         ],
         "ok": true,
         "message": "Undid weigh + load of spool 97",
@@ -300,23 +302,24 @@
         "undoable": false
       },
       {
-        "id": "a-5",
-        "at": "2026-10-13T20:04:12Z",
+        "id": "a-6",
+        "at": "2026-10-13T20:05:12Z",
         "action": "weigh_load",
         "spool_id": 97,
         "printers": [
-          "Kilo"
+          "Kilo",
+          "Yankee"
         ],
         "ok": true,
-        "message": "640 g saved; next spool set on Kilo",
+        "message": "640 g saved; next spool set on Kilo, Yankee",
         "code": null,
         "dry_run": false,
         "undone": true,
         "undoable": false
       },
       {
-        "id": "a-4",
-        "at": "2026-10-13T20:03:12Z",
+        "id": "a-5",
+        "at": "2026-10-13T20:04:12Z",
         "action": "weigh",
         "spool_id": 86,
         "printers": [],
@@ -328,8 +331,8 @@
         "undoable": false
       },
       {
-        "id": "a-3",
-        "at": "2026-10-13T20:02:12Z",
+        "id": "a-4",
+        "at": "2026-10-13T20:03:12Z",
         "action": "empty_spool",
         "spool_id": 60,
         "printers": [],
@@ -341,15 +344,31 @@
         "undoable": true
       },
       {
+        "id": "a-3",
+        "at": "2026-10-13T20:02:12Z",
+        "action": "spool_loaded",
+        "spool_id": 93,
+        "printers": [
+          "Kilo"
+        ],
+        "ok": true,
+        "message": "in Yankee lane3; next spool cleared on Kilo",
+        "code": null,
+        "dry_run": false,
+        "undone": false,
+        "undoable": true
+      },
+      {
         "id": "a-2",
         "at": "2026-10-13T20:01:12Z",
         "action": "load",
         "spool_id": 93,
         "printers": [
+          "Kilo",
           "Yankee"
         ],
         "ok": true,
-        "message": "next spool set on Yankee",
+        "message": "next spool set on Kilo, Yankee",
         "code": null,
         "dry_run": false,
         "undone": false,
@@ -370,7 +389,6 @@
       }
     ],
     "settings": {
-      "target": "both",
       "scan_mode": "immediate",
       "theme": "dark",
       "sanity_threshold_g": 50,

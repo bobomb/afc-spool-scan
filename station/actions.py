@@ -36,6 +36,8 @@ UNDO_LABELS = {
     "assign_lane": "lane assignment",
     "empty_spool": "empty spool",
     "clear_pending": "clear pending",
+    "sleep": "sleep clear",
+    "spool_loaded": "automatic clear",
 }
 
 
@@ -143,6 +145,7 @@ class Actions:
             "cancel_countdown": self.cancel_countdown,
             "dismiss_prompt": self.dismiss_prompt,
             "clear_spool": self.clear_spool,
+            "sleep": self.sleep,
         }
 
     async def handle(self, action: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -218,13 +221,6 @@ class Actions:
         except UnknownPrinter as error:
             raise ActionError("invalid_args", str(error)) from error
 
-    def _targets(self, args: dict[str, Any]) -> list[MoonrakerClient]:
-        target = args.get("target") or self.settings["target"]
-        try:
-            return self.printers.resolve(target)
-        except UnknownPrinter as error:
-            raise ActionError("invalid_args", str(error)) from error
-
     def _fail(self, error: ActionError) -> None:
         if error.code != "needs_confirm":
             self.cues.play("error")
@@ -290,6 +286,40 @@ class Actions:
             printers=[c.printer.name for c in clients], undo=undo,
         )
 
+    async def _clear_step(self, clients: list[MoonrakerClient]) -> StepResult:
+        """Clear the next spool on `clients`; undo restores what each had pending."""
+
+        async def one(client: MoonrakerClient) -> tuple[MoonrakerClient, str | None, bool, int | None]:
+            previous = client.state.pending_spool
+            try:
+                result = await client.set_next_spool(None)
+            except PrinterOffline:
+                return client, "offline", False, previous
+            except asyncio.TimeoutError:
+                return client, NO_REPLY, False, previous
+            except PrinterCommandError as error:
+                return client, str(error) or "command failed", False, previous
+            return client, None, result.dry_run, previous
+
+        outcomes = await asyncio.gather(*(one(client) for client in clients))
+        done = [c.printer.name for c, error, _, _ in outcomes if error is None]
+        failed = [(c.printer.name, error) for c, error, _, _ in outcomes if error is not None]
+        dry_run = any(dry for _, error, dry, _ in outcomes if error is None)
+        undo = [
+            UndoStep(kind="pending", printer=c.key, spool_id=previous)
+            for c, error, dry, previous in outcomes
+            if previous is not None and ((error is None and not dry) or error == NO_REPLY)
+        ]
+        parts = []
+        if done:
+            parts.append(("Dry run: would clear next spool on " if dry_run else "next spool cleared on ") + _join(done))
+        parts += [f"{name}: {error}" for name, error in failed]
+        code = None
+        if failed:
+            code = "printer_offline" if any(error == "offline" for _, error in failed) else "printer_error"
+        return StepResult("; ".join(parts), ok=not failed, code=code, dry_run=dry_run,
+                          printers=[c.printer.name for c in clients], undo=undo)
+
     async def _ensure_known_spool(self, spool_id: int) -> None:
         """Reject unknown spools; proceed if Spoolman is unreachable (parity with scanning)."""
         try:
@@ -329,7 +359,7 @@ class Actions:
 
     async def load(self, args: dict[str, Any]) -> Outcome:
         spool_id = _spool_id(args)
-        clients = self._targets(args)
+        clients = self.printers.all()
         async with self._lock:
             try:
                 await self._ensure_known_spool(spool_id)
@@ -346,7 +376,7 @@ class Actions:
         """Weigh then load. From a scan, a missing weight is skipped like the bash scanner."""
         spool_id = _spool_id(args)
         confirm = _bool(args, "confirm")
-        clients = self._targets(args)
+        clients = self.printers.all()
         from_scan = source == "scan"
         async with self._lock:
             weigh: StepResult | None = None
@@ -629,3 +659,31 @@ class Actions:
             self.store.set_spool(None)
             self.refresh_scale()
         return Outcome(True, "Spool cleared")
+
+    async def sleep(self, args: dict[str, Any]) -> Outcome:
+        """The station went to sleep (screen off): deselect the spool and clear every pending next spool."""
+        self._clear_prompt()
+        await self.clear_spool(args)
+        async with self._lock:
+            clients = [c for c in self.printers.all() if c.state.pending_spool is not None]
+            if not clients:
+                return Outcome(True, "Asleep")
+            step = await self._clear_step(clients)
+            activity_id = self._record("sleep", None, step)
+            return Outcome(step.ok, f"Station asleep: {step.message}", code=step.code, activity_id=activity_id,
+                           dry_run=step.dry_run)
+
+    async def spool_loaded(self, printer: str, lane: str, spool_id: int) -> None:
+        """A lane took `spool_id`, so it is physically there: clear it as next spool on the other printers."""
+        async with self._lock:
+            try:
+                source = self.printers.get(printer)
+            except UnknownPrinter:
+                return
+            others = [c for c in self.printers.all() if c is not source and c.state.pending_spool == spool_id]
+            if not others:
+                return
+            step = await self._clear_step(others)
+            log.info("Spool %d loaded in %s %s; %s", spool_id, source.printer.name, lane, step.message)
+            step.message = f"in {source.printer.name} {lane}; {step.message}"
+            self._record("spool_loaded", spool_id, step)

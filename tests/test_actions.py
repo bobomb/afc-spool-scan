@@ -33,7 +33,6 @@ async def test_unknown_action_and_invalid_args(station: Station) -> None:
     for args in ({}, {"spool_id": "abc"}, {"spool_id": 0}, {"spool_id": True}, {"spool_id": -4}):
         assert (await act(station, "lookup", **args))["code"] == "invalid_args"
     assert (await act(station, "weigh", spool_id=97, confirm="yes"))["code"] == "invalid_args"
-    assert (await act(station, "load", spool_id=97, target="prusa"))["code"] == "invalid_args"
 
 
 async def test_lookup_publishes_spool(station: Station) -> None:
@@ -134,7 +133,8 @@ async def test_weigh_dry_run_when_writes_off(station: Station) -> None:
 
 async def test_load_both_and_undo(station: Station) -> None:
     kilo, yankee = sim_printer(station, "kilo"), sim_printer(station, "yankee")
-    await act(station, "load", spool_id=84, target="yankee")
+    await act(station, "load", spool_id=84)
+    await act(station, "clear_pending", printer="kilo")
     result = await act(station, "load", spool_id=97)
     assert result["ok"] is True
     assert result["message"] == "Spool 97: next spool set on Kilo, Yankee"
@@ -147,18 +147,61 @@ async def test_load_both_and_undo(station: Station) -> None:
     assert station.store.printers["yankee"].pending_spool == 84
 
 
-async def test_load_single_target_and_setting_default(station: Station) -> None:
-    await act(station, "set_setting", key="target", value="kilo")
-    result = await act(station, "load", spool_id=97)
-    assert result["message"] == "Spool 97: next spool set on Kilo"
+async def test_load_always_goes_to_every_printer(station: Station) -> None:
+    assert "target" not in station.store.settings
+    assert (await act(station, "set_setting", key="target", value="kilo"))["code"] == "invalid_args"
+    result = await act(station, "load", spool_id=97, target="kilo")
+    assert result["message"] == "Spool 97: next spool set on Kilo, Yankee"
+    assert sim_printer(station, "yankee").next_spool_id == 97
+
+
+async def test_loading_on_one_printer_clears_the_others(station: Station) -> None:
+    await act(station, "load", spool_id=97)
+    await act(station, "sim.printer", printer="kilo", op="insert", lane="lane4")
+    await wait_until(lambda: station.store.printers["yankee"].pending_spool is None)
     assert sim_printer(station, "yankee").next_spool_id is None
-    explicit = await act(station, "load", spool_id=90, target="YANKEE")
-    assert explicit["ok"] and sim_printer(station, "yankee").next_spool_id == 90
-    listed = await act(station, "load", spool_id=86, target="yankee,kilo")
-    assert listed["message"] == "Spool 86: next spool set on Kilo, Yankee"
-    await act(station, "set_setting", key="target", value="yankee,kilo")
-    assert station.store.settings["target"] == "both"
-    assert (await act(station, "load", spool_id=97, target="kilo,prusa"))["code"] == "invalid_args"
+    assert sim_printer(station, "yankee").gcode_log[-1] == "SET_NEXT_SPOOL_ID"
+    assert station.store.printers["kilo"].lanes[3].spool_id == 97
+    assert station.store.printers["kilo"].pending_spool is None
+    await wait_until(lambda: station.store.activity[0]["action"] == "spool_loaded")
+    entry = station.store.activity[0]
+    assert entry["message"] == "in Kilo lane4; next spool cleared on Yankee"
+    assert entry["spool_id"] == 97 and entry["printers"] == ["Yankee"] and entry["undoable"]
+    assert station.cues.played == ["success"]
+
+
+async def test_loading_leaves_other_printers_with_a_different_next_spool(station: Station) -> None:
+    await act(station, "load", spool_id=97)
+    await station.printers.get("kilo").set_next_spool(90)
+    await act(station, "sim.printer", printer="kilo", op="insert", lane="lane4")
+    await wait_until(lambda: station.store.printers["kilo"].lanes[3].spool_id == 90)
+    await asyncio.sleep(0.05)
+    assert station.store.printers["yankee"].pending_spool == 97
+    assert sim_printer(station, "yankee").next_spool_id == 97
+    assert all(entry["action"] != "spool_loaded" for entry in station.store.activity)
+
+
+async def test_sleep_deselects_and_clears_every_next_spool(station: Station) -> None:
+    assert (await act(station, "sleep"))["message"] == "Asleep"
+    await act(station, "load", spool_id=97)
+    assert station.store.spool.id == 97
+    result = await act(station, "sleep")
+    assert result["ok"] and result["message"] == "Station asleep: next spool cleared on Kilo, Yankee"
+    assert station.store.spool is None and station.store.scale.check is None
+    assert sim_printer(station, "kilo").next_spool_id is None and sim_printer(station, "yankee").next_spool_id is None
+    assert all(p.pending_spool is None for p in station.store.printers.values())
+    assert station.store.activity[0]["action"] == "sleep" and station.store.activity[0]["undoable"]
+    assert station.store.activity[0]["message"] == "next spool cleared on Kilo, Yankee"
+    await act(station, "undo", activity_id=result["activity_id"])
+    assert sim_printer(station, "kilo").next_spool_id == 97 and sim_printer(station, "yankee").next_spool_id == 97
+
+
+async def test_sleep_skips_printers_without_a_next_spool(station: Station) -> None:
+    await act(station, "load", spool_id=97)
+    await act(station, "sim.printer", printer="kilo", op="disconnect")
+    await wait_until(lambda: not station.store.printers["kilo"].connected)
+    result = await act(station, "sleep")
+    assert result["message"] == "Station asleep: next spool cleared on Yankee"
 
 
 async def test_lanes_carry_remaining_percent_and_colours(station: Station) -> None:
@@ -222,9 +265,9 @@ async def test_weigh_load_from_ui(station: Station) -> None:
     assert result["code"] == "below_minimum"
     assert sim_printer(station, "kilo").next_spool_id is None
     await set_scale(station, 640.0)
-    result = await act(station, "weigh_load", spool_id=97, target="kilo")
+    result = await act(station, "weigh_load", spool_id=97)
     assert result["ok"] is True
-    assert result["message"] == "Spool 97: 640 g saved; next spool set on Kilo"
+    assert result["message"] == "Spool 97: 640 g saved; next spool set on Kilo, Yankee"
     assert station.cues.played[-2:] == ["weigh", "success"]
     await act(station, "undo", activity_id=result["activity_id"])
     assert sim_spool(station, 97)["used_weight"] == pytest.approx(545.3)
@@ -232,7 +275,7 @@ async def test_weigh_load_from_ui(station: Station) -> None:
 
 
 async def test_clear_pending_and_undo(station: Station) -> None:
-    await act(station, "load", spool_id=97, target="kilo")
+    await act(station, "load", spool_id=97)
     result = await act(station, "clear_pending", printer="Kilo")
     assert result["ok"] and result["message"] == "Cleared next spool on Kilo"
     assert sim_printer(station, "kilo").next_spool_id is None
@@ -430,7 +473,7 @@ async def test_printer_timeouts_are_recorded_with_undo(station: Station, monkeyp
     async def no_reply(*args: Any, **kwargs: Any) -> Any:
         raise asyncio.TimeoutError
 
-    await act(station, "load", spool_id=97, target="kilo")
+    await act(station, "load", spool_id=97)
     monkeypatch.setattr(kilo, "call", no_reply)
     cleared = await act(station, "clear_pending", printer="kilo")
     assert cleared["ok"] is False and cleared["code"] == "printer_error"
@@ -439,7 +482,7 @@ async def test_printer_timeouts_are_recorded_with_undo(station: Station, monkeyp
     assigned = await act(station, "assign_lane", spool_id=97, printer="kilo", lane="lane4")
     assert assigned["code"] == "printer_error" and assigned["activity_id"]
     assert station.store.activity[0]["action"] == "assign_lane" and station.store.activity[0]["undoable"]
-    loaded = await act(station, "load", spool_id=90, target="kilo")
+    loaded = await act(station, "load", spool_id=90)
     assert loaded["code"] == "printer_error" and station.store.activity[0]["undoable"]
 
 
@@ -459,7 +502,7 @@ async def test_disconnecting_client_does_not_abort_a_write(station: Station,
     reader, writer = await asyncio.open_connection("127.0.0.1", station.ipc_port)
     await reader.readline()
     await reader.readline()
-    request = {"type": "request", "id": "x", "action": "weigh_load", "args": {"spool_id": 97, "target": "kilo"}}
+    request = {"type": "request", "id": "x", "action": "weigh_load", "args": {"spool_id": 97}}
     writer.write((json.dumps(request) + "\n").encode())
     await writer.drain()
     await asyncio.sleep(0.1)

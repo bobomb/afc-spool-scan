@@ -1,7 +1,6 @@
 #include "view_model.hpp"
 
 #include <algorithm>
-#include <cctype>
 #include <cmath>
 
 #include "format.hpp"
@@ -13,17 +12,6 @@ double linear(std::uint32_t channel)
 {
     const double v = static_cast<double>(channel & 0xFFu) / 255.0;
     return v <= 0.04045 ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4);
-}
-
-std::string trim_lower(const std::string& text)
-{
-    std::size_t start = 0;
-    std::size_t end = text.size();
-    while (start < end && std::isspace(static_cast<unsigned char>(text[start]))) ++start;
-    while (end > start && std::isspace(static_cast<unsigned char>(text[end - 1]))) --end;
-    std::string out = text.substr(start, end - start);
-    for (char& c : out) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    return out;
 }
 
 }  // namespace
@@ -63,51 +51,6 @@ std::vector<std::uint32_t> parse_colors(const std::vector<std::string>& hexes)
         if (color != kInvalid) out.push_back(color);
     }
     return out;
-}
-
-std::vector<std::string> included_printers(const std::string& target, const std::vector<std::string>& keys)
-{
-    const std::string text = trim_lower(target);
-    if (text.empty() || text == "both") {
-        return keys;
-    }
-    std::vector<std::string> named;
-    std::size_t start = 0;
-    while (start <= text.size()) {
-        const std::size_t comma = text.find(',', start);
-        named.push_back(trim_lower(text.substr(start, comma == std::string::npos ? std::string::npos : comma - start)));
-        if (comma == std::string::npos) break;
-        start = comma + 1;
-    }
-    std::vector<std::string> out;
-    for (const std::string& key : keys) {
-        if (std::find(named.begin(), named.end(), key) != named.end()) out.push_back(key);
-    }
-    return out.empty() ? keys : out;
-}
-
-std::optional<std::string> toggle_target(const std::string& target, const std::vector<std::string>& keys,
-                                         const std::string& key)
-{
-    if (std::find(keys.begin(), keys.end(), key) == keys.end()) {
-        return target;
-    }
-    std::vector<std::string> included = included_printers(target, keys);
-    const auto it = std::find(included.begin(), included.end(), key);
-    if (it != included.end()) {
-        if (included.size() == 1) return std::nullopt;
-        included.erase(it);
-    } else {
-        included.push_back(key);
-    }
-    if (included.size() == keys.size()) {
-        return std::string("both");
-    }
-    std::vector<std::string> ordered;
-    for (const std::string& k : keys) {
-        if (std::find(included.begin(), included.end(), k) != included.end()) ordered.push_back(k);
-    }
-    return join(ordered, ",");
 }
 
 std::optional<double> spool_remaining_pct(const SpoolInfo& spool)

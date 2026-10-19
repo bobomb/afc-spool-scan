@@ -139,7 +139,6 @@ struct ActivityEntry {
 };
 
 struct Settings {
-    std::string target = "both";
     std::string scan_mode = "immediate";
     std::string theme = "dark";
     double sanity_threshold_g = 50;

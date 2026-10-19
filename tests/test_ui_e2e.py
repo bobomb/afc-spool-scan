@@ -123,16 +123,16 @@ async def test_ui_numpad_clear_deselects_the_spool(station: Station, tmp_path: P
 
 
 @pytest.mark.e2e
-async def test_ui_printer_cards_change_the_load_target(station: Station, tmp_path: Path) -> None:
+async def test_ui_load_goes_to_both_printers_and_sleep_resets(station: Station, tmp_path: Path) -> None:
     exe = find_ui()
     if exe is None:
         pytest.skip("station-ui is not built")
-    script = tmp_path / "target.script"
+    script = tmp_path / "sleep.script"
     script.write_text(
         "tap 300 76\ntype 93\nkey enter\nwait 500\n"
-        "tap 614 200\nwait 600\nshot kilo-only\n"
-        "tap 258 200\nwait 600\n"
-        "tap 425 394\nwait 900\n",
+        "tap 614 200\nwait 300\n"
+        "tap 425 394\nwait 900\nshot loaded\n"
+        "idle off\nwait 900\nidle wake\nwait 300\nshot woken\n",
         encoding="utf-8",
     )
     process = await asyncio.create_subprocess_exec(
@@ -141,10 +141,13 @@ async def test_ui_printer_cards_change_the_load_target(station: Station, tmp_pat
     )
     _, stderr = await asyncio.wait_for(process.communicate(), 90)
     assert process.returncode == 0, stderr.decode(errors="replace")
-    assert station.store.settings["target"] == "kilo"
-    assert station.sim_printers.printers["kilo"].next_spool_id == 93
+    actions = [(e["action"], e["spool_id"]) for e in station.store.activity]
+    assert actions == [("sleep", None), ("load", 93)]
+    assert station.store.activity[1]["printers"] == ["Kilo", "Yankee"]
+    assert station.store.spool is None
+    assert station.sim_printers.printers["kilo"].next_spool_id is None
     assert station.sim_printers.printers["yankee"].next_spool_id is None
-    assert [(e["action"], e["spool_id"]) for e in station.store.activity] == [("load", 93)]
+    assert all(p.pending_spool is None for p in station.store.printers.values())
 
 
 @pytest.mark.e2e

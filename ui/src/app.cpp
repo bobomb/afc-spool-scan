@@ -486,17 +486,21 @@ void App::open_more()
     if (id) more_->show(*id);
 }
 
-void App::toggle_target(const std::string& key)
+void App::on_sleep()
 {
-    std::vector<std::string> keys;
-    for (const Printer& printer : state().printers) keys.push_back(printer.key);
-    const auto next = station::toggle_target(state().settings.target, keys, key);
-    if (!next) {
-        banner({BannerMessage::Kind::Warn, "Keep at least one printer included", ""});
-        return;
-    }
-    if (*next != state().settings.target) {
-        set_setting("target", *next);
+    close_keypad();
+    more_->close();
+    assign_->close();
+    confirm_->close();
+    show(ScreenId::Main);
+    if (online()) {
+        request("sleep", json::object(), [this](const Result& result) {
+            if (result.activity_id.empty() && result.ok) {
+                banner({BannerMessage::Kind::Idle, "Ready", ""});
+            } else {
+                show_result(result);
+            }
+        });
     }
 }
 
@@ -588,16 +592,16 @@ void App::weigh_load(bool confirm)
 {
     const auto id = spool_id();
     if (!id) return;
-    send_weigh_load(*id, state().settings.target, confirm);
+    send_weigh_load(*id, confirm);
 }
 
-void App::send_weigh_load(int spool, const std::string& target, bool confirm)
+void App::send_weigh_load(int spool, bool confirm)
 {
     banner({BannerMessage::Kind::Info, "Weighing and loading spool #" + std::to_string(spool) + "...", ""});
-    request("weigh_load", {{"spool_id", spool}, {"target", target}, {"confirm", confirm}},
-            [this, spool, target](const Result& result) {
+    request("weigh_load", {{"spool_id", spool}, {"confirm", confirm}},
+            [this, spool](const Result& result) {
                 if (result.code == "needs_confirm") {
-                    confirm_weight(result, [this, spool, target] { send_weigh_load(spool, target, true); });
+                    confirm_weight(result, [this, spool] { send_weigh_load(spool, true); });
                 } else {
                     show_result(result);
                 }

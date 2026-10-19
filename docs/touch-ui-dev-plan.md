@@ -86,7 +86,7 @@ afc-spool-scan/
 │  ├─ spoolman.py              Spoolman REST client
 │  ├─ catalog.py               cached Spoolman details (initial weight, colours) for lanes
 │  ├─ moonraker.py             Moonraker WebSocket client
-│  ├─ printers.py              all printers, target resolution
+│  ├─ printers.py              all printers (Load always targets every printer)
 │  ├─ scale/{dymo.py,source.py,hidraw.py,sim.py}
 │  ├─ scanner/{keymap.py,evdev_reader.py,sim.py}
 │  ├─ sim/printers.py          fixture-driven fake Moonraker + AFC
@@ -223,7 +223,7 @@ request's id) and `code: invalid_args`; the connection stays open. Lines over
      "printers": ["Kilo"], "ok": true, "message": "984 g saved; next spool set", "undoable": true}
   ],
   "settings": {
-    "target": "both", "scan_mode": "immediate", "theme": "dark",
+    "scan_mode": "immediate", "theme": "dark",
     "sanity_threshold_g": 50, "sanity_threshold_pct": 10,
     "low_stock_g": 100, "undo_depth": 20, "idle_dim_s": 120, "idle_off_s": 300
   }
@@ -244,7 +244,7 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `spool` | `found` (false → `{id, found, message}` only), `initial_weight_g`, `used_weight_g`, `tare_source` (`spool`, `filament`, `vendor`), `colors` (every filament colour, from `multi_color_hexes`; `color` is the first) |
 | `printers[]` | `key`, `klippy_state`, `filename`, `pending_confirmed`; lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known) and `colors` (Spoolman colours, else the AFC lane `color`) |
 | `health` | `scale_status` |
-| `activity[]` | `code`, `dry_run`, `undone`; `action` may also be `scan`, `clear_pending`, `undo` |
+| `activity[]` | `code`, `dry_run`, `undone`; `action` may also be `scan`, `clear_pending`, `undo`, `spool_loaded` (a lane took the spool, so the service cleared it as next spool on the other printers) and `sleep` (pending next spools cleared when the station went to sleep) |
 | `result` | `code`, `dry_run`, `data` (e.g. sanity figures with `needs_confirm`) |
 
 ### 5.3 Actions
@@ -253,8 +253,8 @@ Additive fields implemented beyond the example above (all protocol 1):
 |---|---|---|
 | `lookup` | `spool_id` | Fetch spool from Spoolman → `spool` event |
 | `weigh` | `spool_id`, `confirm?` | Stable weight > 50 g → `PUT /spool/{id}/measure` |
-| `weigh_load` | `spool_id`, `target?`, `confirm?` | `weigh` then `load` |
-| `load` | `spool_id`, `target?` | `SET_NEXT_SPOOL_ID` on target printer(s); track pending |
+| `weigh_load` | `spool_id`, `confirm?` | `weigh` then `load` |
+| `load` | `spool_id` | `SET_NEXT_SPOOL_ID` on every printer; track pending |
 | `clear_pending` | `printer` | Clear pending next spool on one printer |
 | `assign_lane` | `spool_id`, `printer`, `lane` | `SET_SPOOL_ID LANE=… SPOOL_ID=…` |
 | `empty_spool` | `spool_id`, `confirm?` | Stable weight → spool and filament `spool_weight`, archive |
@@ -263,12 +263,14 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `cancel_countdown` | — | Cancel a pending scan-mode countdown |
 | `dismiss_prompt` | — | Clear `scan.prompt` without saving the weight |
 | `clear_spool` | — | Deselect the current spool (`spool` → `null`, scale check reset); keypad Clear / Esc |
+| `sleep` | — | Sent by the UI when the screen goes off: `clear_spool`, dismiss any prompt, and clear the pending next spool on every printer that has one (recorded as `sleep`, undoable) |
 | `sim.scale` / `sim.scan` / `sim.printer` / `sim.spoolman` | see `simcontrol.py` | Drive simulated components (`simctl`) |
 
-`target` (argument and setting) is `both` or one or more printer keys,
-comma-separated (`kilo`, `kilo,yankee`); the setting is normalised to config
-order and to `both` when every printer is listed. Omitted means the `target`
-setting. When the sanity check (§6.4) fails, the result is
+`load` and `weigh_load` always target every printer (product plan §4.2 #1,
+2026-10-19); the former `target` argument is ignored and the `target`
+setting no longer exists (old settings files drop it silently). When a lane's
+`spool_id` changes to a spool that another printer still has pending, the
+service clears it there (`spool_loaded`). When the sanity check (§6.4) fails, the result is
 `{"ok":false,"code":"needs_confirm","message":"…","data":{…}}` and the UI
 re-sends with `"confirm":true`. `empty_spool` also answers `needs_confirm`
 when the measured weight is far from the known tare. Error `code`s:
@@ -343,7 +345,7 @@ clients.
   entries recorded under the current write mode can be undone.
 - Scan handling by `scan_mode`:
   - `immediate`: today's behaviour — weigh if a qualifying weight is present,
-    then load to the target.
+    then load to both printers.
   - `countdown`: fill the ID, run `weigh_load` after 5 s unless cancelled.
   - `fill`: fill the ID and look it up only.
 - Audio cues as today: `weigh` when a weight is saved, `success`, `error`.
@@ -355,13 +357,12 @@ settings so they can change without code edits:
 
 | Setting | Default |
 |---|---|
-| `target` | `both` (parity with today) |
 | `scan_mode` | `immediate` (parity with today) |
 | `theme` | `dark` |
 | Sanity threshold | 50 g or 10%, whichever is larger |
 | `low_stock_g` | 100 |
 | `undo_depth` | 20 |
-| Idle | dim 120 s, blank 300 s |
+| Idle | dim 120 s, blank 300 s (blank = sleep: deselect, clear next spools) |
 | Empty spool minimum weight | > 10 g stable |
 
 ## 7. UI design notes
@@ -495,13 +496,15 @@ within a phase unless noted. Each task ends with tests/build passing.
   with filament-coloured lane tiles, More menu, action bar. Service adds
   lane `remaining_pct`/`colors`, spool `colors` and multi-printer targets.
   *Done 2026-10-15; replaces the header, numpad, scale tile, spool card and
-  target selector widgets; see §10.*
+  target selector widgets; see §10. Printer selection removed 2026-10-19
+  (F11).*
 
 ### F — Features (service + UI)
 
 - [x] **F1** Target selection + pending tracking + `clear_pending` (#1). First
   check AFC source (`SET_NEXT_SPOOL_ID` in AFC-Klipper-Add-On) for how to
   clear; record the syntax in the product plan §6.1.
+  *Target selection replaced by F11 (2026-10-19).*
 - [x] **F2** Look-up card fields (#2).
 - [x] **F3** Assign to lane (#3); confirm `SET_SPOOL_ID` syntax in AFC source;
   undo restores previous lane spool.
@@ -518,6 +521,12 @@ within a phase unless noted. Each task ends with tests/build passing.
 - [x] **F9** Health indicators incl. scale status text (#10).
 - [x] **F10** Idle dim/blank + wake on touch, scan, scale change (#11); dim
   only if `/sys/class/backlight` exists, otherwise black overlay.
+- [x] **F11** Next spool always on both printers (product plan §4.2 #1,
+  2026-10-19): remove the `target` setting/argument and the printer-card
+  toggle; when a lane takes a spool, clear it as next spool on the other
+  printers (`spool_loaded`); when the screen goes off, the UI sends `sleep`
+  (deselect the spool, clear every pending next spool).
+  *Done 2026-10-19; unit, service and UI end-to-end tests.*
 
 ### P — spoolpi deployment
 

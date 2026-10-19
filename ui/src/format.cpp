@@ -79,6 +79,8 @@ std::string action_label(const std::string& action)
     if (action == "clear_pending") return "Clear pending";
     if (action == "undo") return "Undo";
     if (action == "lookup") return "Look up";
+    if (action == "spool_loaded") return "Loaded";
+    if (action == "sleep") return "Sleep";
     std::string label = action;
     for (auto& c : label) {
         if (c == '_') c = ' ';

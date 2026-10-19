@@ -25,17 +25,21 @@ request sim.scale {"grams": 640}
 wait 400
 shot 03-lookup
 
-# Exclude Yankee from Load by tapping its card, then include it again.
+# Tapping a printer card changes nothing: Load always goes to both printers.
 tap 614 200
-wait 600
-shot 04-kilo-only
-tap 614 200
-wait 600
+wait 300
 
 # Weigh + Load to both printers.
 tap 646 394
 wait 900
-shot 05-weigh-load
+shot 04-weigh-load
+
+# Kilo's lane4 takes the spool, so Yankee's next spool is cleared automatically.
+request sim.printer {"printer": "kilo", "op": "insert", "lane": "lane4"}
+wait 900
+shot 05-loaded-in-kilo
+request sim.printer {"printer": "kilo", "op": "eject", "lane": "lane4"}
+wait 400
 
 # Printers screen; tap Kilo lane4 to assign the spool.
 tap 36 110
@@ -126,7 +130,7 @@ request sim.printer {"printer": "yankee", "op": "connect"}
 # Light theme from Settings.
 tap 36 438
 wait 300
-tap 683 181
+tap 683 115
 wait 1500
 shot 23-light-settings
 tap 36 42
@@ -135,7 +139,13 @@ shot 24-light-main
 request set_setting {"key": "theme", "value": "dark"}
 wait 1200
 
-# Idle blanking.
+# Sleep: a scan in immediate mode sets the next spool on both printers; when the screen goes
+# off the spool is deselected and both pending next spools are cleared.
+request sim.scan {"code": "web+spoolman:s-97"}
+wait 1200
 idle off
+wait 900
 shot 25-blank
 idle wake
+wait 300
+shot 26-woken

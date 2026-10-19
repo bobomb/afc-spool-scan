@@ -96,6 +96,7 @@ class MoonrakerClient:
         writes: bool,
         low_stock_g: Callable[[], float] = lambda: 100.0,
         spool_meta: Callable[[int], SpoolMeta | None] = lambda spool_id: None,
+        on_lane_loaded: Callable[[str, str, int], None] = lambda printer, lane, spool_id: None,
         url: str | None = None,
         request_timeout: float = 10.0,
         backoff: tuple[float, float] = (1.0, 30.0),
@@ -107,6 +108,7 @@ class MoonrakerClient:
         self.writes = writes
         self.low_stock_g = low_stock_g
         self.spool_meta = spool_meta
+        self.on_lane_loaded = on_lane_loaded
         self.url = url or printer.websocket_url
         self.request_timeout = request_timeout
         self.backoff = backoff
@@ -340,6 +342,9 @@ class MoonrakerClient:
             lane.spool_id == pending and previous.get(lane.lane) != pending for lane in lanes
         ):
             pending, confirmed = None, False
+        # Lanes known before that now hold a different spool (AFC loaded the pending one, or an assignment).
+        loaded = [(lane.lane, lane.spool_id) for lane in lanes
+                  if lane.spool_id is not None and lane.lane in previous and previous[lane.lane] != lane.spool_id]
 
         progress = display.get("progress")
         self.state = replace(
@@ -354,6 +359,8 @@ class MoonrakerClient:
             pending_confirmed=confirmed,
             lanes=lanes,
         )
+        for lane_name, spool_id in loaded:
+            self.on_lane_loaded(self.key, lane_name, spool_id)
 
     def refresh(self) -> None:
         """Recompute derived fields (e.g. low stock after a threshold change)."""

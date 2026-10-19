@@ -13,9 +13,6 @@ void AssignDialog::show(int spool_id, const std::string& printer, const std::str
     const State& state = app_.state();
     if (printer_.empty() || app_.model().printer(printer_) == nullptr) {
         printer_ = state.printers.empty() ? std::string() : state.printers.front().key;
-        if (state.settings.target != "both" && app_.model().printer(state.settings.target)) {
-            printer_ = state.settings.target;
-        }
     }
     build();
 }

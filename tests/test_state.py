@@ -43,47 +43,47 @@ def test_store_emits_only_changes() -> None:
 
 
 def test_settings_defaults_and_validation(tmp_path: Path) -> None:
-    settings = Settings(tmp_path / "settings.json", ["kilo", "yankee"])
+    settings = Settings(tmp_path / "settings.json")
     assert settings.as_dict() == DEFAULTS
-    assert settings.set("target", "Kilo") is True
-    assert settings["target"] == "kilo"
-    assert settings.set("target", "kilo") is False
+    assert settings.set("scan_mode", "fill") is True
+    assert settings["scan_mode"] == "fill"
+    assert settings.set("scan_mode", "fill") is False
     assert settings.set("sanity_threshold_g", 75.0) is True
     assert settings["sanity_threshold_g"] == 75
     assert settings.set("sanity_threshold_pct", 12.5) is True
     for key, value in [
-        ("target", "prusa"), ("scan_mode", "later"), ("theme", "blue"), ("undo_depth", 0),
+        ("target", "kilo"), ("scan_mode", "later"), ("theme", "blue"), ("undo_depth", 0),
         ("undo_depth", 2.5), ("low_stock_g", True), ("low_stock_g", "100"), ("idle_off_s", -1),
         ("nope", 1),
     ]:
         with pytest.raises(SettingsError):
             settings.set(key, value)
-    reloaded = Settings(tmp_path / "settings.json", ["kilo", "yankee"])
+    reloaded = Settings(tmp_path / "settings.json")
     reloaded.load()
-    assert reloaded["target"] == "kilo"
+    assert reloaded["scan_mode"] == "fill"
     assert reloaded["sanity_threshold_pct"] == 12.5
 
 
-def test_settings_target_subsets() -> None:
-    settings = Settings(None, ["kilo", "yankee", "zulu"])
-    assert settings.validate("target", "Yankee, kilo") == "kilo,yankee"
-    assert settings.validate("target", "zulu") == "zulu"
-    assert settings.validate("target", "kilo,yankee,zulu") == "both"
-    assert settings.validate("target", " BOTH ") == "both"
-    for bad in ("", ",", "kilo,kilo", "kilo,prusa", None, 3):
-        with pytest.raises(SettingsError):
-            settings.validate("target", bad)
+def test_settings_drop_the_retired_target(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"target": "kilo", "theme": "light"}), encoding="utf-8")
+    settings = Settings(path)
+    settings.load()
+    assert "target" not in settings.as_dict() and settings["theme"] == "light"
+    assert "target" not in caplog.text
+    settings.set("theme", "dark")
+    assert "target" not in json.loads(path.read_text(encoding="utf-8"))
 
 
 def test_settings_ignore_invalid_stored_values(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
-    path.write_text(json.dumps({"target": "gone", "theme": "light", "junk": 1}), encoding="utf-8")
-    settings = Settings(path, ["kilo"])
+    path.write_text(json.dumps({"scan_mode": "gone", "theme": "light", "junk": 1}), encoding="utf-8")
+    settings = Settings(path)
     settings.load()
-    assert settings["target"] == "both"
+    assert settings["scan_mode"] == "immediate"
     assert settings["theme"] == "light"
     path.write_text("{not json", encoding="utf-8")
-    broken = Settings(path, ["kilo"])
+    broken = Settings(path)
     broken.load()
     assert broken.as_dict() == DEFAULTS
 

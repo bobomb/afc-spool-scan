@@ -1,6 +1,6 @@
 #pragma once
-// Pure view logic for the station screen: mark colours on filament fills, Load targets and the
-// one-line connection summary in the side rail. No LVGL, so it is unit tested.
+// Pure view logic for the station screen: mark colours on filament fills and the one-line
+// connection summary in the side rail. No LVGL, so it is unit tested.
 
 #include <cstdint>
 #include <optional>
@@ -21,12 +21,6 @@ double contrast_ratio(std::uint32_t a, std::uint32_t b);
 std::uint32_t mark_color(const std::vector<std::uint32_t>& fills);
 // "#RRGGBB" strings to colours; invalid entries are skipped.
 std::vector<std::uint32_t> parse_colors(const std::vector<std::string>& hexes);
-
-// The Load target setting is "both" (every printer) or comma-separated printer keys.
-std::vector<std::string> included_printers(const std::string& target, const std::vector<std::string>& keys);
-// Target after tapping printer `key`; nullopt when that would leave no printer included.
-std::optional<std::string> toggle_target(const std::string& target, const std::vector<std::string>& keys,
-                                         const std::string& key);
 
 // Remaining share (0-100) of the selected spool when Spoolman knows its initial weight.
 std::optional<double> spool_remaining_pct(const SpoolInfo& spool);

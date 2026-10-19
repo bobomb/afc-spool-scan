@@ -97,8 +97,9 @@ Spoolman (`scripts/capture-fixtures.py`, read-only):
 `python -m station --sim-fixtures station/sim/fixtures/captured`.
 In the simulator window a PC keyboard digit opens the keypad with that digit;
 Backspace, Enter and Esc edit, look up and clear (Esc also deselects the
-spool). Tap the top box to open the keypad, and tap a printer card to include
-or exclude it from Load.
+spool). Tap the top box to open the keypad. Load always sets the next spool
+on both printers; once one printer loads it, the other's is cleared, and the
+station clears both (and deselects the spool) when the screen goes off.
 
 Headless screenshots (no window, no service needed):
 

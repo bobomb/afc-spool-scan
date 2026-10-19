@@ -164,6 +164,22 @@ async def test_disconnect_and_reconnect(rig) -> None:  # noqa: ANN001
     assert client.state.pending_spool is None
 
 
+async def test_lane_loaded_events_only_for_real_changes(rig) -> None:  # noqa: ANN001
+    printer, client, _ = rig
+    events: list[tuple[str, str, int]] = []
+    client.on_lane_loaded = lambda *event: events.append(event)
+    await client.set_next_spool(97)
+    await printer.insert_lane("lane4")
+    await wait_until(lambda: events == [("kilo", "lane4", 97)])
+    await printer.disconnect()
+    await wait_until(lambda: not client.state.connected)
+    printer.connect()
+    await wait_until(lambda: client.state.connected, timeout=3)
+    await printer.eject_lane("lane4")
+    await wait_until(lambda: client.lane("lane4").spool_id is None)
+    assert events == [("kilo", "lane4", 97)]
+
+
 async def test_klippy_shutdown_clears_pending(rig) -> None:  # noqa: ANN001
     printer, client, published = rig
     await client.set_next_spool(97)

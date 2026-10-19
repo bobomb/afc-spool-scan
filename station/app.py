@@ -57,7 +57,7 @@ class Station:
             version=__version__, protocol=PROTOCOL, hardware=config.hardware, printers=config.printers_mode,
             spoolman=config.spoolman_mode, writes=config.writes, dry_run=dry_run,
         ))
-        self.settings = Settings(config.state_dir / "settings.json", [p.key for p in config.printers])
+        self.settings = Settings(config.state_dir / "settings.json")
         mode = (f"printers={config.printers_mode}:{'w' if config.writes_enabled('printers') else 'ro'},"
                 f"spoolman={config.spoolman_mode}:{'w' if config.writes_enabled('spoolman') else 'ro'}")
         self.activity = ActivityLog(config.state_dir / "activity.jsonl", mode=mode)
@@ -73,6 +73,7 @@ class Station:
         self.scan_flow: ScanFlow | None = None
         self.ipc: IpcServer | None = None
         self._health_task: asyncio.Task[None] | None = None
+        self._tasks: set[asyncio.Task[None]] = set()
 
     @property
     def ipc_port(self) -> int:
@@ -95,6 +96,16 @@ class Station:
     def _on_catalog_update(self) -> None:
         if self.printers is not None:
             self.printers.refresh()
+
+    def _on_lane_loaded(self, printer: str, lane: str, spool_id: int) -> None:
+        if self.actions is None:
+            return
+        try:
+            task = asyncio.get_running_loop().create_task(self.actions.spool_loaded(printer, lane, spool_id))
+        except RuntimeError:
+            return
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     def _on_scan(self, code: str) -> None:
         if self.scan_flow is not None:
@@ -150,7 +161,8 @@ class Station:
         self.printers = PrinterManager(
             config.printers, self.session, on_change=self.store.set_printer,
             writes=config.writes_enabled("printers"), low_stock_g=lambda: self.settings["low_stock_g"],
-            spool_meta=self.catalog.get, urls=urls, backoff=self.printer_backoff, publish_delay=self.publish_delay,
+            spool_meta=self.catalog.get, on_lane_loaded=self._on_lane_loaded, urls=urls,
+            backoff=self.printer_backoff, publish_delay=self.publish_delay,
         )
         self._create_hardware()
         assert self.scale is not None
@@ -200,6 +212,10 @@ class Station:
             self._health_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._health_task
+        for task in list(self._tasks):
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
         for component in (self.scan_flow, self.scanner, self.scale, self.printers, self.catalog):
             if component is not None:
                 await component.stop()

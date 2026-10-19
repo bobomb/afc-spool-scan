@@ -38,12 +38,16 @@ void IdleManager::start()
 
 void IdleManager::apply(Level level)
 {
+    const bool falling_asleep = level == Level::Off && level_ != Level::Off;
     level_ = level;
     Platform& platform = app_.platform();
     if (platform.has_backlight()) {
         platform.set_backlight(brightness_for(level));
     }
     app_.set_blank(level == Level::Off);
+    if (falling_asleep) {
+        app_.on_sleep();
+    }
 }
 
 }  // namespace station

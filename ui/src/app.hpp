@@ -61,8 +61,8 @@ public:
     void open_keypad();
     void close_keypad();
     void open_more();
-    // Includes or excludes a printer from the Load target (printer card tap).
-    void toggle_target(const std::string& key);
+    // The screen went off: reset the session (deselect the spool, clear pending next spools).
+    void on_sleep();
 
     void weigh(bool confirm = false);
     void weigh_load(bool confirm = false);
@@ -92,9 +92,9 @@ private:
     void show_result(const Result& result);
     void confirm_weight(const Result& result, std::function<void()> on_confirm);
     void request_empty(int spool, bool confirm);
-    // The spool (and target) are captured so a confirmation never applies to a different spool.
+    // The spool is captured so a confirmation never applies to a different spool.
     void send_weigh(int spool, bool confirm);
-    void send_weigh_load(int spool, const std::string& target, bool confirm);
+    void send_weigh_load(int spool, bool confirm);
     void sync_prompt();
     void attach_keyboard();
     static void on_key(lv_event_t* e);

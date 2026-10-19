@@ -238,7 +238,6 @@ std::vector<ActivityEntry> parse_activity(const json& data)
 Settings parse_settings(const json& data)
 {
     Settings settings;
-    settings.target = str(data, "target", settings.target);
     settings.scan_mode = str(data, "scan_mode", settings.scan_mode);
     settings.theme = str(data, "theme", settings.theme);
     settings.sanity_threshold_g = number_or(data, "sanity_threshold_g", settings.sanity_threshold_g);
