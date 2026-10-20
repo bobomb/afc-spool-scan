@@ -104,6 +104,7 @@ struct Lane {
 struct Printer {
     std::string key;
     std::string name;
+    std::string display_name;
     bool connected = false;
     std::string klippy_state;
     std::string print_state;
@@ -115,6 +116,9 @@ struct Printer {
     std::optional<int> pending_spool;
     bool pending_confirmed = false;
     std::vector<Lane> lanes;
+
+    // Mainsail printer name when the service has one, else the configured name.
+    const std::string& label() const { return display_name.empty() ? name : display_name; }
 };
 
 struct Health {

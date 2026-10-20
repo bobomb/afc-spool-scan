@@ -161,7 +161,8 @@ class Station:
         self.printers = PrinterManager(
             config.printers, self.session, on_change=self.store.set_printer,
             writes=config.writes_enabled("printers"), low_stock_g=lambda: self.settings["low_stock_g"],
-            spool_meta=self.catalog.get, on_lane_loaded=self._on_lane_loaded, urls=urls,
+            spool_meta=self.catalog.get, on_lane_loaded=self._on_lane_loaded,
+            names_path=config.state_dir / "printer_names.json", urls=urls,
             backoff=self.printer_backoff, publish_delay=self.publish_delay,
         )
         self._create_hardware()

@@ -23,6 +23,9 @@ PrinterCard::PrinterCard(App& app, lv_obj_t* parent, int x, int y, int w, int h)
     lv_obj_set_pos(dot_, 0, 9);
     name_ = ui::label(root_, theme.normal(), theme.text(), "");
     lv_obj_set_pos(name_, 20, 0);
+    lv_obj_set_style_max_width(name_, w / 2, 0);
+    lv_obj_set_height(name_, lv_font_get_line_height(theme.normal()));
+    lv_label_set_long_mode(name_, LV_LABEL_LONG_MODE_DOTS);
     print_ = ui::chip(root_, theme, "", theme.muted());
     lv_obj_align(print_, LV_ALIGN_TOP_RIGHT, 0, 2);
 
@@ -110,7 +113,7 @@ void PrinterCard::update(const Printer& printer, const Settings& settings, bool 
     const bool up = online && printer.connected;
     lv_obj_set_style_bg_color(dot_, !online ? theme.muted() : !printer.connected ? theme.error()
                                   : printer.afc_error.empty() ? theme.ok() : theme.warn(), 0);
-    ui::set_text(name_, printer.name);
+    ui::set_text(name_, printer.label());
 
     std::string print_text = up ? print_state_label(printer.print_state, printer.progress) : "Offline";
     lv_color_t print_color = theme.muted();

@@ -50,6 +50,7 @@ class SimPrinter:
         self.objects: dict[str, dict[str, Any]] = copy.deepcopy(fixture["objects"])
         self.object_list: list[str] = list(fixture.get("object_list") or self.objects)
         self.server_info: dict[str, Any] = dict(fixture.get("server_info") or {})
+        self.mainsail_name: str | None = fixture.get("mainsail_name")
         self.spool_lookup = spool_lookup
         self.next_spool_id: int | None = None
         self.online = True
@@ -262,6 +263,13 @@ class SimPrinter:
             return {**self.server_info, "klippy_connected": True, "klippy_state": self.klippy_state}
         if method == "server.connection.identify":
             return {"connection_id": id(ws)}
+        if method == "server.database.get_item":
+            namespace, key = params.get("namespace"), params.get("key")
+            if namespace != "mainsail":
+                raise RpcError(f"Namespace '{namespace}' not found", 404)
+            if key != "general.printername" or self.mainsail_name is None:
+                raise RpcError(f"Key '{key}' in namespace '{namespace}' not found", 404)
+            return {"namespace": namespace, "key": key, "value": self.mainsail_name}
         if self.klippy_state != "ready" and method.startswith("printer."):
             raise RpcError("Klippy Disconnected", 503)
         if method == "printer.objects.list":

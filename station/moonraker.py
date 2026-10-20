@@ -25,8 +25,13 @@ NEXT_SPOOL_PATTERN = re.compile(
 LANE_PREFIXES = ("AFC_stepper ", "AFC_lane ")
 # With writes off only these JSON-RPC methods may reach Moonraker (second guard behind gcode()).
 READ_ONLY_METHODS = frozenset(
-    {"server.info", "printer.objects.list", "printer.objects.query", "printer.objects.subscribe"}
+    {"server.info", "server.database.get_item", "printer.objects.list", "printer.objects.query",
+     "printer.objects.subscribe"}
 )
+# Mainsail stores the printer name set under Settings > General here.
+MAINSAIL_NAME_ITEM = {"namespace": "mainsail", "key": "general.printername"}
+DISPLAY_NAME_MAX = 32
+NOT_FOUND = 404
 
 
 class PrinterOffline(Exception):
@@ -34,7 +39,9 @@ class PrinterOffline(Exception):
 
 
 class PrinterCommandError(Exception):
-    pass
+    def __init__(self, message: str, code: int | None = None) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -86,6 +93,13 @@ def parse_next_spool(line: str) -> tuple[bool, int | None]:
     return True, _int_or_none(match.group(1))
 
 
+def clean_display_name(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = " ".join(value.split())[:DISPLAY_NAME_MAX].strip()
+    return text or None
+
+
 class MoonrakerClient:
     def __init__(
         self,
@@ -97,6 +111,8 @@ class MoonrakerClient:
         low_stock_g: Callable[[], float] = lambda: 100.0,
         spool_meta: Callable[[int], SpoolMeta | None] = lambda spool_id: None,
         on_lane_loaded: Callable[[str, str, int], None] = lambda printer, lane, spool_id: None,
+        display_name: str | None = None,
+        on_display_name: Callable[[str, str | None], None] = lambda key, name: None,
         url: str | None = None,
         request_timeout: float = 10.0,
         backoff: tuple[float, float] = (1.0, 30.0),
@@ -109,11 +125,12 @@ class MoonrakerClient:
         self.low_stock_g = low_stock_g
         self.spool_meta = spool_meta
         self.on_lane_loaded = on_lane_loaded
+        self.on_display_name = on_display_name
         self.url = url or printer.websocket_url
         self.request_timeout = request_timeout
         self.backoff = backoff
         self.publish_delay = publish_delay
-        self.state = PrinterState(key=printer.key, name=printer.name)
+        self.state = PrinterState(key=printer.key, name=printer.name, display_name=clean_display_name(display_name))
         self._status: dict[str, dict[str, Any]] = {}
         self._lane_objects: dict[str, str] = {}
         self._ws: aiohttp.ClientWebSocketResponse | None = None
@@ -128,6 +145,11 @@ class MoonrakerClient:
     @property
     def key(self) -> str:
         return self.printer.key
+
+    @property
+    def label(self) -> str:
+        """Name shown to the user: the Mainsail printer name, else the configured name."""
+        return self.state.label
 
     @property
     def online(self) -> bool:
@@ -167,7 +189,7 @@ class MoonrakerClient:
                 log.debug("%s: connection failed: %s", self.printer.name, error)
             finally:
                 self._ws = None
-                self._fail_pending(PrinterOffline(f"{self.printer.name} disconnected"))
+                self._fail_pending(PrinterOffline(f"{self.label} disconnected"))
                 if self._subscribe_task is not None:
                     self._subscribe_task.cancel()
                     self._subscribe_task = None
@@ -196,7 +218,7 @@ class MoonrakerClient:
             raise PrinterCommandError(f"writes are off; refusing {method}")
         ws = self._ws
         if ws is None or ws.closed:
-            raise PrinterOffline(f"{self.printer.name} is offline")
+            raise PrinterOffline(f"{self.label} is offline")
         request_id = self._next_id
         self._next_id += 1
         future: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
@@ -208,17 +230,36 @@ class MoonrakerClient:
             await ws.send_str(json.dumps(message))
             return await asyncio.wait_for(future, timeout or self.request_timeout)
         except (ConnectionError, aiohttp.ClientError) as error:
-            raise PrinterOffline(f"{self.printer.name} is offline") from error
+            raise PrinterOffline(f"{self.label} is offline") from error
         finally:
             self._rpc.pop(request_id, None)
 
     async def _initialize(self) -> None:
         info = await self.call("server.info")
+        await self._refresh_display_name()
         state = info.get("klippy_state") if isinstance(info, dict) else None
         if state == "ready":
             await self._subscribe()
         else:
             self._mark_offline(state or "unknown")
+
+    async def _refresh_display_name(self) -> None:
+        try:
+            result = await self.call("server.database.get_item", dict(MAINSAIL_NAME_ITEM))
+        except PrinterCommandError as error:
+            if error.code != NOT_FOUND:
+                log.debug("%s: Mainsail name unavailable: %s", self.printer.name, error)
+                return
+            result = None
+        except (PrinterOffline, asyncio.TimeoutError):
+            return
+        name = clean_display_name(result.get("value") if isinstance(result, dict) else None)
+        if name == self.state.display_name:
+            return
+        log.info("%s: Mainsail name %r", self.printer.name, name)
+        self.state = replace(self.state, display_name=name)
+        self._publish_now()
+        self.on_display_name(self.key, name)
 
     async def _subscribe(self) -> None:
         listing = await self.call("printer.objects.list")
@@ -258,7 +299,11 @@ class MoonrakerClient:
                     continue
                 if "error" in data:
                     error = data["error"] or {}
-                    future.set_exception(PrinterCommandError(str(error.get("message", error))))
+                    code = error.get("code") if isinstance(error, dict) else None
+                    future.set_exception(PrinterCommandError(
+                        str(error.get("message", error)) if isinstance(error, dict) else str(error),
+                        code if isinstance(code, int) else None,
+                    ))
                 else:
                     future.set_result(data.get("result"))
             elif "method" in data:
@@ -288,6 +333,7 @@ class MoonrakerClient:
 
     async def _resubscribe(self) -> None:
         try:
+            await self._refresh_display_name()
             await self._subscribe()
         except (PrinterOffline, PrinterCommandError, asyncio.TimeoutError) as error:
             log.warning("%s: resubscribe failed: %s", self.printer.name, error)
@@ -388,7 +434,7 @@ class MoonrakerClient:
             log.info("%s: writes off, would send %r", self.printer.name, script)
             return GcodeResult(dry_run=True)
         if not self.online:
-            raise PrinterOffline(f"{self.printer.name} is offline")
+            raise PrinterOffline(f"{self.label} is offline")
         collector: list[str] = []
         self._collectors.append(collector)
         try:

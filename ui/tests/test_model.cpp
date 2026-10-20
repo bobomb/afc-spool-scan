@@ -20,7 +20,7 @@ const char* kSnapshot = R"({
             "color": "#FFFFFF", "remaining_g": 454.7, "spool_weight_g": 180.0, "expected_gross_g": 634.7,
             "location": null, "last_used": "2026-10-01T07:16:18Z", "archived": false, "low_stock": false},
   "printers": [
-    {"key": "kilo", "name": "Kilo", "connected": true, "print_state": "complete", "progress": 1.0,
+    {"key": "kilo", "name": "Kilo", "display_name": "Kestrel", "connected": true, "print_state": "complete", "progress": 1.0,
      "afc_state": "Idle", "afc_error": null, "current_load": "lane2", "pending_spool": 97,
      "pending_confirmed": true,
      "lanes": [{"lane": "lane1", "map": "T0", "spool_id": 84, "material": "PLA", "color": "#FFFFFF",
@@ -59,6 +59,8 @@ TEST_CASE("snapshot populates the full state")
     CHECK(s.spool->location.empty());
     CHECK(s.spool->colors == std::vector<std::string>{"#FFFFFF"});
     REQUIRE(s.printers.size() == 1);
+    CHECK(s.printers[0].name == "Kilo");
+    CHECK(s.printers[0].label() == "Kestrel");
     REQUIRE(s.printers[0].lanes.size() == 2);
     CHECK(*s.printers[0].lanes[0].remaining_pct == doctest::Approx(88.8));
     CHECK(s.printers[0].lanes[0].colors == std::vector<std::string>{"#FFFFFF", "#33B5E5"});
@@ -91,8 +93,10 @@ TEST_CASE("events replace subtrees and printer events merge by key")
     CHECK(model.apply_event("printer", json::parse(R"({"key":"yankee","name":"Yankee","connected":false})")) ==
           kTopicPrinters);
     CHECK(model.state().printers.size() == 2);
+    CHECK(model.state().printers[1].label() == "Yankee");
     model.apply_event("printer", json::parse(R"({"key":"kilo","name":"Kilo","connected":false,"lanes":[]})"));
     CHECK(model.state().printers.size() == 2);
+    CHECK(model.state().printers[0].label() == "Kilo");
     CHECK_FALSE(model.state().printers[0].connected);
     CHECK(model.state().printers[0].lanes.empty());
 

@@ -108,6 +108,11 @@ class PrinterState:
     pending_spool: int | None = None
     pending_confirmed: bool = False
     lanes: list[LaneState] = field(default_factory=list)
+    display_name: str | None = None
+
+    @property
+    def label(self) -> str:
+        return self.display_name or self.name
 
 
 @dataclass

@@ -123,7 +123,8 @@
             "remaining_pct": null,
             "colors": []
           }
-        ]
+        ],
+        "display_name": "Kestrel"
       },
       {
         "key": "yankee",
@@ -213,7 +214,8 @@
               "#8A8D91"
             ]
           }
-        ]
+        ],
+        "display_name": "Yeti"
       }
     ],
     "health": {

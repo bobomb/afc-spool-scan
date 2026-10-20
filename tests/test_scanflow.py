@@ -16,7 +16,7 @@ async def test_immediate_scan_weighs_and_loads(station: Station) -> None:
     await act(station, "sim.scan", code="WEB+SPOOLMAN:S-97")
     await wait_until(lambda: station.store.activity and station.store.activity[0]["action"] == "scan")
     entry = station.store.activity[0]
-    assert entry["ok"] and entry["message"] == "640 g saved; next spool set on Kilo, Yankee"
+    assert entry["ok"] and entry["message"] == "640 g saved; next spool set on Kestrel, Yeti"
     assert station.store.scan.last_code == "WEB+SPOOLMAN:S-97" and station.store.scan.spool_id == 97
     assert station.cues.played == ["weigh", "success"]
     assert station.sim_printers.printers["kilo"].next_spool_id == 97
@@ -27,7 +27,7 @@ async def test_immediate_scan_without_weight_still_loads(station: Station) -> No
     await wait_until(lambda: bool(station.store.activity))
     entry = station.store.activity[0]
     assert entry["ok"] is True
-    assert entry["message"] == "weight not saved (scale is empty); next spool set on Kilo, Yankee"
+    assert entry["message"] == "weight not saved (scale is empty); next spool set on Kestrel, Yeti"
     assert station.cues.played == ["success"]
 
 

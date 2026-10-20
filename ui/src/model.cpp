@@ -146,6 +146,7 @@ Printer parse_printer(const json& data)
 {
     Printer printer;
     printer.name = str(data, "name");
+    printer.display_name = str(data, "display_name");
     printer.key = str(data, "key");
     if (printer.key.empty()) {
         printer.key = printer.name;

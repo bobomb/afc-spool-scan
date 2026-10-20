@@ -58,6 +58,7 @@ TEST_CASE("side rail status summary")
     kilo.connected = true;
     Printer yankee = kilo;
     yankee.name = "Yankee";
+    yankee.display_name = "Yeti";
     state.printers = {kilo, yankee};
 
     CHECK(summarize_health(state, false).text == "Offline");
@@ -74,5 +75,5 @@ TEST_CASE("side rail status summary")
     state.printers[0].afc_error = "jam";
     summary = summarize_health(state, true);
     CHECK(summary.level == Level::Error);
-    CHECK(summary.text == "Yankee offline +2");
+    CHECK(summary.text == "Yeti offline +2");
 }

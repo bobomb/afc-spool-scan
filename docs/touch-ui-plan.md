@@ -229,7 +229,10 @@ screen.
   found in Spoolman".
 - **Printer cards.** One card per printer, display only: status, lanes and
   the pending next spool at the bottom. Load always goes to both printers
-  (§4.2 #1), so there is no target selection.
+  (§4.2 #1), so there is no target selection. Cards are ordered as in
+  `PRINTERS` (left to right) and titled with the printer name set in
+  Mainsail (falling back to the configured name); the same name is used on
+  the Printers screen, in the status line and in result messages (2026-10-19).
 - **Lane tiles.** Each lane is a rounded tile filled with the lane spool's
   colour(s), with its remaining ring (share of the initial weight), grams
   left in the ring ("852 g", "1.2 kg" above 1 kg), material and spool # in
@@ -421,3 +424,4 @@ Detailed tasks: dev plan §8.
 | 2026-10-16 | A printer going offline (unreachable, Klippy shutdown/disconnect) clears its pending next spool in the service, because it usually means the printer shut down or rebooted. |
 | 2026-10-19 | Changes §4.2 #1 (was target selection Kilo / Yankee / Both): Load and Weigh + Load always set the next spool on both printers and printers cannot be deselected (the `target` setting and the card toggle are removed). When a printer loads that spool into a lane, the next spool is cleared on the other printers. |
 | 2026-10-19 | §4.2 #11: when the screen goes off the station goes to sleep: deselect the spool and clear the pending next spool on both printers. |
+| 2026-10-19 | §5.1: printers are shown by their Mainsail printer name (configured name as fallback), and the card order follows `PRINTERS` (on the station: Yankee left, Kilo right). |

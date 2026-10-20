@@ -265,8 +265,8 @@ class Actions:
             return client, None, result.dry_run, previous
 
         outcomes = await asyncio.gather(*(one(client) for client in clients))
-        done = [c.printer.name for c, error, _, _ in outcomes if error is None]
-        failed = [(c.printer.name, error) for c, error, _, _ in outcomes if error is not None]
+        done = [c.label for c, error, _, _ in outcomes if error is None]
+        failed = [(c.label, error) for c, error, _, _ in outcomes if error is not None]
         dry_run = any(dry for _, error, dry, _ in outcomes if error is None)
         undo = [
             UndoStep(kind="pending", printer=c.key, spool_id=previous)
@@ -283,7 +283,7 @@ class Actions:
             code = "printer_offline" if any(error == "offline" for _, error in failed) else "printer_error"
         return StepResult(
             "; ".join(parts), ok=not failed, code=code, dry_run=dry_run,
-            printers=[c.printer.name for c in clients], undo=undo,
+            printers=[c.label for c in clients], undo=undo,
         )
 
     async def _clear_step(self, clients: list[MoonrakerClient]) -> StepResult:
@@ -302,8 +302,8 @@ class Actions:
             return client, None, result.dry_run, previous
 
         outcomes = await asyncio.gather(*(one(client) for client in clients))
-        done = [c.printer.name for c, error, _, _ in outcomes if error is None]
-        failed = [(c.printer.name, error) for c, error, _, _ in outcomes if error is not None]
+        done = [c.label for c, error, _, _ in outcomes if error is None]
+        failed = [(c.label, error) for c, error, _, _ in outcomes if error is not None]
         dry_run = any(dry for _, error, dry, _ in outcomes if error is None)
         undo = [
             UndoStep(kind="pending", printer=c.key, spool_id=previous)
@@ -318,7 +318,7 @@ class Actions:
         if failed:
             code = "printer_offline" if any(error == "offline" for _, error in failed) else "printer_error"
         return StepResult("; ".join(parts), ok=not failed, code=code, dry_run=dry_run,
-                          printers=[c.printer.name for c in clients], undo=undo)
+                          printers=[c.label for c in clients], undo=undo)
 
     async def _ensure_known_spool(self, spool_id: int) -> None:
         """Reject unknown spools; proceed if Spoolman is unreachable (parity with scanning)."""
@@ -440,16 +440,16 @@ class Actions:
             except asyncio.TimeoutError as error:
                 self.cues.play("error")
                 undo = [] if previous is None else [UndoStep(kind="pending", printer=client.key, spool_id=previous)]
-                step = StepResult(f"Clear on {client.printer.name}: {NO_REPLY}", ok=False, code="printer_error",
-                                  printers=[client.printer.name], undo=undo)
+                step = StepResult(f"Clear on {client.label}: {NO_REPLY}", ok=False, code="printer_error",
+                                  printers=[client.label], undo=undo)
                 activity_id = self._record("clear_pending", previous, step)
                 return Outcome(False, step.message, code=step.code, activity_id=activity_id)
             undo = [] if result.dry_run or previous is None else [
                 UndoStep(kind="pending", printer=client.key, spool_id=previous)
             ]
             prefix = "Dry run: would clear" if result.dry_run else "Cleared"
-            step = StepResult(f"{prefix} next spool on {client.printer.name}", dry_run=result.dry_run,
-                              printers=[client.printer.name], undo=undo)
+            step = StepResult(f"{prefix} next spool on {client.label}", dry_run=result.dry_run,
+                              printers=[client.label], undo=undo)
             activity_id = self._record("clear_pending", previous, step)
             return Outcome(True, step.message, activity_id=activity_id, dry_run=result.dry_run)
 
@@ -459,12 +459,12 @@ class Actions:
         lane_name = args.get("lane")
         lane = client.lane(lane_name) if isinstance(lane_name, str) else None
         if lane is None:
-            raise ActionError("invalid_args", f"{client.printer.name} has no lane {lane_name!r}")
+            raise ActionError("invalid_args", f"{client.label} has no lane {lane_name!r}")
         if not client.online:
-            raise ActionError("printer_offline", f"{client.printer.name} is offline")
+            raise ActionError("printer_offline", f"{client.label} is offline")
         other = next((item for item in client.state.lanes if item.spool_id == spool_id and item.lane != lane.lane), None)
         if other is not None:
-            raise ActionError("invalid_args", f"Spool {spool_id} is already in {other.lane} on {client.printer.name}")
+            raise ActionError("invalid_args", f"Spool {spool_id} is already in {other.lane} on {client.label}")
         async with self._lock:
             try:
                 await self._ensure_known_spool(spool_id)
@@ -480,14 +480,14 @@ class Actions:
             except PrinterCommandError as error:
                 self.cues.play("error")
                 step = StepResult(f"Assign failed: {error}", ok=False, code="printer_error",
-                                  printers=[client.printer.name])
+                                  printers=[client.label])
                 self._record("assign_lane", spool_id, step)
                 raise ActionError("printer_error", step.message) from error
             except asyncio.TimeoutError:
                 self.cues.play("error")
                 step = StepResult(
-                    f"Assign spool {spool_id} to {client.printer.name} {lane.lane}: {NO_REPLY}", ok=False,
-                    code="printer_error", printers=[client.printer.name],
+                    f"Assign spool {spool_id} to {client.label} {lane.lane}: {NO_REPLY}", ok=False,
+                    code="printer_error", printers=[client.label],
                     undo=[UndoStep(kind="lane", printer=client.key, lane=lane.lane, spool_id=previous)],
                 )
                 activity_id = self._record("assign_lane", spool_id, step)
@@ -496,8 +496,8 @@ class Actions:
             undo = [] if result.dry_run else [
                 UndoStep(kind="lane", printer=client.key, lane=lane.lane, spool_id=previous)
             ]
-            step = StepResult(f"{prefix} spool {spool_id} to {client.printer.name} {lane.lane}",
-                              dry_run=result.dry_run, printers=[client.printer.name], undo=undo)
+            step = StepResult(f"{prefix} spool {spool_id} to {client.label} {lane.lane}",
+                              dry_run=result.dry_run, printers=[client.label], undo=undo)
             self.cues.play("success")
             activity_id = self._record("assign_lane", spool_id, step)
             return Outcome(True, step.message, activity_id=activity_id, dry_run=result.dry_run)
@@ -684,6 +684,6 @@ class Actions:
             if not others:
                 return
             step = await self._clear_step(others)
-            log.info("Spool %d loaded in %s %s; %s", spool_id, source.printer.name, lane, step.message)
-            step.message = f"in {source.printer.name} {lane}; {step.message}"
+            log.info("Spool %d loaded in %s %s; %s", spool_id, source.label, lane, step.message)
+            step.message = f"in {source.label} {lane}; {step.message}"
             self._record("spool_loaded", spool_id, step)

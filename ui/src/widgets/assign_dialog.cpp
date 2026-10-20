@@ -86,7 +86,7 @@ void AssignDialog::refresh(const State& state)
     Theme& theme = app_.theme();
     lv_obj_clean(printer_row_);
     for (const Printer& printer : state.printers) {
-        lv_obj_t* button = ui::button(printer_row_, theme, printer.name, ui::ButtonStyle::Segment, theme.normal());
+        lv_obj_t* button = ui::button(printer_row_, theme, printer.label(), ui::ButtonStyle::Segment, theme.normal());
         lv_obj_set_height(button, 52);
         lv_obj_set_flex_grow(button, 1);
         ui::set_checked(button, printer.key == printer_);

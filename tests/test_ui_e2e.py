@@ -143,7 +143,7 @@ async def test_ui_load_goes_to_both_printers_and_sleep_resets(station: Station, 
     assert process.returncode == 0, stderr.decode(errors="replace")
     actions = [(e["action"], e["spool_id"]) for e in station.store.activity]
     assert actions == [("sleep", None), ("load", 93)]
-    assert station.store.activity[1]["printers"] == ["Kilo", "Yankee"]
+    assert station.store.activity[1]["printers"] == ["Kestrel", "Yeti"]
     assert station.store.spool is None
     assert station.sim_printers.printers["kilo"].next_spool_id is None
     assert station.sim_printers.printers["yankee"].next_spool_id is None

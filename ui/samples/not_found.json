@@ -127,7 +127,8 @@
             "remaining_pct": null,
             "colors": []
           }
-        ]
+        ],
+        "display_name": "Kestrel"
       },
       {
         "key": "yankee",
@@ -217,7 +218,8 @@
               "#8A8D91"
             ]
           }
-        ]
+        ],
+        "display_name": "Yeti"
       }
     ],
     "health": {
@@ -233,11 +235,11 @@
         "action": "load",
         "spool_id": 91,
         "printers": [
-          "Kilo",
-          "Yankee"
+          "Kestrel",
+          "Yeti"
         ],
         "ok": true,
-        "message": "next spool set on Kilo, Yankee",
+        "message": "next spool set on Kestrel, Yeti",
         "code": null,
         "dry_run": false,
         "undone": false,
@@ -249,11 +251,11 @@
         "action": "weigh_load",
         "spool_id": 90,
         "printers": [
-          "Kilo",
-          "Yankee"
+          "Kestrel",
+          "Yeti"
         ],
         "ok": true,
-        "message": "1102 g saved; next spool set on Kilo, Yankee",
+        "message": "1102 g saved; next spool set on Kestrel, Yeti",
         "code": null,
         "dry_run": false,
         "undone": false,
@@ -265,8 +267,8 @@
         "action": "undo",
         "spool_id": 97,
         "printers": [
-          "Kilo",
-          "Yankee"
+          "Kestrel",
+          "Yeti"
         ],
         "ok": true,
         "message": "Undid weigh + load of spool 97",
@@ -281,11 +283,11 @@
         "action": "weigh_load",
         "spool_id": 97,
         "printers": [
-          "Kilo",
-          "Yankee"
+          "Kestrel",
+          "Yeti"
         ],
         "ok": true,
-        "message": "640 g saved; next spool set on Kilo, Yankee",
+        "message": "640 g saved; next spool set on Kestrel, Yeti",
         "code": null,
         "dry_run": false,
         "undone": true,
@@ -323,10 +325,10 @@
         "action": "spool_loaded",
         "spool_id": 93,
         "printers": [
-          "Kilo"
+          "Kestrel"
         ],
         "ok": true,
-        "message": "in Yankee lane3; next spool cleared on Kilo",
+        "message": "in Yeti lane3; next spool cleared on Kestrel",
         "code": null,
         "dry_run": false,
         "undone": false,
@@ -338,11 +340,11 @@
         "action": "load",
         "spool_id": 93,
         "printers": [
-          "Kilo",
-          "Yankee"
+          "Kestrel",
+          "Yeti"
         ],
         "ok": true,
-        "message": "next spool set on Kilo, Yankee",
+        "message": "next spool set on Kestrel, Yeti",
         "code": null,
         "dry_run": false,
         "undone": false,

@@ -137,7 +137,7 @@ async def test_load_both_and_undo(station: Station) -> None:
     await act(station, "clear_pending", printer="kilo")
     result = await act(station, "load", spool_id=97)
     assert result["ok"] is True
-    assert result["message"] == "Spool 97: next spool set on Kilo, Yankee"
+    assert result["message"] == "Spool 97: next spool set on Kestrel, Yeti"
     assert kilo.next_spool_id == 97 and yankee.next_spool_id == 97
     printers = station.store.printers
     assert printers["kilo"].pending_spool == 97 and printers["kilo"].pending_confirmed
@@ -151,7 +151,7 @@ async def test_load_always_goes_to_every_printer(station: Station) -> None:
     assert "target" not in station.store.settings
     assert (await act(station, "set_setting", key="target", value="kilo"))["code"] == "invalid_args"
     result = await act(station, "load", spool_id=97, target="kilo")
-    assert result["message"] == "Spool 97: next spool set on Kilo, Yankee"
+    assert result["message"] == "Spool 97: next spool set on Kestrel, Yeti"
     assert sim_printer(station, "yankee").next_spool_id == 97
 
 
@@ -165,8 +165,8 @@ async def test_loading_on_one_printer_clears_the_others(station: Station) -> Non
     assert station.store.printers["kilo"].pending_spool is None
     await wait_until(lambda: station.store.activity[0]["action"] == "spool_loaded")
     entry = station.store.activity[0]
-    assert entry["message"] == "in Kilo lane4; next spool cleared on Yankee"
-    assert entry["spool_id"] == 97 and entry["printers"] == ["Yankee"] and entry["undoable"]
+    assert entry["message"] == "in Kestrel lane4; next spool cleared on Yeti"
+    assert entry["spool_id"] == 97 and entry["printers"] == ["Yeti"] and entry["undoable"]
     assert station.cues.played == ["success"]
 
 
@@ -186,12 +186,12 @@ async def test_sleep_deselects_and_clears_every_next_spool(station: Station) -> 
     await act(station, "load", spool_id=97)
     assert station.store.spool.id == 97
     result = await act(station, "sleep")
-    assert result["ok"] and result["message"] == "Station asleep: next spool cleared on Kilo, Yankee"
+    assert result["ok"] and result["message"] == "Station asleep: next spool cleared on Kestrel, Yeti"
     assert station.store.spool is None and station.store.scale.check is None
     assert sim_printer(station, "kilo").next_spool_id is None and sim_printer(station, "yankee").next_spool_id is None
     assert all(p.pending_spool is None for p in station.store.printers.values())
     assert station.store.activity[0]["action"] == "sleep" and station.store.activity[0]["undoable"]
-    assert station.store.activity[0]["message"] == "next spool cleared on Kilo, Yankee"
+    assert station.store.activity[0]["message"] == "next spool cleared on Kestrel, Yeti"
     await act(station, "undo", activity_id=result["activity_id"])
     assert sim_printer(station, "kilo").next_spool_id == 97 and sim_printer(station, "yankee").next_spool_id == 97
 
@@ -201,7 +201,7 @@ async def test_sleep_skips_printers_without_a_next_spool(station: Station) -> No
     await act(station, "sim.printer", printer="kilo", op="disconnect")
     await wait_until(lambda: not station.store.printers["kilo"].connected)
     result = await act(station, "sleep")
-    assert result["message"] == "Station asleep: next spool cleared on Yankee"
+    assert result["message"] == "Station asleep: next spool cleared on Yeti"
 
 
 async def test_lanes_carry_remaining_percent_and_colours(station: Station) -> None:
@@ -244,7 +244,7 @@ async def test_load_partial_failure_when_printer_offline(station: Station) -> No
     await wait_until(lambda: not station.store.printers["yankee"].connected)
     result = await act(station, "load", spool_id=97)
     assert result["ok"] is False and result["code"] == "printer_offline"
-    assert result["message"] == "Spool 97: next spool set on Kilo; Yankee: offline"
+    assert result["message"] == "Spool 97: next spool set on Kestrel; Yeti: offline"
     assert station.cues.played[-1] == "error"
     assert station.store.activity[0]["undoable"]
     await act(station, "sim.printer", printer="yankee", op="connect")
@@ -267,7 +267,7 @@ async def test_weigh_load_from_ui(station: Station) -> None:
     await set_scale(station, 640.0)
     result = await act(station, "weigh_load", spool_id=97)
     assert result["ok"] is True
-    assert result["message"] == "Spool 97: 640 g saved; next spool set on Kilo, Yankee"
+    assert result["message"] == "Spool 97: 640 g saved; next spool set on Kestrel, Yeti"
     assert station.cues.played[-2:] == ["weigh", "success"]
     await act(station, "undo", activity_id=result["activity_id"])
     assert sim_spool(station, 97)["used_weight"] == pytest.approx(545.3)
@@ -277,7 +277,7 @@ async def test_weigh_load_from_ui(station: Station) -> None:
 async def test_clear_pending_and_undo(station: Station) -> None:
     await act(station, "load", spool_id=97)
     result = await act(station, "clear_pending", printer="Kilo")
-    assert result["ok"] and result["message"] == "Cleared next spool on Kilo"
+    assert result["ok"] and result["message"] == "Cleared next spool on Kestrel"
     assert sim_printer(station, "kilo").next_spool_id is None
     assert station.store.printers["kilo"].pending_spool is None
     await act(station, "undo", activity_id=result["activity_id"])
@@ -287,7 +287,7 @@ async def test_clear_pending_and_undo(station: Station) -> None:
 
 async def test_assign_lane_and_undo(station: Station) -> None:
     result = await act(station, "assign_lane", spool_id=97, printer="kilo", lane="lane4")
-    assert result["ok"] and result["message"] == "Assigned spool 97 to Kilo lane4"
+    assert result["ok"] and result["message"] == "Assigned spool 97 to Kestrel lane4"
     await wait_until(lambda: station.store.printers["kilo"].lanes[3].spool_id == 97)
     assert station.store.printers["kilo"].lanes[3].material == "ABS"
     duplicate = await act(station, "assign_lane", spool_id=97, printer="kilo", lane="lane1")

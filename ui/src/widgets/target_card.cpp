@@ -33,6 +33,9 @@ TargetCard::TargetCard(App& app, lv_obj_t* parent, int x, int y, int w, int h) :
     lv_obj_set_style_pad_column(head, 10, 0);
     dot_ = ui::dot(head, 10, theme.muted());
     name_ = ui::label(head, theme.normal(), theme.text(), "");
+    lv_obj_set_style_max_width(name_, (w - 2 * kInset) / 2, 0);
+    lv_obj_set_height(name_, lv_font_get_line_height(theme.normal()));
+    lv_label_set_long_mode(name_, LV_LABEL_LONG_MODE_DOTS);
     state_ = ui::label(head, theme.caption(), theme.muted(), "");
 
     // Room around the tiles for the in-tool outline, which would otherwise be clipped.
@@ -107,7 +110,7 @@ void TargetCard::update(const Printer& printer, bool online)
     const bool up = online && printer.connected;
     lv_obj_set_style_bg_color(dot_, !online ? theme.muted() : !printer.connected ? theme.error()
                                   : printer.afc_error.empty() ? theme.ok() : theme.warn(), 0);
-    ui::set_text(name_, printer.name);
+    ui::set_text(name_, printer.label());
 
     std::string status = up ? print_state_label(printer.print_state, printer.progress) : "Offline";
     lv_color_t status_color = theme.muted();

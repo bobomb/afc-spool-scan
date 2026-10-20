@@ -125,7 +125,7 @@ only), so the `station/` directory must stay next to it.
 | `--log-level` / `STATION_LOG_LEVEL` | `DEBUG`…`ERROR` | `INFO` | `INFO` |
 | `--sim-fixtures` / `STATION_SIM_FIXTURES` | fixture dir | built-in synthetic | — |
 | `SPOOLMAN_URL` | URL | `http://192.0.2.10:7912/api/v1` for live reads | `http://127.0.0.1:7912/api/v1` |
-| `PRINTERS` | `Name=host:port,…` | `Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125` | same |
+| `PRINTERS` | `Name=host:port,…` (order = card order, left to right) | `Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125` | same |
 
 Precedence: platform defaults < `config.env` < environment < CLI flags.
 
@@ -135,7 +135,8 @@ Precedence: platform defaults < `config.env` < environment < CLI flags.
   Reads (spool lookup, printer subscriptions) still work against live
   services. Simulated services (`sim`) are in-memory and always accept writes.
   A second guard sits in the clients: with writes off the Moonraker client
-  only sends `server.info` and `printer.objects.list/query/subscribe`, and the
+  only sends `server.info`, `server.database.get_item` and
+  `printer.objects.list/query/subscribe`, and the
   Spoolman client only sends `GET`.
 - Never enable `--writes on` against the real printers from Windows except for
   a deliberate test with a known spare spool.
@@ -242,7 +243,7 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `scale` | `stable`; derived against the current spool: `tare_g`, `net_g`, `expected_g`, `delta_g`, `check` (`ok`, `warn`, `tare_unknown` or null) — the sanity rule stays in the service |
 | `scan` | `countdown` `{spool_id, action, remaining_s}` (published each second) and `prompt` `{kind: "confirm_weigh", spool_id, message, gross_g, tare_g, net_g, expected_g, delta_g}` when an immediate scan skipped saving a suspicious weight |
 | `spool` | `found` (false → `{id, found, message}` only), `initial_weight_g`, `used_weight_g`, `tare_source` (`spool`, `filament`, `vendor`), `colors` (every filament colour, from `multi_color_hexes`; `color` is the first) |
-| `printers[]` | `key`, `klippy_state`, `filename`, `pending_confirmed`; lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known) and `colors` (Spoolman colours, else the AFC lane `color`) |
+| `printers[]` | `key`, `display_name` (the printer name set in Mainsail, else null; the UI shows it instead of `name`), `klippy_state`, `filename`, `pending_confirmed`; lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known) and `colors` (Spoolman colours, else the AFC lane `color`) |
 | `health` | `scale_status` |
 | `activity[]` | `code`, `dry_run`, `undone`; `action` may also be `scan`, `clear_pending`, `undo`, `spool_loaded` (a lane took the spool, so the service cleared it as next spool on the other printers) and `sleep` (pending next spools cleared when the station went to sleep) |
 | `result` | `code`, `dry_run`, `data` (e.g. sanity figures with `needs_confirm`) |
@@ -312,7 +313,11 @@ clients.
 ### 6.3 Moonraker
 
 - WebSocket `ws://<host>:<port>/websocket`, JSON-RPC.
-- On connect: `server.info`; when Klippy is ready, `printer.objects.list`
+- On connect: `server.info`, then the Mainsail printer name
+  (`server.database.get_item` namespace `mainsail`, key
+  `general.printername`; re-read on every connect and Klippy ready, cached in
+  `<state dir>/printer_names.json` so a printer that is off keeps its name;
+  a 404 falls back to the configured name); when Klippy is ready, `printer.objects.list`
   then `printer.objects.subscribe` with `AFC`, every `AFC_stepper <lane>` or
   `AFC_lane <lane>` object (lane order from `AFC.lanes`), `print_stats`,
   `display_status`; handle `notify_status_update`,
@@ -527,6 +532,11 @@ within a phase unless noted. Each task ends with tests/build passing.
   printers (`spool_loaded`); when the screen goes off, the UI sends `sleep`
   (deselect the spool, clear every pending next spool).
   *Done 2026-10-19; unit, service and UI end-to-end tests.*
+- [x] **F12** Printer names and order (product plan §5.1, 2026-10-19): show
+  each printer's Mainsail name (`display_name`) on the cards, the Printers
+  screen, the assign dialog, the status line and in result messages; card
+  order follows `PRINTERS`.
+  *Done 2026-10-19; unit and UI model tests, screenshots.*
 
 ### P — spoolpi deployment
 

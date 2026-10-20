@@ -58,8 +58,9 @@ SideRail::SideRail(App& app, lv_obj_t* parent) : app_(app)
     lv_obj_set_pos(status_dot_, (layout::kRailW - 10) / 2, 330);
     status_text_ = ui::label(root, theme.tiny(), theme.muted(), "");
     lv_obj_set_width(status_text_, layout::kRailW - 8);
+    lv_obj_set_style_max_height(status_text_, 3 * lv_font_get_line_height(theme.tiny()), 0);
     lv_obj_set_style_text_align(status_text_, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_long_mode(status_text_, LV_LABEL_LONG_MODE_WRAP);
+    lv_label_set_long_mode(status_text_, LV_LABEL_LONG_MODE_DOTS);
     lv_obj_set_pos(status_text_, 4, 346);
 }
 
