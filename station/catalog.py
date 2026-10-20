@@ -48,6 +48,10 @@ class SpoolCatalog:
         self._failed: dict[int, float] = {}
         self._tasks: dict[int, asyncio.Task[None]] = {}
 
+    @property
+    def busy(self) -> bool:
+        return bool(self._tasks)
+
     def get(self, spool_id: int) -> SpoolMeta | None:
         entry = self._entries.get(spool_id)
         now = self.clock()

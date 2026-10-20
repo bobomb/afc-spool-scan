@@ -42,6 +42,7 @@ async def station(tmp_path: Path):  # noqa: ANN201
                       scale_interval=0, countdown_tick_s=0.01)
     await station.start()
     await wait_until(lambda: all(p.connected for p in station.store.printers.values()))
+    await wait_until(lambda: not station.catalog.busy)  # type: ignore[union-attr]
     cues = RecordingCues()
     station.actions.cues = cues  # type: ignore[union-attr]
     station.cues = cues  # type: ignore[attr-defined]
