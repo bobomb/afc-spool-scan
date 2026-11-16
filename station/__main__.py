@@ -22,6 +22,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     logging.basicConfig(level=config.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if config.writes and "live" in (config.printers_mode, config.spoolman_mode):
         log.warning("Writes are ON: Spoolman updates and G-code will be sent to live services")
+    if config.has_bambuddy and config.printers_mode == "live":
+        log.warning("Bambuddy writes are %s", "ON: slot assignments will be sent" if config.writes_enabled("bambuddy")
+                    else "OFF: slot assignments are dry runs")
     try:
         asyncio.run(Station(config).run_forever())
     except KeyboardInterrupt:

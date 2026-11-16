@@ -268,6 +268,7 @@ private:
     std::deque<LaneRow> lanes_;
     int width_ = 0;
     int height_ = 0;
+    int cell_w_ = 0;
     bool narrow_ = false;
     bool grid_ = false;
 };

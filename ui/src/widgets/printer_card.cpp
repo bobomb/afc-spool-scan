@@ -26,10 +26,10 @@ PrinterCard::PrinterCard(App& app, lv_obj_t* parent, int x, int y, int w, int h)
 
     dot_ = ui::dot(root_, 12, theme.muted());
     lv_obj_set_pos(dot_, 0, 9);
-    name_ = ui::label(root_, narrow_ ? theme.medium() : theme.normal(), theme.text(), "");
-    lv_obj_set_pos(name_, 20, narrow_ ? 2 : 0);
-    lv_obj_set_style_max_width(name_, narrow_ ? w - 130 : w / 2, 0);
-    lv_obj_set_height(name_, lv_font_get_line_height(narrow_ ? theme.medium() : theme.normal()));
+    name_ = ui::label(root_, narrow_ ? theme.small() : theme.normal(), theme.text(), "");
+    lv_obj_set_pos(name_, 20, narrow_ ? 3 : 0);
+    lv_obj_set_style_max_width(name_, narrow_ ? w - 132 : w / 2, 0);
+    lv_obj_set_height(name_, lv_font_get_line_height(narrow_ ? theme.small() : theme.normal()));
     lv_label_set_long_mode(name_, LV_LABEL_LONG_MODE_DOTS);
     print_ = ui::chip(root_, theme, "", theme.muted());
     lv_obj_align(print_, LV_ALIGN_TOP_RIGHT, 0, 2);
@@ -68,6 +68,7 @@ void PrinterCard::build_lanes(std::size_t count, bool grid)
     const int box_h = height_ - 20 - 102;
     const int rows = grid ? (static_cast<int>(count) + kGridColumns - 1) / kGridColumns : 0;
     const int cell_w = (box_w - (kGridColumns - 1) * kCellGap) / kGridColumns;
+    cell_w_ = cell_w;
     const int cell_h = rows > 0 ? std::min(110, (box_h - (rows - 1) * kCellGap) / rows) : 0;
     for (std::size_t i = 0; i < count; ++i) {
         LaneRow row{};
@@ -196,6 +197,11 @@ void PrinterCard::update(const Printer& printer, const Settings& settings, bool 
     else if (up && printer.print_state == "complete") print_color = theme.ok();
     else if (!up && !off) print_color = theme.error();
     ui::set_chip(print_, print_text, print_color);
+    if (narrow_) {
+        // The chip's width depends on its text; the name gets what is left of the header row.
+        lv_obj_update_layout(print_);
+        lv_obj_set_style_max_width(name_, std::max(40, width_ - 20 - 20 - lv_obj_get_width(print_) - 6), 0);
+    }
 
     lv_color_t status_color;
     const std::string status = status_text(printer, online, status_color);
@@ -293,7 +299,7 @@ void PrinterCard::update_cell(LaneRow& row, const Lane& lane, bool loaded)
     }
     lv_obj_set_style_text_font(row.material, has_spool ? theme.tiny() : theme.caption(), 0);
     lv_obj_set_pos(row.material, has_spool ? 7 : 4, has_spool ? 40 : 24);
-    lv_obj_set_width(row.material, lv_obj_get_width(row.root) - (has_spool ? 10 : 5));
+    lv_obj_set_width(row.material, cell_w_ - (has_spool ? 10 : 5));
     if (!has_spool && lane.prep) lv_obj_set_style_text_font(row.material, theme.tiny(), 0);
     lv_obj_set_style_text_opa(row.name, LV_OPA_80, 0);
     for (lv_obj_t* label : {row.name, row.spool, row.material, row.weight, row.status}) {

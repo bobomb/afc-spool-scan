@@ -6,7 +6,7 @@
 namespace station {
 namespace {
 
-constexpr int kHeadW = 106;
+constexpr int kHeadW = 122;
 constexpr int kInsetY = 7;
 constexpr int kRightInset = 10;
 constexpr int kTileGap = 5;
