@@ -669,6 +669,11 @@ within a phase unless noted. Each task ends with tests/build passing.
 - [ ] **B10** Rollout on spoolpi: deploy with `BAMBUDDY_WRITES=off` and
   `Hotel=bambuddy:1` appended to `PRINTERS`, watch the dry-run log, capture
   fixtures, then writes on and the acceptance test (product plan §6.4).
+  *2026-11-16: deployed read-only (writes off), live status and all nine
+  slots shown correctly; read-only capture committed as
+  `station/sim/fixtures/captured/bambuddy/hotel.json` (+ `.ws.jsonl`) and
+  replayed by `tests/test_captured_fixtures.py`. Remaining: writes on and
+  the acceptance test with the user at the printer.*
 
 ### C — Continuous integration (optional)
 

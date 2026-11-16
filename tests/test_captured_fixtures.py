@@ -2,7 +2,8 @@
 
 The fixtures in station/sim/fixtures/captured/ come from
 `scripts/capture-fixtures.py` (read-only) run against Kilo, Yankee and
-Spoolman on 2026-10-14. No network: they are replayed through the simulators.
+Spoolman on 2026-10-14, and against Bambuddy (Hotel) on 2026-11-16. No network:
+they are replayed through the simulators.
 """
 
 from __future__ import annotations
@@ -12,10 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from conftest import sim_config, wait_until
+from conftest import THREE_PRINTERS, sim_config, wait_until
 
 from station.app import Station
-from station.config import ConfigError, load_config
+from station.bambuddy import AMS_3H, spool_present
+from station.config import ConfigError, load_config, parse_printers
 from station.moonraker import NEXT_SPOOL_PATTERN, normalize_color
 from station.sim.spoolman import load_spool_fixtures
 from station.spoolman import spool_info_from_api
@@ -73,6 +75,46 @@ async def test_station_replays_captured_data(tmp_path: Path) -> None:
         tagged = next(lane.spool_id for p in station.store.printers.values() for lane in p.lanes if lane.spool_id)
         result = await station.actions.handle("lookup", {"spool_id": tagged})
         assert result["ok"] is True
+    finally:
+        await station.stop()
+
+
+def test_captured_bambuddy_has_the_fields_we_read() -> None:
+    data = json.loads((CAPTURED / "bambuddy" / "hotel.json").read_text(encoding="utf-8"))
+    status = data["status"]
+    assert {"connected", "state", "progress", "hms_errors", "tray_now", "ams"} <= set(status)
+    unit = next(unit for unit in status["ams"] if unit["id"] == AMS_3H)
+    trays = {tray["id"]: tray for tray in unit["tray"]}
+    assert set(trays) == set(range(9))
+    for tray in trays.values():
+        assert {"exists", "state", "tray_type", "tray_color", "tray_uuid", "tag_uid"} <= set(tray)
+    assert any(spool_present(tray) for tray in trays.values())
+    assert any(not spool_present(tray) for tray in trays.values())
+    messages = [json.loads(line) for line in
+                (CAPTURED / "bambuddy" / "hotel.ws.jsonl").read_text(encoding="utf-8").splitlines() if line]
+    status_messages = [message for message in messages if message["type"] == "printer_status"]
+    assert status_messages and all({"printer_id", "data"} <= set(message) for message in status_messages)
+    assert "ams" in status_messages[0]["data"]
+
+
+async def test_station_replays_captured_bambuddy(tmp_path: Path) -> None:
+    data = json.loads((CAPTURED / "bambuddy" / "hotel.json").read_text(encoding="utf-8"))
+    station = Station(sim_config(tmp_path, sim_fixtures=CAPTURED, printers=parse_printers(THREE_PRINTERS)),
+                      printer_backoff=(0.02, 0.05), publish_delay=0, scale_interval=0)
+    await station.start()
+    try:
+        await wait_until(lambda: all(p.connected for p in station.store.printers.values()))
+        printer = station.store.printers["hotel"]
+        trays = {tray["id"]: tray for unit in data["status"]["ams"] if unit["id"] == AMS_3H
+                 for tray in unit["tray"]}
+        assert len(printer.lanes) == 9
+        for slot, lane in enumerate(printer.lanes):
+            present = spool_present(trays[slot])
+            assert lane.prep is present
+            expected = data["assignments"].get(str(slot)) if present else None
+            assert lane.spool_id == expected
+            if present:
+                assert lane.material and lane.color
     finally:
         await station.stop()
 
