@@ -41,7 +41,8 @@ async def test_fetches_in_background_then_caches(rig) -> None:  # noqa: ANN001
     sim, catalog, updates, clock = rig
     assert catalog.get(93) is None
     await wait_until(lambda: updates)
-    assert catalog.get(93) == SpoolMeta(initial_g=1000.0, colors=("#C94CE0", "#33B5E5", "#F2C14E"))
+    assert catalog.get(93) == SpoolMeta(initial_g=1000.0, colors=("#C94CE0", "#33B5E5", "#F2C14E"), material="PLA",
+                                        remaining_g=701.0)
     assert gets(sim, 93) == 1
     clock.now += 61
     assert catalog.get(93) is not None
@@ -76,9 +77,21 @@ async def test_put_updates_without_fetching(rig) -> None:  # noqa: ANN001
     assert gets(sim, 97) == 0
 
 
+async def test_refresh_fetches_again_and_keeps_the_cached_value(rig) -> None:  # noqa: ANN001
+    sim, catalog, updates, _ = rig
+    catalog.put(sim.get(97))
+    sim.spools[97]["remaining_weight"] = 400.0
+    catalog.refresh([97])
+    assert catalog.get(97).remaining_g == 454.7  # type: ignore[union-attr]
+    await wait_until(lambda: gets(sim, 97) == 1 and len(updates) == 2)
+    assert catalog.get(97).remaining_g == 400.0  # type: ignore[union-attr]
+
+
 def test_meta_falls_back_to_filament_weight() -> None:
     assert meta_from_api({"filament": {"weight": 750, "color_hex": "00ff00"}}) == SpoolMeta(750.0, ("#00FF00",))
     assert meta_from_api({"initial_weight": 0, "filament": {}}) == SpoolMeta(None, ())
+    meta = meta_from_api({"remaining_weight": -3, "archived": True, "filament": {"material": " PETG "}})
+    assert (meta.remaining_g, meta.archived, meta.material) == (0.0, True, "PETG")
 
 
 def test_get_without_event_loop_returns_cached_only() -> None:

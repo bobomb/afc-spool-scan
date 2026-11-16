@@ -246,7 +246,7 @@ async def test_disconnect_and_reconnect(rig) -> None:  # noqa: ANN001
 async def test_lane_loaded_events_only_for_real_changes(rig) -> None:  # noqa: ANN001
     printer, client, _ = rig
     events: list[tuple[str, str, int]] = []
-    client.on_lane_loaded = lambda *event: events.append(event)
+    client.on_lane_loaded = lambda load: events.append((load.printer, load.lane, load.spool_id))
     await client.set_next_spool(97)
     await printer.insert_lane("lane4")
     await wait_until(lambda: events == [("kilo", "lane4", 97)])

@@ -125,7 +125,10 @@ only), so the `station/` directory must stay next to it.
 | `--log-level` / `STATION_LOG_LEVEL` | `DEBUG`…`ERROR` | `INFO` | `INFO` |
 | `--sim-fixtures` / `STATION_SIM_FIXTURES` | fixture dir | built-in synthetic | — |
 | `SPOOLMAN_URL` | URL | `http://192.0.2.10:7912/api/v1` for live reads | `http://127.0.0.1:7912/api/v1` |
-| `PRINTERS` | `Name=host:port,…` (order = card order, left to right) | `Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125` | same |
+| `PRINTERS` | `Name=host:port,…` (order = card order, left to right); `Name=bambuddy:<printer id>` is a Bambu printer behind Bambuddy | `Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125` | same |
+| `BAMBUDDY_URL` | URL | `http://127.0.0.1:8010` | same |
+| `BAMBUDDY_API_KEY` / `BAMBUDDY_API_KEY_FILE` | key, or an env-style file with a `BAMBUDDY_API_KEY=` line (e.g. Bambuddy's `secrets.env`) | — | — |
+| `--bambuddy-writes` / `BAMBUDDY_WRITES` | `on`, `off` | follows `--writes` | follows `--writes` |
 
 Precedence: platform defaults < `config.env` < environment < CLI flags.
 
@@ -136,8 +139,16 @@ Precedence: platform defaults < `config.env` < environment < CLI flags.
   services. Simulated services (`sim`) are in-memory and always accept writes.
   A second guard sits in the clients: with writes off the Moonraker client
   only sends `server.info`, `server.database.get_item` and
-  `printer.objects.list/query/subscribe`, and the
+  `printer.objects.list/query/subscribe`, the Bambuddy client only `GET`
+  (and `POST /auth/ws-token`), and the
   Spoolman client only sends `GET`.
+- `BAMBUDDY_WRITES` overrides `--writes` for Bambuddy only, so a Bambu
+  printer can run read-only beside writing Moonraker printers (or the
+  reverse). With Bambuddy writes off the next spool is still armed (that is
+  local) and an insertion is logged as "Dry run: would assign …".
+- The Bambuddy API key is never logged or shown (`Config` hides it from
+  `repr`); keep it in the git-ignored `config.env` or point
+  `BAMBUDDY_API_KEY_FILE` at Bambuddy's own secrets file.
 - Never enable `--writes on` against the real printers from Windows except for
   a deliberate test with a known spare spool.
 - Tests never touch the network; they use mocks and fixtures.
@@ -239,13 +250,13 @@ Additive fields implemented beyond the example above (all protocol 1):
 
 | Subtree | Fields |
 |---|---|
-| `service` | `version`, `protocol`, `hardware`, `printers`, `spoolman`, `writes`, `dry_run` (writes off with a live service) |
+| `service` | `version`, `protocol`, `hardware`, `printers`, `spoolman`, `writes`, `dry_run` (writes off with a live service), `bambuddy_writes` (only with a Bambuddy printer) |
 | `scale` | `stable`; derived against the current spool: `tare_g`, `net_g`, `expected_g`, `delta_g`, `check` (`ok`, `warn`, `tare_unknown` or null) — the sanity rule stays in the service |
 | `scan` | `countdown` `{spool_id, action, remaining_s}` (published each second) and `prompt` `{kind: "confirm_weigh", spool_id, message, gross_g, tare_g, net_g, expected_g, delta_g}` when an immediate scan skipped saving a suspicious weight |
 | `spool` | `found` (false → `{id, found, message}` only), `initial_weight_g`, `used_weight_g`, `tare_source` (`spool`, `filament`, `vendor`), `colors` (every filament colour, from `multi_color_hexes`; `color` is the first) |
-| `printers[]` | `key`, `display_name` (the printer name set in Mainsail, else null; the UI shows it instead of `name`), `klippy_state`, `filename`, `pending_confirmed`; lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known) and `colors` (Spoolman colours, else the AFC lane `color`) |
+| `printers[]` | `key`, `display_name` (the printer name set in Mainsail or Bambuddy, else null; the UI shows it instead of `name`), `kind` (`moonraker` or `bambuddy`), `off` (a Bambu printer switched off while Bambuddy runs: not an error, Load skips it), `klippy_state` (Bambuddy: `ready`, `off` or `disconnected`), `filename`, `pending_confirmed`; `afc_state`/`afc_error` carry the filament system state/error (Bambu: the HMS warning or error); lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known), `colors` (Spoolman colours, else the AFC lane or AMS tray colour) and `settings_pending` (Bambu slot settings apply after the print). Bambu lanes are the AMS 3H slots `3H-1`…`3H-9`; `prep` means a spool is in the slot |
 | `health` | `scale_status` |
-| `activity[]` | `code`, `dry_run`, `undone`; `action` may also be `scan`, `clear_pending`, `undo`, `spool_loaded` (a lane took the spool, so the service cleared it as next spool on the other printers) and `sleep` (pending next spools cleared when the station went to sleep) |
+| `activity[]` | `code`, `dry_run`, `undone`; `action` may also be `scan`, `clear_pending`, `undo`, `spool_loaded` (a lane took the spool, so the service cleared it as next spool on the other printers; for a Bambu slot it also records the assignment, and undo unassigns it and arms the printers again), `sleep` (pending next spools cleared when the station went to sleep) and `printer` (a printer reports something to see, e.g. an RFID spool that differs from the scan; `code: printer_notice`) |
 | `result` | `code`, `dry_run`, `data` (e.g. sanity figures with `needs_confirm`) |
 
 ### 5.3 Actions
@@ -369,6 +380,45 @@ settings so they can change without code edits:
 | `undo_depth` | 20 |
 | Idle | dim 120 s, blank 300 s (blank = sleep: deselect, clear next spools) |
 | Empty spool minimum weight | > 10 g stable |
+
+### 6.6 Bambuddy
+
+Product plan §6.4 has the endpoints and decided behaviour. Implementation
+(`station/bambuddy.py`, `BambuddyClient`; both clients satisfy
+`station/printer_client.py` `PrinterClient`):
+
+- Connect: mint a ws-token (`POST /auth/ws-token`, `X-API-Key`), open
+  `/api/v1/ws`, then seed from `GET /printers/{id}/status` and
+  `GET …/slot-assignments/all?printer_id=`; `printer_status` messages (same
+  dict as the status route) are filtered by `printer_id`. A ping every 30 s
+  keeps the socket alive; any failure reconnects with backoff and a fresh
+  token. The first status after (re)connect only primes slot presence, so a
+  reconnect never looks like an insertion.
+- Presence per slot is Bambuddy's `exists` bit (else `state` 9/10 = empty),
+  ported from `ams_slot_presence.spool_present`. An empty → filled edge with a
+  spool armed starts the insertion handler (about 3 s settle for Bambuddy's
+  RFID match, then re-read the assignments). The station's own assignments
+  are remembered so the resulting `spool_assignment_changed` is not reported
+  twice; an assignment made elsewhere (Bambuddy UI, RFID match) for a filled
+  slot is reported as `LaneLoad` like AFC loading a lane.
+- `data.connected == false` → `off` (printer switched off); Bambuddy
+  unreachable → offline. Both disarm.
+- Settings-pending slots are re-sent once when the print ends (state leaves
+  RUNNING/PREPARE/SLICING/PAUSE); the same edge refreshes every assigned
+  spool in the catalog right away and again 30 s later, after Bambuddy has
+  charged the usage.
+- Simulator: `station/sim/bambuddy.py` (REST + websocket, API key and token
+  checks, move, archived check, refuse-while-printing, 120 s auto-unassign,
+  RFID match and `unknown_tag`, tag 409). Fixture
+  `station/sim/fixtures/bambuddy/hotel.json` (placeholder printer Hotel /
+  "Heron"); `--printers sim` starts it when `PRINTERS` has a bambuddy entry.
+  `simctl printer hotel --insert 3H-4 [--rfid …] / --eject / --power-off /
+  --tool 3H-2 / --print RUNNING`.
+- `scripts/capture-fixtures.py --bambuddy [--bambuddy-ws-seconds N]` records
+  status, assignments and the websocket read-only, scrubbed by
+  `scrub_capture` (no serials, IPs, tokens, access codes, real tag IDs, file
+  names or names); `tests/test_placeholder_hosts.py` rejects `bb_…` API keys
+  and quoted serial/access-code/IP fields in tracked files.
 
 ## 7. UI design notes
 
@@ -589,6 +639,37 @@ within a phase unless noted. Each task ends with tests/build passing.
   verified. Tap test by the user: touch aligned in landscape, touch wakes
   the screen. `spool-station-ui.service` enabled at the cutover.*
 
+### B — Bambu H3C via Bambuddy (product plan §6.4, decided 2026-11-15)
+
+- [x] **B0** Backup before the change: branch `touch-ui-pre-h3c` and tag
+  `pre-h3c` at b8b6c58 on the fork; spoolpi's `config.env` and running
+  commit copied to `~/.local/state/spool-station/*.pre-h3c`. Rollback: §10.
+- [x] **B1** Layout mockups for three printers (station A/B/C, Printers
+  P1/P2); user chose C and P1.
+- [x] **B2** `printer_client.py`: `PrinterClient` protocol, neutral
+  `PrinterOffline`/`PrinterCommandError`/`CommandResult` (`GcodeResult`
+  alias), `LaneLoad`, `PrinterNotice`; `PrinterManager` builds a client per
+  `PrinterConfig.kind`. Existing tests unchanged.
+- [x] **B3** Config: `Name=bambuddy:<id>`, `BAMBUDDY_URL`,
+  `BAMBUDDY_API_KEY[_FILE]`, `BAMBUDDY_WRITES` / `--bambuddy-writes`.
+- [x] **B4** Simulator, fixture and `simctl` controls (§6.6).
+- [x] **B5** `BambuddyClient` read side: status, slots, assignments, names,
+  off vs offline, HMS errors, catalog material/grams.
+- [x] **B6** Write side: arm/disarm, insertion → assign, RFID match /
+  learn / 409, settings pending + resend after the print, assign/unassign a
+  slot, dry runs, second write guard.
+- [x] **B7** Actions: Load skips `off` printers, `spool_loaded` with the
+  assignment and undo, `printer` notices; tests `test_bambuddy.py`,
+  `test_actions_bambuddy.py`.
+- [x] **B8** UI: `kind`, `off`, `settings_pending`, compact two-row station
+  cards, three-column Printers screen with the slot grid, assign dialog for
+  nine slots, kind-aware wording; samples `three`, `three_off`.
+- [x] **B9** Read-only capture script for Bambuddy with scrubbing;
+  placeholder guard for API keys and device secrets.
+- [ ] **B10** Rollout on spoolpi: deploy with `BAMBUDDY_WRITES=off` and
+  `Hotel=bambuddy:1` appended to `PRINTERS`, watch the dry-run log, capture
+  fixtures, then writes on and the acceptance test (product plan §6.4).
+
 ### C — Continuous integration (optional)
 
 - [x] **C1** GitHub Actions: `pytest` on Ubuntu and Windows; build UI with
@@ -775,3 +856,21 @@ Append dated notes here (verified API details, gotchas, measurements).
   upstream base `7b41331` are untouched. The deploy script reads the real
   host and user from git-ignored `deploy.env`. Real printer names still come
   from `config.env` on the Pi, so the panel is unchanged.
+
+- 2026-11-15 (Bambu H3C): Bambuddy 1.3.1 verified read-only with the
+  station key: `GET /printers/1/status` gives `state` (FINISH, RUNNING, …),
+  `progress` in percent, `subtask_name`, `hms_errors[]` (`severity` 1 error,
+  2 warning, 3 note; `description`), `ams[]` with unit `id` 32 and nine
+  `tray[]` entries (`exists`, `state` 9 empty / 27 loaded without tag /
+  283 RFID, `tray_type`, `tray_color` RRGGBBAA, `tray_uuid`), `tray_now`
+  (255 = none, 28 + slot) and per-tool external inputs in `vt_tray`
+  (247–255, ignored). The websocket sends one `printer_status` per printer
+  right after connect and then only on change; it answers `{"type": "ping"}`
+  with `pong`. Bambuddy refuses a websocket without a valid token by closing
+  with 4401 before accept.
+- 2026-11-15 rollback to the version before the H3C work: on spoolpi
+  `cd ~/afc-spool-scan && git fetch origin && git checkout pre-h3c &&
+  ./scripts/install-spoolpi.sh --update`, then
+  `cp ~/.local/state/spool-station/config.env.pre-h3c config.env` and
+  `systemctl --user restart spool-station spool-station-ui`. The fork keeps
+  branch `touch-ui-pre-h3c` at the same commit.

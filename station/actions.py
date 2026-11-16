@@ -11,7 +11,7 @@ from typing import Any, Protocol
 from .activity import ActivityLog, UndoStep
 from .catalog import SpoolCatalog
 from .config import Config
-from .moonraker import MoonrakerClient, PrinterCommandError, PrinterOffline
+from .printer_client import LaneLoad, PrinterClient, PrinterCommandError, PrinterNotice, PrinterOffline
 from .printers import PrinterManager, UnknownPrinter
 from .rules import (
     EMPTY_MINIMUM_G,
@@ -37,7 +37,7 @@ UNDO_LABELS = {
     "empty_spool": "empty spool",
     "clear_pending": "clear pending",
     "sleep": "sleep clear",
-    "spool_loaded": "automatic clear",
+    "spool_loaded": "automatic load",
 }
 
 
@@ -215,11 +215,15 @@ class Actions:
         assert reading.grams is not None
         return reading.grams
 
-    def _client(self, name: Any) -> MoonrakerClient:
+    def _client(self, name: Any) -> PrinterClient:
         try:
             return self.printers.get(name)
         except UnknownPrinter as error:
             raise ActionError("invalid_args", str(error)) from error
+
+    def _load_targets(self) -> list[PrinterClient]:
+        """Every printer, except one switched off on purpose (a powered-off Bambu printer is not an error)."""
+        return [client for client in self.printers.all() if not client.state.off]
 
     def _fail(self, error: ActionError) -> None:
         if error.code != "needs_confirm":
@@ -251,8 +255,11 @@ class Actions:
             undo=[UndoStep(kind="spool_patch", spool_id=spool_id, fields=previous)],
         ), grams
 
-    async def _load_step(self, spool_id: int, clients: list[MoonrakerClient]) -> StepResult:
-        async def one(client: MoonrakerClient) -> tuple[MoonrakerClient, str | None, bool, int | None]:
+    async def _load_step(self, spool_id: int, clients: list[PrinterClient]) -> StepResult:
+        if not clients:
+            return StepResult("no printer is on to take the next spool", ok=False, code="printer_offline")
+
+        async def one(client: PrinterClient) -> tuple[PrinterClient, str | None, bool, int | None]:
             previous = client.state.pending_spool
             try:
                 result = await client.set_next_spool(spool_id)
@@ -286,10 +293,10 @@ class Actions:
             printers=[c.label for c in clients], undo=undo,
         )
 
-    async def _clear_step(self, clients: list[MoonrakerClient]) -> StepResult:
+    async def _clear_step(self, clients: list[PrinterClient]) -> StepResult:
         """Clear the next spool on `clients`; undo restores what each had pending."""
 
-        async def one(client: MoonrakerClient) -> tuple[MoonrakerClient, str | None, bool, int | None]:
+        async def one(client: PrinterClient) -> tuple[PrinterClient, str | None, bool, int | None]:
             previous = client.state.pending_spool
             try:
                 result = await client.set_next_spool(None)
@@ -359,7 +366,7 @@ class Actions:
 
     async def load(self, args: dict[str, Any]) -> Outcome:
         spool_id = _spool_id(args)
-        clients = self.printers.all()
+        clients = self._load_targets()
         async with self._lock:
             try:
                 await self._ensure_known_spool(spool_id)
@@ -376,7 +383,7 @@ class Actions:
         """Weigh then load. From a scan, a missing weight is skipped like the bash scanner."""
         spool_id = _spool_id(args)
         confirm = _bool(args, "confirm")
-        clients = self.printers.all()
+        clients = self._load_targets()
         from_scan = source == "scan"
         async with self._lock:
             weigh: StepResult | None = None
@@ -673,17 +680,43 @@ class Actions:
             return Outcome(step.ok, f"Station asleep: {step.message}", code=step.code, activity_id=activity_id,
                            dry_run=step.dry_run)
 
-    async def spool_loaded(self, printer: str, lane: str, spool_id: int) -> None:
-        """A lane took `spool_id`, so it is physically there: clear it as next spool on the other printers."""
+    async def spool_loaded(self, load: LaneLoad) -> None:
+        """A lane took a spool, so it is physically there: clear it as next spool on the other printers.
+
+        When the station assigned it (a Bambu slot), the entry also records that, and undo unassigns the slot
+        and arms the printer again.
+        """
         async with self._lock:
             try:
-                source = self.printers.get(printer)
+                source = self.printers.get(load.printer)
             except UnknownPrinter:
                 return
-            others = [c for c in self.printers.all() if c is not source and c.state.pending_spool == spool_id]
-            if not others:
+            others = [c for c in self.printers.all()
+                      if c is not source and c.state.pending_spool == load.spool_id and not c.state.off]
+            if not others and not load.assigned:
                 return
-            step = await self._clear_step(others)
-            log.info("Spool %d loaded in %s %s; %s", spool_id, source.label, lane, step.message)
-            step.message = f"in {source.label} {lane}; {step.message}"
-            self._record("spool_loaded", spool_id, step)
+            step = await self._clear_step(others) if others else StepResult("")
+            where = load.note or f"in {source.label} {load.lane}"
+            log.info("Spool %d loaded in %s %s; %s", load.spool_id, source.label, load.lane,
+                     step.message or where)
+            step.message = f"{where}; {step.message}" if step.message else where
+            if load.assigned and not load.dry_run:
+                step.printers = [source.label, *step.printers]
+                step.undo = [
+                    UndoStep(kind="pending", printer=source.key, spool_id=load.armed),
+                    UndoStep(kind="lane", printer=source.key, lane=load.lane, spool_id=load.previous),
+                    *step.undo,
+                ]
+                self.cues.play("success")
+            self._record("spool_loaded", load.spool_id, step)
+
+    def printer_notice(self, notice: PrinterNotice) -> None:
+        """A printer reports something to show (e.g. the RFID spool differs from the scanned one)."""
+        try:
+            label = self.printers.get(notice.printer).label
+        except UnknownPrinter:
+            label = notice.printer
+        if not notice.ok:
+            self.cues.play("error")
+        self._record("printer", notice.spool_id,
+                     StepResult(notice.message, ok=notice.ok, code=notice.code, printers=[label]))

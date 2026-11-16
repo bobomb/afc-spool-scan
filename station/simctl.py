@@ -8,6 +8,9 @@ Examples (dev plan §4):
   simctl printer kilo --disconnect / --connect / --restart
   simctl printer yankee --lane lane2 --spool 97 --status Ready
   simctl printer kilo --insert lane4      (AFC tags it with the pending spool)
+  simctl printer hotel --insert 3H-4 --material PETG --color FF6A13 [--rfid <tray uuid>]
+  simctl printer hotel --eject 3H-4 / --tool 3H-2 / --power-off / --power-on
+  simctl printer hotel --print RUNNING --progress 0.42   (Bambu states: RUNNING, PAUSE, FINISH, FAILED, IDLE)
   simctl spoolman --offline / --online
   simctl request weigh '{"spool_id": 97}'
   simctl state [topic]
@@ -52,9 +55,15 @@ def build_parser() -> argparse.ArgumentParser:
     group.add_argument("--eject", metavar="LANE", help="eject a lane")
     group.add_argument("--print", dest="print_state", metavar="STATE",
                        help="print_stats state: standby, printing, paused, complete, cancelled, error")
-    group.add_argument("--error", metavar="MESSAGE", help="raise an AFC error")
+    group.add_argument("--error", metavar="MESSAGE", help="raise an AFC error (Bambu: an HMS warning)")
     group.add_argument("--clear-error", action="store_true")
+    group.add_argument("--power-on", action="store_true", help="Bambu: switch the printer on")
+    group.add_argument("--power-off", action="store_true", help="Bambu: switch the printer off (Bambuddy stays up)")
+    group.add_argument("--tool", metavar="SLOT", help="Bambu: the slot feeding the active tool (none to clear)")
     printer.add_argument("--spool", type=int)
+    printer.add_argument("--material", help="Bambu --insert: tray material (default PLA)")
+    printer.add_argument("--color", help="Bambu --insert: tray colour RRGGBB")
+    printer.add_argument("--rfid", metavar="TRAY_UUID", help="Bambu --insert: the spool's RFID tray UUID")
     printer.add_argument("--clear", action="store_true", help="remove the lane's spool")
     printer.add_argument("--status", help="lane status, e.g. Loaded")
     printer.add_argument("--filament-status", help="Ready, In Tool, Prep, Not Ready")
@@ -108,8 +117,15 @@ def to_request(args: argparse.Namespace) -> tuple[str, dict[str, Any]] | None:
             payload["op"] = "restart"
         elif args.insert:
             payload.update(op="insert", lane=args.insert)
+            for name in ("material", "color", "rfid"):
+                if getattr(args, name):
+                    payload[name] = getattr(args, name)
         elif args.eject:
             payload.update(op="eject", lane=args.eject)
+        elif args.power_on or args.power_off:
+            payload["op"] = "power_on" if args.power_on else "power_off"
+        elif args.tool:
+            payload.update(op="tool", lane=None if args.tool.lower() == "none" else args.tool)
         elif args.print_state:
             payload.update(op="print", state=args.print_state)
         elif args.error:

@@ -48,3 +48,22 @@ async def station(tmp_path: Path):  # noqa: ANN201
     station.cues = cues  # type: ignore[attr-defined]
     yield station
     await station.stop()
+
+
+THREE_PRINTERS = DEFAULT_PRINTERS + ",Hotel=bambuddy:1"
+FAST_BAMBUDDY = {"insert_settle_s": 0.05, "settings_check_s": 0.05, "usage_refresh_s": 0.05}
+
+
+@pytest.fixture
+async def station3(tmp_path: Path):  # noqa: ANN201
+    """Kilo and Yankee (Moonraker) plus Hotel, a Bambu H3C behind the simulated Bambuddy."""
+    station = Station(sim_config(tmp_path, printers=parse_printers(THREE_PRINTERS)), printer_backoff=(0.02, 0.05),
+                      publish_delay=0, scale_interval=0, countdown_tick_s=0.01, bambuddy_options=FAST_BAMBUDDY)
+    await station.start()
+    await wait_until(lambda: all(p.connected for p in station.store.printers.values()))
+    await wait_until(lambda: not station.catalog.busy)  # type: ignore[union-attr]
+    cues = RecordingCues()
+    station.actions.cues = cues  # type: ignore[union-attr]
+    station.cues = cues  # type: ignore[attr-defined]
+    yield station
+    await station.stop()

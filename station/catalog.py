@@ -1,11 +1,12 @@
-"""Spoolman details for lane spools (initial weight, colours), cached and fetched in the background."""
+"""Spoolman details for lane spools (initial weight, colours, material, grams left), cached and fetched in the
+background."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,17 +15,33 @@ from .spoolman import SpoolmanClient, SpoolmanError, SpoolNotFound, spool_colors
 log = logging.getLogger(__name__)
 
 
+def _positive(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
 @dataclass(frozen=True)
 class SpoolMeta:
     initial_g: float | None
     colors: tuple[str, ...]
+    material: str | None = None
+    remaining_g: float | None = None
+    archived: bool = False
 
 
 def meta_from_api(data: dict[str, Any]) -> SpoolMeta:
     filament = data.get("filament") or {}
-    initial = data.get("initial_weight") or filament.get("weight")
-    number = float(initial) if isinstance(initial, (int, float)) and not isinstance(initial, bool) else None
-    return SpoolMeta(initial_g=number if number and number > 0 else None, colors=tuple(spool_colors(filament)))
+    number = _positive(data.get("initial_weight") or filament.get("weight"))
+    remaining = _positive(data.get("remaining_weight"))
+    material = filament.get("material")
+    return SpoolMeta(
+        initial_g=number if number and number > 0 else None,
+        colors=tuple(spool_colors(filament)),
+        material=material.strip() or None if isinstance(material, str) else None,
+        remaining_g=round(max(remaining, 0.0), 1) if remaining is not None else None,
+        archived=bool(data.get("archived")),
+    )
 
 
 class SpoolCatalog:
@@ -65,6 +82,12 @@ class SpoolCatalog:
         spool_id = data.get("id")
         if isinstance(spool_id, int):
             self._store(spool_id, meta_from_api(data))
+
+    def refresh(self, spool_ids: Iterable[int]) -> None:
+        """Fetch again now (e.g. after a print used filament); the cached value stays until the answer."""
+        for spool_id in spool_ids:
+            self._failed.pop(spool_id, None)
+            self._fetch(spool_id)
 
     def _store(self, spool_id: int, meta: SpoolMeta | None) -> None:
         previous = self._entries.get(spool_id)

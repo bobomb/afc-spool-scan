@@ -1,0 +1,139 @@
+{
+  "name": "Heron",
+  "model": "H3C",
+  "status": {
+    "connected": true,
+    "state": "RUNNING",
+    "current_print": "bracket_plate_1",
+    "subtask_name": "bracket_plate_1",
+    "progress": 42.0,
+    "hms_errors": [],
+    "ams": [
+      {
+        "id": 32,
+        "humidity": 31,
+        "temp": 26.1,
+        "module_type": "n10a",
+        "ams_type": 6,
+        "tray": [
+          {
+            "id": 0,
+            "tray_color": "00AE42FF",
+            "tray_type": "PLA",
+            "tray_sub_brands": "",
+            "tray_uuid": "A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1",
+            "tag_uid": "A1A1A1A1A1A1A1A1",
+            "remain": 80,
+            "state": 283,
+            "exists": true
+          },
+          {
+            "id": 1,
+            "tray_color": "000000FF",
+            "tray_type": "PLA",
+            "tray_sub_brands": "",
+            "tray_uuid": "B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2",
+            "tag_uid": "B2B2B2B2B2B2B2B2",
+            "remain": 80,
+            "state": 283,
+            "exists": true
+          },
+          {
+            "id": 2,
+            "tray_color": "FF6A13FF",
+            "tray_type": "PETG",
+            "tray_sub_brands": "",
+            "tray_uuid": null,
+            "tag_uid": null,
+            "remain": -1,
+            "state": 27,
+            "exists": true
+          },
+          {
+            "id": 3,
+            "tray_color": null,
+            "tray_type": null,
+            "tray_sub_brands": null,
+            "tray_uuid": null,
+            "tag_uid": null,
+            "remain": 0,
+            "state": 9,
+            "exists": false
+          },
+          {
+            "id": 4,
+            "tray_color": "F2F2F2FF",
+            "tray_type": "PLA",
+            "tray_sub_brands": "",
+            "tray_uuid": "C3C3C3C3C3C3C3C3C3C3C3C3C3C3C3C3",
+            "tag_uid": "C3C3C3C3C3C3C3C3",
+            "remain": 80,
+            "state": 283,
+            "exists": true
+          },
+          {
+            "id": 5,
+            "tray_color": "7C594AFF",
+            "tray_type": "PLA",
+            "tray_sub_brands": "",
+            "tray_uuid": null,
+            "tag_uid": null,
+            "remain": -1,
+            "state": 27,
+            "exists": true
+          },
+          {
+            "id": 6,
+            "tray_color": "808080FF",
+            "tray_type": "PLA",
+            "tray_sub_brands": "",
+            "tray_uuid": null,
+            "tag_uid": null,
+            "remain": -1,
+            "state": 27,
+            "exists": true
+          },
+          {
+            "id": 7,
+            "tray_color": "8A8A8AFF",
+            "tray_type": "ABS",
+            "tray_sub_brands": "",
+            "tray_uuid": null,
+            "tag_uid": null,
+            "remain": -1,
+            "state": 27,
+            "exists": true
+          },
+          {
+            "id": 8,
+            "tray_color": "1F4FB4FF",
+            "tray_type": "TPU",
+            "tray_sub_brands": "",
+            "tray_uuid": null,
+            "tag_uid": null,
+            "remain": -1,
+            "state": 27,
+            "exists": true
+          }
+        ]
+      }
+    ],
+    "vt_tray": [],
+    "tray_now": 29,
+    "active_extruder": 0
+  },
+  "assignments": {
+    "0": 101,
+    "1": 102,
+    "2": 103,
+    "4": 104,
+    "6": 105,
+    "7": 106,
+    "8": 107
+  },
+  "tags": {
+    "A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1": 101,
+    "B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2": 102,
+    "C3C3C3C3C3C3C3C3C3C3C3C3C3C3C3C3": 104
+  }
+}

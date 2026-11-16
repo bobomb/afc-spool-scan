@@ -76,4 +76,11 @@ TEST_CASE("side rail status summary")
     summary = summarize_health(state, true);
     CHECK(summary.level == Level::Error);
     CHECK(summary.text == "Yeti offline +2");
+
+    // A printer switched off on purpose is not a problem; a Bambu error has no "AFC" in it.
+    state.printers[1].off = true;
+    state.printers[0].kind = "bambuddy";
+    summary = summarize_health(state, true);
+    CHECK(summary.level == Level::Warn);
+    CHECK(summary.text == "Kilo error +1");
 }

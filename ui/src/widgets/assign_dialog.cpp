@@ -98,24 +98,38 @@ void AssignDialog::refresh(const State& state)
     lv_obj_clean(lane_grid_);
     const Printer* printer = app_.model().printer(printer_);
     if (printer != nullptr) {
+        // An AMS 3H has nine slots: three narrower columns instead of two wide ones.
+        const bool slots = printer->lanes.size() > 4;
+        const int columns = slots ? 3 : 2;
+        const int button_w = (608 - (columns - 1) * 8) / columns;
+        const int button_h = slots ? 40 : 64;
         for (const Lane& lane : printer->lanes) {
             lv_obj_t* button = ui::button(lane_grid_, theme, "", ui::ButtonStyle::Segment);
-            lv_obj_set_size(button, 296, 64);
+            lv_obj_set_size(button, button_w, button_h);
             lv_obj_t* swatch = ui::container(button);
-            lv_obj_set_size(swatch, 16, 44);
+            lv_obj_set_size(swatch, slots ? 10 : 16, button_h - 20);
             lv_obj_align(swatch, LV_ALIGN_LEFT_MID, 4, 0);
             lv_obj_set_style_radius(swatch, 4, 0);
             lv_obj_set_style_bg_opa(swatch, static_cast<lv_opa_t>(lane.spool_id ? LV_OPA_COVER : LV_OPA_30), 0);
             lv_obj_set_style_bg_color(swatch, lane.spool_id ? ui::swatch_color(lane.color, theme) : theme.muted(), 0);
             std::string name = lane.lane + (lane.map.empty() ? "" : "  " + lane.map);
-            lv_obj_t* title = ui::label(button, theme.normal(), theme.text(), name);
-            lv_obj_align(title, LV_ALIGN_TOP_LEFT, 30, 4);
             std::string detail = lane.spool_id ? "now #" + std::to_string(*lane.spool_id) +
                                                      (lane.material.empty() ? "" : " " + lane.material)
                                                : "empty";
             if (lane.spool_id && spool_id_ > 0 && *lane.spool_id == spool_id_) detail = "already this spool";
-            lv_obj_t* sub = ui::label(button, theme.small(), theme.muted(), detail);
-            lv_obj_align(sub, LV_ALIGN_BOTTOM_LEFT, 30, -4);
+            if (slots) {
+                lv_obj_t* title = ui::label(button, theme.small(), theme.text(), name);
+                lv_obj_align(title, LV_ALIGN_LEFT_MID, 22, 0);
+                lv_obj_t* sub = ui::label(button, theme.tiny(), theme.muted(),
+                                          lane.spool_id ? "#" + std::to_string(*lane.spool_id)
+                                                        : lane.prep ? "no tag" : "empty");
+                lv_obj_align(sub, LV_ALIGN_RIGHT_MID, -8, 0);
+            } else {
+                lv_obj_t* title = ui::label(button, theme.normal(), theme.text(), name);
+                lv_obj_align(title, LV_ALIGN_TOP_LEFT, 30, 4);
+                lv_obj_t* sub = ui::label(button, theme.small(), theme.muted(), detail);
+                lv_obj_align(sub, LV_ALIGN_BOTTOM_LEFT, 30, -4);
+            }
             ui::set_checked(button, lane.lane == lane_);
             const std::string lane_name = lane.lane;
             ui::on_click(button, [this, lane_name] {
@@ -129,11 +143,15 @@ void AssignDialog::refresh(const State& state)
     if (spool_id_ <= 0) {
         hint = "Enter or scan a spool ID on the main screen first.";
     } else if (printer == nullptr || !printer->connected) {
-        hint = "The printer is offline.";
+        hint = printer != nullptr && printer->off ? "The printer is off." : "The printer is offline.";
     } else if (lane_.empty()) {
-        hint = "Choose the printer and lane the spool is in.";
+        hint = printer->bambu() ? "Choose the printer and AMS slot the spool is in."
+                                : "Choose the printer and lane the spool is in.";
+    } else if (printer->bambu()) {
+        hint = "Assigns #" + std::to_string(spool_id_) + " to " + printer->label() + " " + lane_ + " in Bambuddy";
     } else {
-        hint = "Sends SET_SPOOL_ID LANE=" + lane_ + " SPOOL_ID=" + std::to_string(spool_id_) + " to " + printer->name;
+        hint = "Sends SET_SPOOL_ID LANE=" + lane_ + " SPOOL_ID=" + std::to_string(spool_id_) + " to " +
+               printer->label();
     }
     ui::set_text(hint_, hint);
     ui::set_disabled(assign_, spool_id_ <= 0 || lane_.empty() || printer == nullptr || !printer->connected);

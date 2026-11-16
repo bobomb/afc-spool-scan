@@ -74,10 +74,13 @@ HealthSummary summarize_health(const State& state, bool online)
     std::vector<Issue> issues;
     if (!state.health.spoolman) issues.push_back({Level::Error, "Spoolman down"});
     for (const Printer& printer : state.printers) {
+        if (printer.off) {
+            continue;
+        }
         if (!printer.connected) {
             issues.push_back({Level::Error, printer.label() + " offline"});
         } else if (!printer.afc_error.empty()) {
-            issues.push_back({Level::Warn, printer.label() + " AFC error"});
+            issues.push_back({Level::Warn, printer.label() + (printer.bambu() ? " error" : " AFC error")});
         }
     }
     if (!state.health.scanner) issues.push_back({Level::Warn, "No scanner"});

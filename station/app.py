@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 import logging
 import sys
+from collections.abc import Iterable
 from dataclasses import replace
 from typing import Any
 
@@ -16,8 +17,9 @@ from .actions import Actions
 from .activity import ActivityLog
 from .audio import Audio
 from .catalog import SpoolCatalog
-from .config import Config
+from .config import BAMBUDDY, Config
 from .ipc import PROTOCOL, IpcServer
+from .printer_client import LaneLoad, PrinterNotice
 from .printers import PrinterManager
 from .rules import derive_scale_state
 from .scale.sim import SimScale
@@ -25,6 +27,8 @@ from .scale.source import ScaleReading, ScaleSource
 from .scanflow import ScanFlow
 from .scanner.sim import SimScanner
 from .settings import Settings
+from .sim.bambuddy import FIXTURES as BAMBUDDY_FIXTURES
+from .sim.bambuddy import SimBambuddy
 from .sim.printers import FIXTURES as PRINTER_FIXTURES
 from .sim.printers import SimPrinterServer
 from .sim.spoolman import SimSpoolman, load_spool_fixtures
@@ -46,24 +50,30 @@ class Station:
         publish_delay: float = 0.05,
         scale_interval: float = 0.2,
         countdown_tick_s: float = 1.0,
+        bambuddy_options: dict[str, float] | None = None,
     ) -> None:
         self.config = config
         self.printer_backoff = printer_backoff
         self.publish_delay = publish_delay
         self.scale_interval = scale_interval
         self.countdown_tick_s = countdown_tick_s
+        self.bambuddy_options = dict(bambuddy_options or {})
         dry_run = not (config.writes_enabled("printers") and config.writes_enabled("spoolman"))
         self.store = Store(ServiceInfo(
             version=__version__, protocol=PROTOCOL, hardware=config.hardware, printers=config.printers_mode,
             spoolman=config.spoolman_mode, writes=config.writes, dry_run=dry_run,
+            bambuddy_writes=config.writes_enabled(BAMBUDDY) if config.has_bambuddy else None,
         ))
         self.settings = Settings(config.state_dir / "settings.json")
         mode = (f"printers={config.printers_mode}:{'w' if config.writes_enabled('printers') else 'ro'},"
                 f"spoolman={config.spoolman_mode}:{'w' if config.writes_enabled('spoolman') else 'ro'}")
+        if config.has_bambuddy:
+            mode += f",bambuddy={config.printers_mode}:{'w' if config.writes_enabled(BAMBUDDY) else 'ro'}"
         self.activity = ActivityLog(config.state_dir / "activity.jsonl", mode=mode)
         self.session: aiohttp.ClientSession | None = None
         self.sim_spoolman: SimSpoolman | None = None
         self.sim_printers: SimPrinterServer | None = None
+        self.sim_bambuddy: SimBambuddy | None = None
         self.scale: ScaleSource | None = None
         self.scanner: Any = None
         self.printers: PrinterManager | None = None
@@ -97,15 +107,23 @@ class Station:
         if self.printers is not None:
             self.printers.refresh()
 
-    def _on_lane_loaded(self, printer: str, lane: str, spool_id: int) -> None:
+    def _on_lane_loaded(self, load: LaneLoad) -> None:
         if self.actions is None:
             return
         try:
-            task = asyncio.get_running_loop().create_task(self.actions.spool_loaded(printer, lane, spool_id))
+            task = asyncio.get_running_loop().create_task(self.actions.spool_loaded(load))
         except RuntimeError:
             return
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+    def _on_printer_notice(self, notice: PrinterNotice) -> None:
+        if self.actions is not None:
+            self.actions.printer_notice(notice)
+
+    def _refresh_spools(self, spool_ids: Iterable[int]) -> None:
+        if self.catalog is not None:
+            self.catalog.refresh(spool_ids)
 
     def _on_scan(self, code: str) -> None:
         if self.scan_flow is not None:
@@ -146,14 +164,26 @@ class Station:
             self.sim_spoolman = SimSpoolman(spools)
             spoolman_url = await self.sim_spoolman.start()
         urls: dict[str, str] = {}
+        bambuddy_url = config.bambuddy_url
+        moonraker = [p for p in config.printers if p.kind != BAMBUDDY]
+        bambu = [p for p in config.printers if p.kind == BAMBUDDY]
         if config.printers_mode == "sim":
             lookup = self.sim_spoolman.get if self.sim_spoolman else None
-            self.sim_printers = SimPrinterServer.from_fixtures(
-                [p.key for p in config.printers], spool_lookup=lookup,
-                directory=fixtures / "printers" if fixtures else PRINTER_FIXTURES,
-            )
-            await self.sim_printers.start()
-            urls = {p.key: self.sim_printers.url_for(p.key) for p in config.printers}
+            if moonraker:
+                self.sim_printers = SimPrinterServer.from_fixtures(
+                    [p.key for p in moonraker], spool_lookup=lookup,
+                    directory=fixtures / "printers" if fixtures else PRINTER_FIXTURES,
+                )
+                await self.sim_printers.start()
+                urls = {p.key: self.sim_printers.url_for(p.key) for p in moonraker}
+            if bambu:
+                bambuddy_fixtures = fixtures / "bambuddy" if fixtures and (fixtures / "bambuddy").is_dir() \
+                    else BAMBUDDY_FIXTURES
+                self.sim_bambuddy = SimBambuddy.from_fixtures(
+                    {p.bambuddy_printer_id or 0: p.key for p in bambu}, spool_lookup=lookup,
+                    directory=bambuddy_fixtures,
+                )
+                bambuddy_url = await self.sim_bambuddy.start()
 
         self.spoolman = SpoolmanClient(spoolman_url, self.session, writes=config.writes_enabled("spoolman"),
                                        on_health=self._on_spoolman_health)
@@ -161,9 +191,11 @@ class Station:
         self.printers = PrinterManager(
             config.printers, self.session, on_change=self.store.set_printer,
             writes=config.writes_enabled("printers"), low_stock_g=lambda: self.settings["low_stock_g"],
-            spool_meta=self.catalog.get, on_lane_loaded=self._on_lane_loaded,
-            names_path=config.state_dir / "printer_names.json", urls=urls,
-            backoff=self.printer_backoff, publish_delay=self.publish_delay,
+            spool_meta=self.catalog.get, on_lane_loaded=self._on_lane_loaded, on_notice=self._on_printer_notice,
+            spool_refresh=self._refresh_spools, names_path=config.state_dir / "printer_names.json", urls=urls,
+            bambuddy_url=bambuddy_url, bambuddy_api_key=config.bambuddy_api_key,
+            bambuddy_writes=config.writes_enabled(BAMBUDDY), backoff=self.printer_backoff,
+            publish_delay=self.publish_delay, bambuddy_options=self.bambuddy_options,
         )
         self._create_hardware()
         assert self.scale is not None
@@ -177,7 +209,8 @@ class Station:
             sim = SimControl(
                 self.scale if isinstance(self.scale, SimScale) else None,
                 self.scanner if isinstance(self.scanner, SimScanner) else None,
-                self.sim_printers, self.sim_spoolman,
+                self.sim_printers, self.sim_spoolman, self.sim_bambuddy,
+                {p.key: p.bambuddy_printer_id or 0 for p in bambu},
             )
         self.actions = Actions(
             config=config, store=self.store, settings=self.settings, activity=self.activity,
@@ -222,6 +255,8 @@ class Station:
                 await component.stop()
         if self.sim_printers is not None:
             await self.sim_printers.stop()
+        if self.sim_bambuddy is not None:
+            await self.sim_bambuddy.stop()
         if self.sim_spoolman is not None:
             await self.sim_spoolman.stop()
         if self.session is not None:

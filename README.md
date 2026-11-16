@@ -98,8 +98,22 @@ Spoolman (`scripts/capture-fixtures.py`, read-only):
 In the simulator window a PC keyboard digit opens the keypad with that digit;
 Backspace, Enter and Esc edit, look up and clear (Esc also deselects the
 spool). Tap the top box to open the keypad. Load always sets the next spool
-on both printers; once one printer loads it, the other's is cleared, and the
-station clears both (and deselects the spool) when the screen goes off.
+on every printer; once one printer loads it, the others' is cleared, and the
+station clears them all (and deselects the spool) when the screen goes off.
+
+A Bambu printer managed by [Bambuddy](https://github.com/maziggy/bambuddy)
+(the H3C with an AMS 3H) is a `Name=bambuddy:<printer id>` entry in
+`PRINTERS`. The simulator includes one:
+
+```powershell
+$env:PRINTERS = 'Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125,Hotel=bambuddy:1'
+python -m station --hardware sim --printers sim --spoolman sim --writes off
+python -m station.simctl request load '{"spool_id": 97}'
+python -m station.simctl printer hotel --insert 3H-4 --material ABS --color FFFFFF
+```
+
+Load arms the Bambu printer; the spool is assigned in Bambuddy to the AMS
+slot it goes into (product plan §6.4).
 
 Headless screenshots (no window, no service needed):
 
@@ -204,6 +218,10 @@ include:
 - `SCALE_VENDOR_ID` and comma-separated `SCALE_PRODUCT_IDS`
 - `SCALE_MINIMUM_WEIGHT_GRAMS`: weight must be greater than this value to update
 - `AUDIO_BACKEND` and `BUZZER_GPIO_PIN`
+- `PRINTERS` (station service): `Name=host:port` per Moonraker printer and
+  `Name=bambuddy:<id>` per Bambuddy printer, in card order
+- `BAMBUDDY_URL`, `BAMBUDDY_API_KEY` or `BAMBUDDY_API_KEY_FILE`, and
+  `BAMBUDDY_WRITES`: the Bambuddy API (keep the key out of the repo)
 
 ## User service
 

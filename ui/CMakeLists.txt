@@ -93,6 +93,7 @@ set(STATION_UI_SOURCES
   src/screens/printers_screen.cpp
   src/screens/settings_screen.cpp
   src/widgets/assign_dialog.cpp
+  src/widgets/compact_card.cpp
   src/widgets/confirm_dialog.cpp
   src/widgets/countdown_overlay.cpp
   src/widgets/keypad_sheet.cpp

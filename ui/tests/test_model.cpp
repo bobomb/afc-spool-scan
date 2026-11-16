@@ -99,6 +99,22 @@ TEST_CASE("events replace subtrees and printer events merge by key")
     CHECK(model.state().printers[0].label() == "Kilo");
     CHECK_FALSE(model.state().printers[0].connected);
     CHECK(model.state().printers[0].lanes.empty());
+    CHECK(model.state().printers[0].kind == "moonraker");
+    CHECK_FALSE(model.state().printers[0].bambu());
+
+    model.apply_event("printer", json::parse(
+        R"({"key":"hotel","name":"Hotel","kind":"bambuddy","connected":false,"off":true,)"
+        R"("lanes":[{"lane":"3H-4","spool_id":99,"settings_pending":true}]})"));
+    REQUIRE(model.state().printers.size() == 3);
+    const Printer& hotel = model.state().printers[2];
+    CHECK(hotel.bambu());
+    CHECK(hotel.off);
+    REQUIRE(hotel.lanes.size() == 1);
+    CHECK(hotel.lanes[0].settings_pending);
+    CHECK_FALSE(model.state().service.bambuddy_writes);
+    const ServiceInfo service = parse_service(json::parse(R"({"version":"0.1.0","bambuddy_writes":false})"));
+    REQUIRE(service.bambuddy_writes);
+    CHECK_FALSE(*service.bambuddy_writes);
 
     model.apply_event("spool", json());
     CHECK_FALSE(model.state().spool);

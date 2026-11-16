@@ -2,6 +2,7 @@
 // Widgets and screens of the touch UI. Each class has its own source file.
 
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -150,6 +151,40 @@ private:
     std::vector<std::unique_ptr<LaneTile>> tiles_;
 };
 
+// The station screen's printer row for three printers (or one with more than four lanes): a
+// header column (name, status, next spool) beside compact tiles (ring with grams, material, #).
+class CompactCard {
+public:
+    CompactCard(App& app, lv_obj_t* parent, int x, int y, int w, int h);
+    void update(const Printer& printer, bool online);
+    // Owner deletes this before destroying the card: tile gradients point into it.
+    lv_obj_t* root() const { return root_; }
+
+private:
+    struct Tile {
+        lv_obj_t* root;
+        lv_obj_t* ring;
+        lv_obj_t* value;
+        lv_obj_t* line1;
+        lv_obj_t* line2;
+        lv_obj_t* low;
+        lv_obj_t* pending;
+        lv_grad_dsc_t grad;
+    };
+    void build_tiles(std::size_t count);
+
+    App& app_;
+    int width_ = 0;
+    int height_ = 0;
+    lv_obj_t* root_ = nullptr;
+    lv_obj_t* dot_ = nullptr;
+    lv_obj_t* name_ = nullptr;
+    lv_obj_t* state_ = nullptr;
+    lv_obj_t* next_ = nullptr;
+    lv_obj_t* lanes_box_ = nullptr;
+    std::vector<std::unique_ptr<Tile>> tiles_;
+};
+
 class KeypadSheet {
 public:
     explicit KeypadSheet(App& app) : app_(app) {}
@@ -199,18 +234,25 @@ public:
     void update(const Printer& printer, const Settings& settings, bool online);
 
 private:
+    // An AFC lane as a row, or a Bambu AMS slot as a grid cell filled with the spool colour.
     struct LaneRow {
         lv_obj_t* root;
         lv_obj_t* swatch;
         lv_obj_t* name;
         lv_obj_t* spool;
+        lv_obj_t* material;
         lv_obj_t* weight;
         lv_obj_t* bar;
         lv_obj_t* status;
         lv_obj_t* low;
+        lv_obj_t* pending;
         std::string lane;
+        lv_grad_dsc_t grad;
     };
-    void build_lanes(std::size_t count);
+    void build_lanes(std::size_t count, bool grid);
+    void update_row(LaneRow& row, const Lane& lane, bool loaded);
+    void update_cell(LaneRow& row, const Lane& lane, bool loaded);
+    std::string status_text(const Printer& printer, bool online, lv_color_t& color) const;
 
     App& app_;
     std::string key_;
@@ -222,8 +264,12 @@ private:
     lv_obj_t* pending_ = nullptr;
     lv_obj_t* clear_ = nullptr;
     lv_obj_t* lanes_box_ = nullptr;
-    std::vector<LaneRow> lanes_;
+    // Cell gradients are referenced by LVGL styles, so rows never move once built.
+    std::deque<LaneRow> lanes_;
     int width_ = 0;
+    int height_ = 0;
+    bool narrow_ = false;
+    bool grid_ = false;
 };
 
 class ConfirmDialog {
@@ -316,6 +362,10 @@ private:
     lv_obj_t* targets_hint_ = nullptr;
     lv_obj_t* no_printers_ = nullptr;
     std::vector<std::unique_ptr<TargetCard>> cards_;
+    std::vector<std::unique_ptr<CompactCard>> compact_;
+    // Printer index shown by each card, and the layout they were built for.
+    std::vector<std::size_t> shown_;
+    std::string layout_key_;
     lv_obj_t* more_ = nullptr;
     lv_obj_t* weigh_ = nullptr;
     lv_obj_t* load_ = nullptr;

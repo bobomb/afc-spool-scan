@@ -8,14 +8,24 @@ import json
 import logging
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from typing import Any
 
 import aiohttp
 
 from .catalog import SpoolMeta
 from .config import PrinterConfig
+from .printer_client import (
+    CommandResult,
+    GcodeResult,
+    LaneLoad,
+    LaneLoadHandler,
+    PrinterCommandError,
+    PrinterOffline,
+)
 from .state import LaneState, PrinterState
+
+__all__ = ["CommandResult", "GcodeResult", "MoonrakerClient", "PrinterCommandError", "PrinterOffline"]
 
 log = logging.getLogger(__name__)
 
@@ -32,22 +42,6 @@ READ_ONLY_METHODS = frozenset(
 MAINSAIL_NAME_ITEM = {"namespace": "mainsail", "key": "general.printername"}
 DISPLAY_NAME_MAX = 32
 NOT_FOUND = 404
-
-
-class PrinterOffline(Exception):
-    pass
-
-
-class PrinterCommandError(Exception):
-    def __init__(self, message: str, code: int | None = None) -> None:
-        super().__init__(message)
-        self.code = code
-
-
-@dataclass(frozen=True)
-class GcodeResult:
-    dry_run: bool
-    responses: tuple[str, ...] = ()
 
 
 def deep_merge(target: dict[str, Any], diff: dict[str, Any]) -> None:
@@ -110,7 +104,7 @@ class MoonrakerClient:
         writes: bool,
         low_stock_g: Callable[[], float] = lambda: 100.0,
         spool_meta: Callable[[int], SpoolMeta | None] = lambda spool_id: None,
-        on_lane_loaded: Callable[[str, str, int], None] = lambda printer, lane, spool_id: None,
+        on_lane_loaded: LaneLoadHandler = lambda load: None,
         display_name: str | None = None,
         on_display_name: Callable[[str, str | None], None] = lambda key, name: None,
         url: str | None = None,
@@ -406,7 +400,7 @@ class MoonrakerClient:
             lanes=lanes,
         )
         for lane_name, spool_id in loaded:
-            self.on_lane_loaded(self.key, lane_name, spool_id)
+            self.on_lane_loaded(LaneLoad(self.key, lane_name, spool_id))
 
     def refresh(self) -> None:
         """Recompute derived fields (e.g. low stock after a threshold change)."""
@@ -429,10 +423,10 @@ class MoonrakerClient:
     def lane(self, lane: str) -> LaneState | None:
         return next((item for item in self.state.lanes if item.lane == lane), None)
 
-    async def gcode(self, script: str) -> GcodeResult:
+    async def gcode(self, script: str) -> CommandResult:
         if not self.writes:
             log.info("%s: writes off, would send %r", self.printer.name, script)
-            return GcodeResult(dry_run=True)
+            return CommandResult(dry_run=True)
         if not self.online:
             raise PrinterOffline(f"{self.label} is offline")
         collector: list[str] = []
@@ -445,9 +439,9 @@ class MoonrakerClient:
         if errors:
             raise PrinterCommandError(errors[0].lstrip()[2:].strip())
         log.info("%s: sent %r", self.printer.name, script)
-        return GcodeResult(dry_run=False, responses=tuple(collector))
+        return CommandResult(dry_run=False, responses=tuple(collector))
 
-    async def set_next_spool(self, spool_id: int | None) -> GcodeResult:
+    async def set_next_spool(self, spool_id: int | None) -> CommandResult:
         script = "SET_NEXT_SPOOL_ID" if spool_id is None else f"SET_NEXT_SPOOL_ID SPOOL_ID={spool_id}"
         result = await self.gcode(script)
         if not result.dry_run and (self.state.pending_spool != spool_id or spool_id is None):
@@ -455,6 +449,6 @@ class MoonrakerClient:
             self._publish_now()
         return result
 
-    async def set_lane_spool(self, lane: str, spool_id: int | None) -> GcodeResult:
+    async def set_lane_spool(self, lane: str, spool_id: int | None) -> CommandResult:
         value = "" if spool_id is None else str(spool_id)
         return await self.gcode(f"SET_SPOOL_ID LANE={lane} SPOOL_ID={value}")

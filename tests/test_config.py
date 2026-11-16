@@ -51,10 +51,47 @@ def test_parse_printers_from_moonraker_hosts_uses_host_as_name() -> None:
     assert {p.port for p in printers} == {7126}
 
 
-@pytest.mark.parametrize("spec", ["", "A=:7125", "A=host:x", "A=host:70000", "A=h1,a=h2", "Both=h"])
+@pytest.mark.parametrize("spec", ["", "A=:7125", "A=host:x", "A=host:70000", "A=h1,a=h2", "Both=h",
+                                  "H=bambuddy", "H=bambuddy:0", "H=bambuddy:x", "H=BAMBUDDY:-1"])
 def test_parse_printers_rejects_bad_entries(spec: str) -> None:
     with pytest.raises(ConfigError):
         parse_printers(spec)
+
+
+def test_parse_printers_bambuddy_entries() -> None:
+    kilo, hotel = parse_printers("Kilo=192.0.2.11:7125,Hotel=Bambuddy:3")
+    assert kilo.kind == "moonraker" and kilo.bambuddy_printer_id is None
+    assert (hotel.name, hotel.kind, hotel.bambuddy_printer_id) == ("Hotel", "bambuddy", 3)
+
+
+def test_bambuddy_settings_and_key_file(tmp_path: Path) -> None:
+    secrets = tmp_path / "secrets.env"
+    secrets.write_text("# Bambuddy\nBAMBUDDY_ADMIN_USER=admin\nBAMBUDDY_API_KEY=bb_secret_value\n", encoding="utf-8")
+    environ = {"PRINTERS": "Kilo=192.0.2.11:7125,Hotel=bambuddy:1", "BAMBUDDY_API_KEY_FILE": str(secrets),
+               "BAMBUDDY_URL": "http://192.0.2.10:8010/", "BAMBUDDY_WRITES": "off"}
+    config = load_config([], environ=environ, platform="linux", repo_dir=tmp_path)
+    assert config.bambuddy_api_key == "bb_secret_value"
+    assert "bb_secret_value" not in repr(config)
+    assert config.bambuddy_url == "http://192.0.2.10:8010"
+    assert config.writes_enabled("printers") is True and config.writes_enabled("bambuddy") is False
+    assert config.has_bambuddy
+    on = load_config(["--bambuddy-writes", "on", "--writes", "off"], environ=environ, platform="linux",
+                     repo_dir=tmp_path)
+    assert on.writes_enabled("printers") is False and on.writes_enabled("bambuddy") is True
+    direct = load_config([], environ={**environ, "BAMBUDDY_API_KEY": "direct"}, platform="linux", repo_dir=tmp_path)
+    assert direct.bambuddy_api_key == "direct"
+
+
+def test_bambuddy_key_file_problems(tmp_path: Path) -> None:
+    environ = {"PRINTERS": "Hotel=bambuddy:1", "BAMBUDDY_API_KEY_FILE": str(tmp_path / "missing.env")}
+    with pytest.raises(ConfigError, match="cannot be read"):
+        load_config([], environ=environ, platform="linux", repo_dir=tmp_path)
+    (tmp_path / "empty.env").write_text("OTHER=1\n", encoding="utf-8")
+    with pytest.raises(ConfigError, match="no BAMBUDDY_API_KEY"):
+        load_config([], environ={**environ, "BAMBUDDY_API_KEY_FILE": str(tmp_path / "empty.env")},
+                    platform="linux", repo_dir=tmp_path)
+    simulated = load_config([], environ=environ, platform="win32", repo_dir=tmp_path)
+    assert simulated.bambuddy_api_key == "" and simulated.writes_enabled("bambuddy") is True
 
 
 def test_windows_defaults_are_safe(tmp_path: Path) -> None:

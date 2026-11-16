@@ -16,7 +16,8 @@
       "printers": "sim",
       "spoolman": "sim",
       "writes": false,
-      "dry_run": false
+      "dry_run": false,
+      "bambuddy_writes": null
     },
     "scale": {
       "present": false,
@@ -73,7 +74,8 @@
             "remaining_pct": 88.8,
             "colors": [
               "#F5F5F5"
-            ]
+            ],
+            "settings_pending": false
           },
           {
             "lane": "lane2",
@@ -91,7 +93,8 @@
             "remaining_pct": 61.2,
             "colors": [
               "#1A1A1A"
-            ]
+            ],
+            "settings_pending": false
           },
           {
             "lane": "lane3",
@@ -109,7 +112,8 @@
             "remaining_pct": 7.4,
             "colors": [
               "#1E5AA8"
-            ]
+            ],
+            "settings_pending": false
           },
           {
             "lane": "lane4",
@@ -125,10 +129,13 @@
             "tool_loaded": false,
             "low_stock": false,
             "remaining_pct": null,
-            "colors": []
+            "colors": [],
+            "settings_pending": false
           }
         ],
-        "display_name": "Kestrel"
+        "display_name": "Kestrel",
+        "kind": "moonraker",
+        "off": false
       },
       {
         "key": "yankee",
@@ -160,7 +167,8 @@
             "remaining_pct": 95.0,
             "colors": [
               "#D32F2F"
-            ]
+            ],
+            "settings_pending": false
           },
           {
             "lane": "lane2",
@@ -178,7 +186,8 @@
             "remaining_pct": 32.0,
             "colors": [
               "#F57C00"
-            ]
+            ],
+            "settings_pending": false
           },
           {
             "lane": "lane3",
@@ -198,7 +207,8 @@
               "#C94CE0",
               "#33B5E5",
               "#F2C14E"
-            ]
+            ],
+            "settings_pending": false
           },
           {
             "lane": "lane4",
@@ -216,10 +226,13 @@
             "remaining_pct": 4.5,
             "colors": [
               "#8A8D91"
-            ]
+            ],
+            "settings_pending": false
           }
         ],
-        "display_name": "Yeti"
+        "display_name": "Yeti",
+        "kind": "moonraker",
+        "off": false
       }
     ],
     "health": {

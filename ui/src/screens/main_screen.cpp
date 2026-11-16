@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #include "app.hpp"
 #include "ui.hpp"
 #include "view_model.hpp"
@@ -14,6 +16,48 @@ constexpr int kBarY = 364;
 constexpr int kBarH = 60;
 constexpr int kGap = 8;
 constexpr std::size_t kMaxCards = 2;
+constexpr std::size_t kMaxLanes = 4;
+constexpr int kRowH = 85;
+
+struct Slot {
+    std::size_t printer;
+    int x;
+    int y;
+    int w;
+    int h;
+};
+
+// Two rows: printers with up to four lanes pair up side by side (in PRINTERS order, wherever they are
+// listed), others take a full row; rows follow the order of their first printer.
+std::vector<Slot> compact_layout(const std::vector<Printer>& printers, int x, int w)
+{
+    std::vector<std::vector<std::size_t>> rows;
+    std::size_t open = SIZE_MAX;
+    for (std::size_t i = 0; i < printers.size(); ++i) {
+        if (printers[i].lanes.size() > kMaxLanes) {
+            rows.push_back({i});
+        } else if (open != SIZE_MAX) {
+            rows[open].push_back(i);
+            open = SIZE_MAX;
+        } else {
+            open = rows.size();
+            rows.push_back({i});
+        }
+    }
+    std::vector<Slot> slots;
+    const int half = (w - 2 * kGap) / 2;
+    for (std::size_t r = 0; r < rows.size() && r < 2; ++r) {
+        const int y = kCardsY + static_cast<int>(r) * (kRowH + kGap);
+        if (rows[r].size() == 2) {
+            slots.push_back({rows[r][0], x, y, half, kRowH});
+            slots.push_back({rows[r][1], x + half + 2 * kGap, y, half, kRowH});
+        } else {
+            const bool small = printers[rows[r][0]].lanes.size() <= kMaxLanes;
+            slots.push_back({rows[r][0], x, y, small && printers.size() > 1 ? half : w, kRowH});
+        }
+    }
+    return slots;
+}
 
 }  // namespace
 
@@ -65,30 +109,48 @@ void MainScreen::update(const State& state, std::uint32_t topics, bool online)
 {
     hero_->update(state, online);
 
-    const std::size_t count = std::min(state.printers.size(), kMaxCards);
-    const bool rebuilt = cards_.size() != count;
+    const auto& printers = state.printers;
+    bool compact = printers.size() > kMaxCards;
+    std::string key = std::to_string(printers.size());
+    for (const Printer& printer : printers) {
+        compact = compact || printer.lanes.size() > kMaxLanes;
+        key += printer.lanes.size() > kMaxLanes ? "L" : "s";
+    }
+    if (!compact) key = std::to_string(printers.size());
+    const bool rebuilt = key != layout_key_;
     if (rebuilt) {
-        for (const auto& card : cards_) {
-            lv_obj_delete(card->root());
-        }
+        layout_key_ = key;
+        for (const auto& card : cards_) lv_obj_delete(card->root());
+        for (const auto& card : compact_) lv_obj_delete(card->root());
         cards_.clear();
+        compact_.clear();
+        shown_.clear();
         const int x = layout::kMargin;
         const int w = layout::kContentW - 2 * layout::kMargin;
-        const int card_w = count <= 1 ? w : (w - 2 * kGap) / 2;
-        for (std::size_t i = 0; i < count; ++i) {
-            cards_.push_back(std::make_unique<TargetCard>(app_, root_, x + static_cast<int>(i) * (card_w + 2 * kGap),
-                                                          kCardsY, card_w, kCardH));
+        if (compact) {
+            for (const Slot& slot : compact_layout(printers, x, w)) {
+                compact_.push_back(std::make_unique<CompactCard>(app_, root_, slot.x, slot.y, slot.w, slot.h));
+                shown_.push_back(slot.printer);
+            }
+        } else {
+            const std::size_t count = printers.size();
+            const int card_w = count <= 1 ? w : (w - 2 * kGap) / 2;
+            for (std::size_t i = 0; i < count; ++i) {
+                cards_.push_back(std::make_unique<TargetCard>(
+                    app_, root_, x + static_cast<int>(i) * (card_w + 2 * kGap), kCardsY, card_w, kCardH));
+                shown_.push_back(i);
+            }
         }
+        ui::set_text(targets_hint_, printers.size() == 2 ? "\xE2\x80\xA2  Load sets the next spool on both"
+                                                         : "\xE2\x80\xA2  Load sets the next spool on every printer");
     }
-    ui::set_hidden(no_printers_, count != 0);
-    ui::set_hidden(targets_label_, count == 0);
-    if (rebuilt) {
-        ui::set_text(targets_hint_, count == 2 ? "\xE2\x80\xA2  Load sets the next spool on both"
-                                               : "\xE2\x80\xA2  Load sets the next spool on every printer");
-    }
+    ui::set_hidden(no_printers_, !shown_.empty());
+    ui::set_hidden(targets_label_, shown_.empty());
     if (rebuilt || (topics & (kTopicPrinters | kTopicConnection | kTopicService))) {
-        for (std::size_t i = 0; i < count; ++i) {
-            cards_[i]->update(state.printers[i], online);
+        for (std::size_t i = 0; i < shown_.size(); ++i) {
+            const Printer& printer = printers[shown_[i]];
+            if (compact) compact_[i]->update(printer, online);
+            else cards_[i]->update(printer, online);
         }
     }
 

@@ -91,6 +91,8 @@ class LaneState:
     low_stock: bool = False
     remaining_pct: float | None = None
     colors: list[str] = field(default_factory=list)
+    # Bambuddy: the slot's filament settings could not be pushed yet (printer busy printing).
+    settings_pending: bool = False
 
 
 @dataclass
@@ -109,6 +111,9 @@ class PrinterState:
     pending_confirmed: bool = False
     lanes: list[LaneState] = field(default_factory=list)
     display_name: str | None = None
+    kind: str = "moonraker"
+    # Switched off on purpose (Bambuddy reachable, printer not): not an error, and Load skips it.
+    off: bool = False
 
     @property
     def label(self) -> str:
@@ -132,6 +137,8 @@ class ServiceInfo:
     spoolman: str
     writes: bool
     dry_run: bool = False
+    # None without a Bambuddy printer; else whether Bambuddy writes are on (BAMBUDDY_WRITES).
+    bambuddy_writes: bool | None = None
 
 
 def to_data(value: Any) -> Any:

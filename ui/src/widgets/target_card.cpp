@@ -108,15 +108,17 @@ void TargetCard::update(const Printer& printer, bool online)
     Theme& theme = app_.theme();
     key_ = printer.key;
     const bool up = online && printer.connected;
-    lv_obj_set_style_bg_color(dot_, !online ? theme.muted() : !printer.connected ? theme.error()
+    const bool off = online && printer.off;
+    lv_obj_set_style_bg_color(dot_, !online || off ? theme.muted() : !printer.connected ? theme.error()
                                   : printer.afc_error.empty() ? theme.ok() : theme.warn(), 0);
     ui::set_text(name_, printer.label());
 
-    std::string status = up ? print_state_label(printer.print_state, printer.progress) : "Offline";
+    std::string status = off ? "Off" : up ? print_state_label(printer.print_state, printer.progress) : "Offline";
     lv_color_t status_color = theme.muted();
-    if (!up) status_color = theme.error();
+    if (!up && !off) status_color = theme.error();
+    else if (off) status_color = theme.muted();
     else if (!printer.afc_error.empty()) {
-        status = "AFC error";
+        status = printer.bambu() ? "Error" : "AFC error";
         status_color = theme.warn();
     } else if (printer.print_state == "printing") status_color = theme.info();
     else if (printer.print_state == "paused") status_color = theme.warn();

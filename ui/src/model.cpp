@@ -155,6 +155,9 @@ Printer parse_printer(const json& data)
         }
     }
     printer.connected = boolean(data, "connected");
+    printer.off = boolean(data, "off");
+    const std::string kind = str(data, "kind");
+    if (!kind.empty()) printer.kind = kind;
     printer.klippy_state = str(data, "klippy_state");
     printer.print_state = str(data, "print_state");
     printer.progress = number(data, "progress");
@@ -186,6 +189,7 @@ Printer parse_printer(const json& data)
             lane.load = boolean(item, "load");
             lane.tool_loaded = boolean(item, "tool_loaded");
             lane.low_stock = boolean(item, "low_stock");
+            lane.settings_pending = boolean(item, "settings_pending");
             printer.lanes.push_back(std::move(lane));
         }
     }
@@ -263,6 +267,8 @@ ServiceInfo parse_service(const json& data)
     service.spoolman = str(data, "spoolman");
     service.writes = boolean(data, "writes");
     service.dry_run = boolean(data, "dry_run");
+    const json& bambuddy_writes = field(data, "bambuddy_writes");
+    if (bambuddy_writes.is_boolean()) service.bambuddy_writes = bambuddy_writes.get<bool>();
     return service;
 }
 

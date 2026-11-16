@@ -1,4 +1,4 @@
-"""All configured printers: Moonraker clients."""
+"""All configured printers: a Moonraker or Bambuddy client per printer."""
 
 from __future__ import annotations
 
@@ -6,12 +6,15 @@ import json
 import logging
 from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import Any
 
 import aiohttp
 
+from .bambuddy import BambuddyClient
 from .catalog import SpoolMeta
-from .config import PrinterConfig
+from .config import BAMBUDDY, DEFAULT_BAMBUDDY_URL, PrinterConfig
 from .moonraker import MoonrakerClient
+from .printer_client import LaneLoadHandler, NoticeHandler, PrinterClient
 from .settings import atomic_write_text
 from .state import PrinterState
 
@@ -66,24 +69,37 @@ class PrinterManager:
         writes: bool,
         low_stock_g: Callable[[], float],
         spool_meta: Callable[[int], SpoolMeta | None] = lambda spool_id: None,
-        on_lane_loaded: Callable[[str, str, int], None] = lambda printer, lane, spool_id: None,
+        on_lane_loaded: LaneLoadHandler = lambda load: None,
+        on_notice: NoticeHandler = lambda notice: None,
+        spool_refresh: Callable[[Iterable[int]], None] = lambda spool_ids: None,
         names_path: Path | None = None,
         urls: dict[str, str] | None = None,
+        bambuddy_url: str = DEFAULT_BAMBUDDY_URL,
+        bambuddy_api_key: str = "",
+        bambuddy_writes: bool | None = None,
         backoff: tuple[float, float] = (1.0, 30.0),
         publish_delay: float = 0.05,
+        bambuddy_options: dict[str, float] | None = None,
     ) -> None:
         urls = urls or {}
         self.names = DisplayNames(names_path)
         cached = self.names.load()
-        self.clients: dict[str, MoonrakerClient] = {
-            config.key: MoonrakerClient(
-                config, session, on_change=on_change, writes=writes, low_stock_g=low_stock_g,
-                spool_meta=spool_meta, on_lane_loaded=on_lane_loaded, display_name=cached.get(config.key),
-                on_display_name=self.names.set, url=urls.get(config.key), backoff=backoff,
+        self.clients: dict[str, PrinterClient] = {}
+        for config in configs:
+            common: dict[str, Any] = dict(
+                on_change=on_change, low_stock_g=low_stock_g, spool_meta=spool_meta, on_lane_loaded=on_lane_loaded,
+                display_name=cached.get(config.key), on_display_name=self.names.set, backoff=backoff,
                 publish_delay=publish_delay,
             )
-            for config in configs
-        }
+            if config.kind == BAMBUDDY:
+                self.clients[config.key] = BambuddyClient(
+                    config, session, writes=writes if bambuddy_writes is None else bambuddy_writes,
+                    base_url=bambuddy_url, api_key=bambuddy_api_key, on_notice=on_notice,
+                    spool_refresh=spool_refresh, **common, **(bambuddy_options or {}),
+                )
+            else:
+                self.clients[config.key] = MoonrakerClient(config, session, writes=writes, url=urls.get(config.key),
+                                                           **common)
         for client in self.clients.values():
             on_change(client.state)
 
@@ -99,7 +115,7 @@ class PrinterManager:
         for client in self.clients.values():
             await client.stop()
 
-    def get(self, name: str) -> MoonrakerClient:
+    def get(self, name: str) -> PrinterClient:
         if not isinstance(name, str):
             raise UnknownPrinter("printer must be a name")
         client = self.clients.get(name.strip().lower())
@@ -107,7 +123,7 @@ class PrinterManager:
             raise UnknownPrinter(f"unknown printer {name!r}")
         return client
 
-    def all(self) -> list[MoonrakerClient]:
+    def all(self) -> list[PrinterClient]:
         """Load and Weigh + Load always set the next spool on every printer."""
         return list(self.clients.values())
 

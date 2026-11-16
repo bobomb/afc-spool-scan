@@ -152,6 +152,9 @@ void SettingsScreen::update(const State& state, bool online)
     std::string text = "v" + (service.version.empty() ? std::string("?") : service.version) + "  |  hardware " +
                        service.hardware + "  |  printers " + service.printers + "  |  writes " +
                        (service.dry_run ? "off (dry run)" : "on");
+    if (service.bambuddy_writes) {
+        text += std::string("  |  Bambuddy ") + (*service.bambuddy_writes ? "writes on" : "dry run");
+    }
     ui::set_text(service_, text);
 }
 

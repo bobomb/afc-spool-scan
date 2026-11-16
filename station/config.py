@@ -17,6 +17,10 @@ REPO_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_PRINTERS = "Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125"
 DEFAULT_MOONRAKER_PORT = 7125
 DEFAULT_IPC_PORT = 7913
+DEFAULT_BAMBUDDY_URL = "http://127.0.0.1:8010"
+# PRINTERS entry `Name=bambuddy:<printer id>` is a Bambu printer managed by Bambuddy.
+BAMBUDDY = "bambuddy"
+KINDS = ("moonraker", BAMBUDDY)
 
 
 class ConfigError(ValueError):
@@ -28,6 +32,8 @@ class PrinterConfig:
     name: str
     host: str
     port: int = DEFAULT_MOONRAKER_PORT
+    kind: str = "moonraker"
+    bambuddy_printer_id: int | None = None
 
     @property
     def key(self) -> str:
@@ -70,15 +76,27 @@ class Config:
     log_level: str = "INFO"
     # Fixture directory (printers/*.json, spoolman/spools.json) for the simulators; None = built-in.
     sim_fixtures: Path | None = None
+    bambuddy_url: str = DEFAULT_BAMBUDDY_URL
+    bambuddy_api_key: str = field(default="", repr=False)
+    # None follows `writes`; set to keep Bambuddy read-only while Moonraker writes (or the reverse).
+    bambuddy_writes: bool | None = None
 
     def writes_enabled(self, service: str) -> bool:
         """Simulated services are in-memory, so --writes only guards live ones."""
+        if service == BAMBUDDY:
+            if self.printers_mode == "sim":
+                return True
+            return self.writes if self.bambuddy_writes is None else self.bambuddy_writes
         mode = {"spoolman": self.spoolman_mode, "printers": self.printers_mode}[service]
         return mode == "sim" or self.writes
 
     @property
     def simulated(self) -> bool:
         return "sim" in (self.hardware, self.printers_mode, self.spoolman_mode)
+
+    @property
+    def has_bambuddy(self) -> bool:
+        return any(printer.kind == BAMBUDDY for printer in self.printers)
 
 
 def platform_defaults(platform: str) -> dict[str, str]:
@@ -139,13 +157,20 @@ def parse_printers(spec: str, default_port: int = DEFAULT_MOONRAKER_PORT) -> tup
         host = host.strip()
         if not host:
             raise ConfigError(f"printer entry {item!r} has no host")
-        try:
-            port = int(port_text)
-        except ValueError as error:
-            raise ConfigError(f"printer entry {item!r} has an invalid port") from error
-        if not 0 < port < 65536:
-            raise ConfigError(f"printer entry {item!r} has an invalid port")
-        printer = PrinterConfig(name=name or host, host=host, port=port)
+        if host.lower() == BAMBUDDY or address.lower() == BAMBUDDY:
+            if not colon or not port_text.strip().isdigit() or int(port_text) <= 0:
+                raise ConfigError(f"printer entry {item!r} needs a Bambuddy printer id, e.g. bambuddy:1")
+            printer_id = int(port_text)
+            printer = PrinterConfig(name=name or f"Bambuddy {printer_id}", host=BAMBUDDY, port=0, kind=BAMBUDDY,
+                                    bambuddy_printer_id=printer_id)
+        else:
+            try:
+                port = int(port_text)
+            except ValueError as error:
+                raise ConfigError(f"printer entry {item!r} has an invalid port") from error
+            if not 0 < port < 65536:
+                raise ConfigError(f"printer entry {item!r} has an invalid port")
+            printer = PrinterConfig(name=name or host, host=host, port=port)
         if any(existing.key == printer.key for existing in printers):
             raise ConfigError(f"duplicate printer name {printer.name!r}")
         if printer.key == "both":
@@ -154,6 +179,25 @@ def parse_printers(spec: str, default_port: int = DEFAULT_MOONRAKER_PORT) -> tup
     if not printers:
         raise ConfigError("no printers configured")
     return tuple(printers)
+
+
+def read_api_key(values: Mapping[str, str]) -> str:
+    """BAMBUDDY_API_KEY, else the BAMBUDDY_API_KEY line of BAMBUDDY_API_KEY_FILE (an env-style file)."""
+    key = values.get("BAMBUDDY_API_KEY", "").strip()
+    if key:
+        return key
+    path_text = values.get("BAMBUDDY_API_KEY_FILE", "").strip()
+    if not path_text:
+        return ""
+    path = Path(path_text).expanduser()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ConfigError(f"BAMBUDDY_API_KEY_FILE {path_text!r} cannot be read: {error.strerror}") from error
+    key = parse_env_text(text).get("BAMBUDDY_API_KEY", "").strip()
+    if not key:
+        raise ConfigError(f"BAMBUDDY_API_KEY_FILE {path_text!r} has no BAMBUDDY_API_KEY line")
+    return key
 
 
 def _choice(values: Mapping[str, str], key: str, choices: Sequence[str]) -> str:
@@ -189,6 +233,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--printers", choices=("sim", "live"))
     parser.add_argument("--spoolman", choices=("sim", "live"))
     parser.add_argument("--writes", choices=("on", "off"))
+    parser.add_argument("--bambuddy-writes", choices=("on", "off"),
+                        help="writes to Bambuddy (default: follow --writes)")
     parser.add_argument("--ipc-host")
     parser.add_argument("--ipc-port", type=int)
     parser.add_argument("--state-dir", type=Path)
@@ -217,6 +263,7 @@ def load_config(
         "STATION_PRINTERS": args.printers,
         "STATION_SPOOLMAN": args.spoolman,
         "STATION_WRITES": args.writes,
+        "BAMBUDDY_WRITES": args.bambuddy_writes,
         "STATION_IPC_HOST": args.ipc_host,
         "STATION_IPC_PORT": None if args.ipc_port is None else str(args.ipc_port),
         "STATION_STATE_DIR": None if args.state_dir is None else str(args.state_dir),
@@ -254,9 +301,16 @@ def load_config(
         if not (sim_fixtures / "printers").is_dir() or not (sim_fixtures / "spoolman" / "spools.json").is_file():
             raise ConfigError(f"STATION_SIM_FIXTURES {fixtures_text!r} needs printers/*.json and spoolman/spools.json")
 
+    bambuddy_writes: bool | None = None
+    if values.get("BAMBUDDY_WRITES", "").strip():
+        bambuddy_writes = _bool(values, "BAMBUDDY_WRITES")
+    printers_mode = _choice(values, "STATION_PRINTERS", ("sim", "live"))
+    has_bambuddy = any(printer.kind == BAMBUDDY for printer in printers)
+    api_key = read_api_key(values) if has_bambuddy and printers_mode == "live" else ""
+
     config = Config(
         hardware=_choice(values, "STATION_HARDWARE", ("sim", "real")),
-        printers_mode=_choice(values, "STATION_PRINTERS", ("sim", "live")),
+        printers_mode=printers_mode,
         spoolman_mode=_choice(values, "STATION_SPOOLMAN", ("sim", "live")),
         writes=_bool(values, "STATION_WRITES"),
         ipc_host=values.get("STATION_IPC_HOST", "127.0.0.1").strip() or "127.0.0.1",
@@ -276,6 +330,9 @@ def load_config(
         repo_dir=repo_dir,
         log_level=values.get("STATION_LOG_LEVEL", "INFO").strip().upper() or "INFO",
         sim_fixtures=sim_fixtures,
+        bambuddy_url=values.get("BAMBUDDY_URL", DEFAULT_BAMBUDDY_URL).strip().rstrip("/") or DEFAULT_BAMBUDDY_URL,
+        bambuddy_api_key=api_key,
+        bambuddy_writes=bambuddy_writes,
     )
     return config
 

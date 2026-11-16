@@ -81,6 +81,7 @@ std::string action_label(const std::string& action)
     if (action == "lookup") return "Look up";
     if (action == "spool_loaded") return "Loaded";
     if (action == "sleep") return "Sleep";
+    if (action == "printer") return "Printer";
     std::string label = action;
     for (auto& c : label) {
         if (c == '_') c = ' ';

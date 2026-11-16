@@ -99,13 +99,19 @@ struct Lane {
     bool load = false;
     bool tool_loaded = false;
     bool low_stock = false;
+    // Bambu slot: its filament settings are applied after the current print.
+    bool settings_pending = false;
 };
 
 struct Printer {
     std::string key;
     std::string name;
     std::string display_name;
+    // "moonraker" (AFC lanes) or "bambuddy" (AMS 3H slots).
+    std::string kind = "moonraker";
     bool connected = false;
+    // Switched off on purpose (Bambuddy up, printer off): shown as Off, not as an error.
+    bool off = false;
     std::string klippy_state;
     std::string print_state;
     std::optional<double> progress;
@@ -119,6 +125,7 @@ struct Printer {
 
     // Mainsail printer name when the service has one, else the configured name.
     const std::string& label() const { return display_name.empty() ? name : display_name; }
+    bool bambu() const { return kind == "bambuddy"; }
 };
 
 struct Health {
@@ -161,6 +168,8 @@ struct ServiceInfo {
     std::string spoolman;
     bool writes = false;
     bool dry_run = false;
+    // Set only with a Bambuddy printer: whether its writes are on.
+    std::optional<bool> bambuddy_writes;
 };
 
 struct State {

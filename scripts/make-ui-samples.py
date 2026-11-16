@@ -91,6 +91,39 @@ async def build() -> dict[str, Any]:
             await station.stop()
 
 
+async def build_three() -> dict[str, Any]:
+    """Kilo and Yankee plus Hotel, a Bambu H3C behind the simulated Bambuddy (AMS 3H, nine slots)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        config = Config(hardware="sim", printers_mode="sim", spoolman_mode="sim", writes=False, ipc_port=0,
+                        state_dir=Path(tmp), printers=parse_printers(DEFAULT_PRINTERS + ",Hotel=bambuddy:1"))
+        station = Station(config, printer_backoff=(0.02, 0.05), publish_delay=0, scale_interval=0,
+                          bambuddy_options={"insert_settle_s": 0.05, "settings_check_s": 0.05})
+        await station.start()
+        try:
+            await wait_until(lambda: all(p.connected for p in station.store.printers.values()))
+            minutes = iter(range(60))
+            station.activity.clock = lambda: f"2026-11-15T20:{next(minutes):02d}:12Z"
+
+            async def act(action: str, **args: Any) -> dict[str, Any]:
+                return await station.actions.handle(action, args)
+
+            await act("sim.printer", printer="yankee", op="print", state="printing", progress=0.42,
+                      filename="enclosure_hinge.gcode")
+            await act("load", spool_id=99)
+            await act("sim.printer", printer="hotel", op="insert", lane="3H-4", material="PETG", color="E0F2F1")
+            await wait_until(lambda: station.store.activity[0]["action"] == "spool_loaded")
+            await act("sim.scale", grams=841.0)
+            await act("lookup", spool_id=93)
+            await act("load", spool_id=93)
+            await wait_until(lambda: all(lane.remaining_pct is not None for p in station.store.printers.values()
+                                         for lane in p.lanes if lane.spool_id is not None))
+            hello = {"type": "hello", "protocol": 1, "service_version": __version__, "hardware": "sim",
+                     "printers": "sim", "spoolman": "sim", "writes": False}
+            return {"hello": hello, "snapshot": json.loads(json.dumps(station.store.snapshot()))}
+        finally:
+            await station.stop()
+
+
 def sample(base: dict[str, Any], screens: list[str], **changes: Any) -> dict[str, Any]:
     data = {key: copy.deepcopy(value) for key, value in base.items() if key != "multicolor"}
     data["screens"] = screens
@@ -171,9 +204,17 @@ def main() -> int:
     dry_run["snapshot"]["printers"][1]["klippy_state"] = "disconnected"
     samples["dry_run"] = dry_run
 
+    three = asyncio.run(build_three())
+    samples["three"] = sample(three, ["main", "printers"])
+    three_off = sample(three, ["main", "printers"])
+    hotel = three_off["snapshot"]["printers"][2]
+    hotel.update(connected=False, off=True, klippy_state="off", pending_spool=None, pending_confirmed=False)
+    three_off["snapshot"]["activity"] = three_off["snapshot"]["activity"][1:]
+    samples["three_off"] = three_off
+
     OUT.mkdir(parents=True, exist_ok=True)
     for name, data in samples.items():
-        (OUT / f"{name}.json").write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        (OUT / f"{name}.json").write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
         print(f"wrote {OUT / (name + '.json')}")
     return 0
 

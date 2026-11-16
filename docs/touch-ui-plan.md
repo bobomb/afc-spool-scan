@@ -29,6 +29,7 @@ hosts the USB QR scanner, DYMO scale and Spoolman) to:
 | Spoolman | Docker, `http://127.0.0.1:7912/api/v1` |
 | Printer: Kilo | Moonraker `192.0.2.11:7125`, AFC Box Turtle `Turtle_1`, lanes 1–4 |
 | Printer: Yankee | Moonraker `192.0.2.12:7125`, AFC Box Turtle `Turtle_1`, lanes 1–4 |
+| Printer: Hotel (added 2026-11-15) | Bambu Lab H3C with an AMS 3H (nine slots), managed by Bambuddy 1.3.1 (Docker on spoolpi, `http://127.0.0.1:8010`, printer id 1); the station uses Bambuddy's REST API and websocket with a scoped API key (§6.4) |
 | Name resolution | `.local`/mDNS unreliable on spoolpi — use IP addresses |
 | Scale | DYMO M10, USB `0922:8003`, `/dev/hidraw*` via `99-dymo-scale.rules` |
 | QR scanner | TMS HID keyboard, `/dev/input/by-id/usb-TMS_HIDKeyBoard_1234567890abcd-event-kbd` |
@@ -89,12 +90,16 @@ flowchart LR
   S <--> SM[Spoolman]
   S <-->|WebSocket subscribe| K[Kilo Moonraker]
   S <-->|WebSocket subscribe| Y[Yankee Moonraker]
+  S <-->|REST + WebSocket| B[Bambuddy] --> H[Hotel: Bambu H3C + AMS 3H]
   S --> AU[Audio cues]
 ```
 
 - **spool-station service (Python):** sole owner of the scale and QR scanner
-  (no competing readers). Maintains live state, talks to Spoolman and both
-  Moonraker instances, executes actions, plays audio cues, records activity.
+  (no competing readers). Maintains live state, talks to Spoolman, both
+  Moonraker instances and Bambuddy, executes actions, plays audio cues,
+  records activity. It never talks MQTT to the Bambu printer: Bambuddy owns
+  that connection, pushes the slot settings and charges print usage to
+  Spoolman (added 2026-11-15).
 - **Touch UI (LVGL, C):** stateless view. Renders state pushed by the service
   and sends action requests. No network code beyond local IPC.
 - Existing scripts (`dymo-scale-read.py`, `audible-cue.py`) are reused as
@@ -167,7 +172,7 @@ Rules carried over from the current scanner behaviour:
 
 | # | Function | Notes |
 |---|---|---|
-| 1 | **Next spool on both printers** | Changed 2026-10-19 (was "Target printer selection: Kilo / Yankee / Both"). Load and Weigh + Load always set the next spool on every printer; printers cannot be deselected. When one printer loads that spool into a lane, the service clears it as next spool on the other printers (undoable, in the Log). The pending next spool per printer is shown with **Clear pending**. |
+| 1 | **Next spool on every printer** | Changed 2026-10-19 (was "Target printer selection: Kilo / Yankee / Both"); extended 2026-11-15 to the Bambu printer. Load and Weigh + Load always set the next spool on every printer; printers cannot be deselected. On the Bambu printer the next spool is *armed* in the service, and the spool is assigned (in Bambuddy) to whichever empty AMS 3H slot it goes into first. When one printer loads that spool, the service clears it as next spool on the other printers (undoable, in the Log). A Bambu printer that is switched off is skipped quietly. The pending next spool per printer is shown with **Clear pending**. |
 | 2 | **Look up (no action)** | Enter/scan ID → show vendor, filament name, material, color, remaining, spool weight, location, last used. |
 | 3 | **Assign to specific lane** | `SET_SPOOL_ID LANE=laneN SPOOL_ID=X` on a chosen printer/lane; for lanes tagged wrongly or loaded without a scan. Only when explicitly chosen (§4.1: the default is next-spool). |
 | 5 | **Record empty spool** | Weigh the empty core, store it as the spool's `spool_weight` (tare) and as its filament's default `spool_weight`, then archive the spool. |
@@ -175,7 +180,7 @@ Rules carried over from the current scanner behaviour:
 | 7 | **Undo and recent activity** | Activity list of recent actions; undo restores previous Spoolman values / lane assignment / pending spool. |
 | 8 | **Scan behaviour mode** | Configurable behaviour when a QR is scanned while the UI is running (see §7). |
 | 9 | **Low-stock highlighting** | Lanes and looked-up spools below a threshold are highlighted. |
-| 10 | **Health / connection status** | Spoolman, Kilo, Yankee and scale connection indicators; scale status detail. |
+| 10 | **Health / connection status** | Spoolman, Kilo, Yankee, Hotel and scale connection indicators; scale status detail. A Bambu printer that is switched off (Bambuddy up, printer off) is shown as "Off", not as a problem; Bambuddy itself unreachable is "offline" like a Moonraker printer. |
 | 11 | **Screen idle management** | Blank/dim after idle; wake on touch, scan or scale change. Dimming needs a software backlight (verify, §2.1); otherwise blank to a black screen. When the screen goes off the station goes to sleep: the selected spool is deselected and the pending next spool is cleared on both printers (added 2026-10-19; undoable, in the Log). |
 
 ### 4.3 Explicitly excluded — **Decided**
@@ -228,11 +233,31 @@ screen.
   "Scan a spool / or tap here to type its ID"; an unknown ID shows "Not
   found in Spoolman".
 - **Printer cards.** One card per printer, display only: status, lanes and
-  the pending next spool at the bottom. Load always goes to both printers
+  the pending next spool at the bottom. Load always goes to every printer
   (§4.2 #1), so there is no target selection. Cards are ordered as in
   `PRINTERS` (left to right) and titled with the printer name set in
   Mainsail (falling back to the configured name); the same name is used on
   the Printers screen, in the status line and in result messages (2026-10-19).
+- **Three printers (decided 2026-11-15, mockup option C).** With a third
+  printer (or one with more than four lanes) the cards become two rows of
+  compact cards: the two four-lane printers side by side on top, the Bambu
+  printer (nine AMS 3H slots) across the full width below. Each card has a
+  header column (name, status, ↓ next spool #) and compact tiles: a 34 px
+  ring with grams left, then material and spool #; LOW replaces the
+  material, an amber dot marks slot settings that apply after the print, the
+  loaded lane or slot has a blue outline. With one or two four-lane printers
+  the layout above is unchanged. A Bambu printer that is off says "Off" with
+  its tiles dimmed.
+
+```
+│ PRINTERS · Load sets the next spool on every printer          │
+│ ┌ Kilo      [888][612][74][ - ] ┐ ┌ Yankee   [950][321][ ? ][45] ┐ │
+│ │ Complete   PLA  PLA PETG Empty│ │ Printing  PLA PETG Untag ABS │ │
+│ │ ↓ #93                         │ │ ↓ #93                         │ │
+│ ┌ Hotel     [920][410][760][812][ 88][ ? ][530][640][300]          ┐ │
+│ │ Printing   PLA  PLA PETG PETG  LOW  no tag PLA ABS TPU          │ │
+│ │ ↓ #93                                                            │ │
+```
 - **Lane tiles.** Each lane is a rounded tile filled with the lane spool's
   colour(s), with its remaining ring (share of the initial weight), grams
   left in the ring ("852 g", "1.2 kg" above 1 kg), material and spool # in
@@ -250,17 +275,23 @@ screen.
 
 ### 5.2 Printers
 
-Two cards (Kilo, Yankee). Each shows:
+One column per printer (two, or three narrower columns with a third
+printer, decided 2026-11-15, mockup option P1). Each shows:
 
-- Connection, print state and progress, AFC `current_state`, AFC error message.
+- Connection, print state and progress, AFC `current_state` (Bambu: "AMS
+  3H"), AFC error message (Bambu: the HMS warning or error).
 - Pending next spool (tracked by the service) with **Clear**. Cleared when
   the printer goes offline, since that usually means it shut down or
   rebooted; when another printer loads that spool into a lane; and when the
   station goes to sleep (§4.2 #1, #11).
 - Lanes 1–4: color swatch, material, spool ID, remaining g (bar), tool map
   (T0–T3), `filament_status`, loaded lane highlighted, low-stock highlight.
-- Tapping a lane opens **Assign to lane** with the current spool ID; nothing
-  is sent until **Assign** is tapped (§4.1).
+  The Bambu printer shows its nine AMS 3H slots (`3H-1`…`3H-9`) as a 3×3
+  grid of cells filled with the spool colour: slot, spool #, material, grams,
+  status or LOW, and the amber settings-pending dot.
+- Tapping a lane or slot opens **Assign to lane** with the current spool ID;
+  nothing is sent until **Assign** is tapped (§4.1). For the Bambu printer
+  Assign sets the slot's spool in Bambuddy.
 
 ### 5.3 Log
 
@@ -325,6 +356,47 @@ refuses a spool already assigned to another lane and reports errors as
 Expected gross for the sanity check = spool `spool_weight` (fallback: filament
 `spool_weight`) + `remaining_weight`.
 
+### 6.4 Bambuddy (Bambu printers, added 2026-11-15)
+
+Bambuddy (`BAMBUDDY_URL`, API key with *read status* and *inventory* scopes
+only) owns the printer: the station never talks MQTT. AMS 3H slot *n* is
+`(ams_id 32, tray_id n-1)`; the station calls it lane `3H-n`.
+
+| Purpose | Endpoint |
+|---|---|
+| Printer status (seed) | `GET /api/v1/printers/{id}/status` (`state`, `progress`, `subtask_name`, `hms_errors`, `ams[].tray[]` with `exists`, `tray_type`, `tray_color`, `tray_uuid`; `tray_now` = 28 + slot) |
+| Slot → spool map | `GET /api/v1/spoolman/inventory/slot-assignments/all?printer_id={id}` |
+| Live updates | `POST /api/v1/auth/ws-token`, then websocket `/api/v1/ws?token=…`: `printer_status`, `spool_assignment_changed`, `unknown_tag` |
+| Assign a spool to a slot | `POST /api/v1/spoolman/inventory/slot-assignments` `{spoolman_spool_id, printer_id, ams_id, tray_id, move: true}`; Bambuddy also pushes material, colour and temperatures to the slot |
+| Unassign | `DELETE /api/v1/spoolman/inventory/slot-assignments/{spool_id}` |
+| Learn an RFID tag | `PATCH /api/v1/spoolman/inventory/spools/{id}/tag` `{tray_uuid}` (409 if another spool has it) |
+
+Behaviour, decided 2026-11-15:
+
+- **Next spool is armed** in the service. When a slot goes from empty to
+  filled while armed, the service waits about 3 s for Bambuddy's own RFID
+  match, then assigns the armed spool to that slot and clears it as next
+  spool on the other printers (one undoable Log entry: undo unassigns the
+  slot and arms every printer again).
+- **RFID:** a Bambu spool Bambuddy already knows keeps Bambuddy's match. If
+  it differs from the armed spool, the Log warns and the spool stays armed
+  (warn only, no block). A tag no spool has yet is linked to the armed spool,
+  so reinserting it later needs no scan; if the tag belongs to another spool
+  nothing is assigned and the Log says so.
+- **Slot settings while printing:** the H3C refuses Bambuddy's settings push
+  during a print (the assignment is saved anyway). The slot is marked
+  settings-pending and the assignment is sent once more when the print ends;
+  if the slot still differs, the Log says so.
+- **Off vs offline:** printer switched off (Bambuddy reports it
+  disconnected) → "Off", not an error, Load skips it; Bambuddy unreachable →
+  offline, an error. Both clear the armed spool.
+- Bambuddy's own 120 s auto-unassign of an empty slot is shown, not fought.
+  External spool inputs `(255, n)` are not shown (upstream bug, bambuddy
+  #3558). An armed spool does not expire; sleep clears it (§4.2 #11).
+- Spool details (material, colour, grams left) come from Spoolman; the
+  service fetches them again when a print ends, because Bambuddy charges the
+  print's usage then.
+
 ### 6.3 Scale (USB HID POS scale report)
 
 Status byte values to surface in the UI:
@@ -347,7 +419,7 @@ Status byte values to surface in the UI:
 |---|---|---|
 | Weight acceptance | Decided | Stable reading > 50 g |
 | Display orientation | Proposed | Landscape, not rotated (works as currently placed, verified 2026-10-15); if the final mount requires it, rotate in LVGL (display + touch) |
-| Target printer default | **Decided** 2026-10-19 | Always both printers; no selection (§4.2 #1) |
+| Target printer default | **Decided** 2026-10-19 | Always every printer; no selection (§4.2 #1; Bambu printer included 2026-11-15) |
 | Scan behaviour mode (#8) | Decided: configurable; **Open:** default | Options: *immediate* (current: weigh if possible + load), *fill + countdown* (fill ID, run default action after cancellable countdown), *fill only* |
 | Sanity-check warning threshold | **Open** | e.g. 50 g or 10% of expected |
 | Low-stock threshold | **Open** | e.g. < 100 g remaining |
@@ -403,6 +475,11 @@ Detailed tasks: dev plan §8.
     option C (printer cards as the Load target; selection removed 2026-10-19)
     with D's side rail, filled
     lane and spool tiles, tap the top box for the keypad, More menu (§5).
+13. ~~Bambu H3C integration (Q1–Q6, 2026-11-15).~~ Decided 2026-11-15:
+    layout C (two rows) and Printers P1 (three columns) from mockups; Load
+    arms every printer; RFID mismatch warns only; no external inputs in v1;
+    an armed spool does not expire; a switched-off Bambu printer is a neutral
+    "Off" (§4.2, §5, §6.4).
 
 ## Decision log
 
@@ -425,3 +502,8 @@ Detailed tasks: dev plan §8.
 | 2026-10-19 | Changes §4.2 #1 (was target selection Kilo / Yankee / Both): Load and Weigh + Load always set the next spool on both printers and printers cannot be deselected (the `target` setting and the card toggle are removed). When a printer loads that spool into a lane, the next spool is cleared on the other printers. |
 | 2026-10-19 | §4.2 #11: when the screen goes off the station goes to sleep: deselect the spool and clear the pending next spool on both printers. |
 | 2026-10-19 | §5.1: printers are shown by their Mainsail printer name (configured name as fallback), and the card order follows `PRINTERS` (on the station: Yankee left, Kilo right). |
+| 2026-11-15 | Bambu H3C (Hotel) joins through Bambuddy (§2, §3, §6.4): the station uses Bambuddy's API only; the next spool is armed in the service and assigned to the AMS 3H slot the spool goes into. |
+| 2026-11-15 | Changes §4.2 #1 (user, Q2): Load and Weigh + Load arm the Bambu printer too ("every printer"). |
+| 2026-11-15 | Changes §5 (user, Q1, from mockups): with three printers the station screen uses two rows of compact cards (option C) and the Printers screen three columns with a 3×3 slot grid (option P1); one or two four-lane printers keep the current layout. |
+| 2026-11-15 | User, Q3–Q6: no external inputs in v1; an RFID spool that differs from the scan only warns; an armed spool does not expire; a switched-off Bambu printer is a neutral "Off" that Load skips. |
+| 2026-11-15 | Bambuddy writes have their own switch (`BAMBUDDY_WRITES`), so the Bambu printer can start read-only while the Vorons keep writing. |
