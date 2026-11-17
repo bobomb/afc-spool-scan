@@ -78,6 +78,7 @@ def sender_for(client: FakeClient, timeout_s: float = 2.0) -> MqttWeightSender:
 def test_weights_follow_bambu_studio_limits() -> None:
     assert filament_weight(965.4, 1000.0) == (1000, 965)
     assert filament_weight(1203.0, 1000.0) == (1203, 1203)
+    assert filament_weight(1500.0, 2000.0, max_remain=1000) == (2000, 1000)
     assert filament_weight(0.4, 1000.0) is None and filament_weight(None, 1000.0) is None
     assert filament_weight(500.0, None) is None and filament_weight(12000.0, 12000.0) is None
     assert remain_percent(1000, 965) == 96 and remain_percent(1000, 1000) == 100

@@ -22,7 +22,14 @@ from typing import Any
 
 import aiohttp
 
-from .bambu_mqtt import WeightSender, WeightTarget, filament_weight, remain_percent
+from .bambu_mqtt import (
+    MAX_GRAMS,
+    MAX_RFID_REMAIN_GRAMS,
+    WeightSender,
+    WeightTarget,
+    filament_weight,
+    remain_percent,
+)
 from .catalog import SpoolMeta
 from .config import PrinterConfig
 from .moonraker import clean_display_name, normalize_color
@@ -728,9 +735,13 @@ class BambuddyClient:
         return asyncio.get_running_loop().time()
 
     def _hold_weight(self, slot: int) -> None:
-        """A slot changed: let Bambuddy's filament settings land first (Bambu Studio sends the weight after them)."""
+        """A slot changed: let Bambuddy's filament settings land first (Bambu Studio sends the weight after them).
+
+        The printer forgets a slot's weight when its spool comes out, so what was sent before no longer counts.
+        """
         if self.weight_sender is not None:
             self._weight_hold[slot] = self._now() + self.settings_check_s
+            self._weight_sent.pop(slot, None)
 
     def _wake_weights(self, delay: float) -> None:
         when = self._now() + max(delay, 0.0) + 0.01
@@ -745,15 +756,16 @@ class BambuddyClient:
         self._reconcile_weights()
 
     def _desired_weight(self, slot: int) -> tuple[int, int, int] | None:
-        """(spool, total g, remain g) from Spoolman for an untagged spool; the printer tracks RFID spools itself."""
+        """(spool, total g, remain g) from Spoolman; an RFID spool is capped at 1000 g left, the printer's limit."""
         tray = self._tray(slot)
         spool_id = self._assignments.get(slot)
-        if spool_id is None or not spool_present(tray) or tray_tag(tray) is not None or slot in self._pending_settings:
+        if spool_id is None or not spool_present(tray) or slot in self._pending_settings:
             return None
         meta = self.spool_meta(spool_id)
         if meta is None or meta.archived:
             return None
-        weights = filament_weight(meta.remaining_g, meta.initial_g)
+        cap = MAX_RFID_REMAIN_GRAMS if tray_tag(tray) is not None else MAX_GRAMS
+        weights = filament_weight(meta.remaining_g, meta.initial_g, cap)
         return (spool_id, *weights) if weights is not None else None
 
     def _reconcile_weights(self) -> None:

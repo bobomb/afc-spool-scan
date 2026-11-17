@@ -435,22 +435,27 @@ the station sends it itself (`station/bambu_mqtt.py`):
   `{"print": {"command": "set_filament_weight", "sequence_id", "ams_id": 32,
   "slot_id": n, "total": g, "remain": g, "src_id": 1}}` on
   `device/<serial>/request`; the reply (`result: "success"`) comes on
-  `device/<serial>/report`. Limits 1–10000 g, remain ≤ total. The printer
-  then reports `remain` = ⌊remain × 100 / total⌋.
+  `device/<serial>/report`. Limits 1–10000 g, remain ≤ total, and remain ≤
+  1000 g on an RFID tray (Bambu Studio allows RFID edits only where the
+  printer profile says `support_filament_remain_edit_rfid`; the H3C's
+  `N10.json` does). The printer then reports `remain` = ⌊remain × 100 /
+  total⌋.
 - `MqttWeightSender`: one TLS connection per command (port 8883, user
   `bblp`, the access code; self-signed certificate not verified), so it
   never holds one of the printer's MQTT connections. Host and serial come
   from Bambuddy's `GET /printers/` when the client connects.
-- `BambuddyClient._reconcile_weights`: for each present, untagged, assigned
-  slot without pending settings, `total` = Spoolman's initial weight and
-  `remain` = its remaining grams; sent when the tray's `remain` % differs.
+- `BambuddyClient._reconcile_weights`: for each present, assigned slot
+  (RFID or not) without pending settings, `total` = Spoolman's initial
+  weight and `remain` = its remaining grams (RFID: at most 1000 g); sent
+  when the tray's `remain` % differs.
   Only while the printer is idle and online; a slot is held for
   `settings_check_s` after its assignment or presence changes (settings
   first, like Bambu Studio), and every slot for `usage_refresh_s +
   settings_check_s` after a print ends (Spoolman learns the usage later).
   Sends go one at a time and are checked again just before they go out, so
   a slot that changed meanwhile never gets the old spool's grams. A value
-  the printer accepted is not sent again until Spoolman's grams change (the
+  the printer accepted is not sent again until Spoolman's grams change or
+  the spool is taken out (the printer forgets the weight then; the
   printer's own count-down is never fought); a failed send is retried after
   5 minutes. Runs on status pushes and catalog updates, so a weigh or a
   print's usage reaches the printer.

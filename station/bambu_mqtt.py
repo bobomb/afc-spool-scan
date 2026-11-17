@@ -21,9 +21,10 @@ from .printer_client import PrinterCommandError, PrinterOffline
 
 MQTT_PORT = 8883
 MQTT_USER = "bblp"
-# Bambu Studio's limits (DevFilamentWeight): 1-10000 g, remain <= total.
+# Bambu Studio's limits (DevFilamentWeight): 1-10000 g, remain <= total, and at most 1000 g left on an RFID spool.
 MIN_GRAMS = 1
 MAX_GRAMS = 10000
+MAX_RFID_REMAIN_GRAMS = 1000
 
 
 @dataclass(frozen=True)
@@ -35,11 +36,12 @@ class WeightTarget:
     serial: str | None = field(default=None, repr=False)
 
 
-def filament_weight(remaining_g: float | None, initial_g: float | None) -> tuple[int, int] | None:
+def filament_weight(remaining_g: float | None, initial_g: float | None,
+                    max_remain: int = MAX_GRAMS) -> tuple[int, int] | None:
     """(total, remain) in grams as Bambu Studio sends them, or None when Spoolman's numbers can't be sent."""
     if remaining_g is None or initial_g is None:
         return None
-    remain = round(remaining_g)
+    remain = min(round(remaining_g), max_remain)
     total = max(round(initial_g), remain)
     if remain < MIN_GRAMS or total > MAX_GRAMS:
         return None

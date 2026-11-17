@@ -398,15 +398,16 @@ Behaviour, decided 2026-11-15:
 - Spool details (material, colour, grams left) come from Spoolman; the
   service fetches them again when a print ends, because Bambuddy charges the
   print's usage then.
-- **Remaining weight on the printer** (decided 2026-11-16): for a spool
-  without a Bambu RFID tag, the service sends Spoolman's grams to the slot
-  (`set_filament_weight` over the printer's LAN MQTT, as Bambu Studio does;
-  Bambuddy 1.3.1 doesn't), so the H3C's own screen shows them. It sends
-  when the printer is idle, after the slot's filament settings, and again
-  whenever Spoolman's grams no longer match the printer's whole-percent
-  figure (a weigh, a print's usage). Needs the printer's access code
-  (`BAMBU_ACCESS_CODE`); without it this is skipped. RFID spools are left
-  to the printer. Also proposed upstream to Bambuddy.
+- **Remaining weight on the printer** (decided 2026-11-16): the service
+  sends Spoolman's grams to each assigned slot (`set_filament_weight` over
+  the printer's LAN MQTT, as Bambu Studio does; Bambuddy 1.3.1 doesn't), so
+  the H3C's own screen shows them. It sends when the printer is idle, after
+  the slot's filament settings, and again whenever Spoolman's grams no
+  longer match the printer's whole-percent figure (a weigh, a print's usage,
+  a spool taken out and put back). Needs the printer's access code
+  (`BAMBU_ACCESS_CODE`); without it this is skipped. Bambu RFID spools are
+  synced too (user, 2026-11-16), capped at 1000 g left, the printer's limit
+  for tagged spools. Also proposed upstream to Bambuddy.
 
 ### 6.3 Scale (USB HID POS scale report)
 
@@ -523,3 +524,4 @@ Detailed tasks: dev plan §8.
 | 2026-11-15 | User, Q3–Q6: no external inputs in v1; an RFID spool that differs from the scan only warns; an armed spool does not expire; a switched-off Bambu printer is a neutral "Off" that Load skips. |
 | 2026-11-15 | Bambuddy writes have their own switch (`BAMBUDDY_WRITES`), so the Bambu printer can start read-only while the Vorons keep writing. |
 | 2026-11-16 | User (open question 14): show Spoolman's grams on the H3C itself. The station sends `set_filament_weight` over the printer's MQTT (needs `BAMBU_ACCESS_CODE`), and Bambuddy is asked upstream (issue + PR) to send it with slot assignments. Changes §6.4 "the station never talks MQTT". |
+| 2026-11-16 | User: Bambu RFID spools get Spoolman's grams too, not the printer's own estimate (capped at 1000 g left, the H3C's limit for tagged spools; its profile allows RFID edits). |
