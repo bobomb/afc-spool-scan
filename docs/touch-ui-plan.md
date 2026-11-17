@@ -480,6 +480,12 @@ Detailed tasks: dev plan §8.
     arms every printer; RFID mismatch warns only; no external inputs in v1;
     an armed spool does not expire; a switched-off Bambu printer is a neutral
     "Off" (§4.2, §5, §6.4).
+14. Show Spoolman's remaining grams on the H3C's own screen for untagged
+    spools (2026-11-16)? The printer accepts `set_filament_weight` over MQTT
+    (what Bambu Studio sends); Bambuddy 1.3.1 does not send it. Options:
+    ask Bambuddy to send it with each slot assignment, or give the station
+    its own MQTT connection to the printer (needs the LAN access code).
+    Open; see dev plan §10.
 
 ## Decision log
 

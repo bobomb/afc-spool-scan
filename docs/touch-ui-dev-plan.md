@@ -879,9 +879,15 @@ Append dated notes here (verified API details, gotchas, measurements).
   `cp ~/.local/state/spool-station/config.env.pre-h3c config.env` and
   `systemctl --user restart spool-station spool-station-ui`. The fork keeps
   branch `touch-ui-pre-h3c` at the same commit.
-- 2026-11-16 (H3C writes on): the H3C's own screen shows remaining filament
-  only for Bambu RFID spools (tray `state` 283, `remain` in %). Untagged
-  spools report `remain: -1` and show no amount, even after a Bambuddy
-  assignment: `ams_filament_setting` (what Bambuddy sends) has no remaining
-  field and Bambu tags are signed, so neither the station nor Bambuddy can
-  set it. Spoolman grams show on the station and in Bambuddy's inventory.
+- 2026-11-16 (H3C writes on): untagged spools report `remain: -1` (no
+  amount on the H3C's screen) even after a Bambuddy assignment, because
+  Bambuddy 1.3.1 only sends `ams_filament_setting`, which has no weight.
+  The H3C does accept a weight: Bambu Studio's slot dialog sends
+  `{"print": {"command": "set_filament_weight", "ams_id", "slot_id",
+  "total", "remain", "src_id": 1}}` (grams, 1–10000, remain ≤ total) right
+  after `ams_filament_setting` succeeds; the printer then reports `remain`
+  in % and counts it down while printing. Setting 965 g of 1000 g on slot
+  3H-1 by hand gave `remain: 96`. Bambuddy has no API for it, so the
+  station would need it upstream in Bambuddy or its own MQTT connection
+  (the printer runs in developer mode). Bambuddy's weight sync is on but
+  left Spoolman's 966 g unchanged.
