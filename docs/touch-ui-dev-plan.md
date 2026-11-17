@@ -879,3 +879,9 @@ Append dated notes here (verified API details, gotchas, measurements).
   `cp ~/.local/state/spool-station/config.env.pre-h3c config.env` and
   `systemctl --user restart spool-station spool-station-ui`. The fork keeps
   branch `touch-ui-pre-h3c` at the same commit.
+- 2026-11-16 (H3C writes on): the H3C's own screen shows remaining filament
+  only for Bambu RFID spools (tray `state` 283, `remain` in %). Untagged
+  spools report `remain: -1` and show no amount, even after a Bambuddy
+  assignment: `ams_filament_setting` (what Bambuddy sends) has no remaining
+  field and Bambu tags are signed, so neither the station nor Bambuddy can
+  set it. Spoolman grams show on the station and in Bambuddy's inventory.
