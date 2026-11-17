@@ -723,8 +723,9 @@ within a phase unless noted. Each task ends with tests/build passing.
   `~/.config/spool-station/bambu.env` (0600) on spoolpi, copied from
   Bambuddy's database. The four untagged slots went from `remain: -1` to
   Spoolman's grams (969 → 96 %, 785 → 78 %, 340 → 34 %, 870 → 87 %). RFID
-  slots were left alone and Spoolman was unchanged. Remaining: the Bambuddy
-  issue and PR.*
+  slots were left alone and Spoolman was unchanged. RFID slots synced too
+  (3a66f6a, user's choice): #81 33 → 37 %, #18 100 → 50 %, #13 100 → 86 %,
+  all accepted. Remaining: the Bambuddy issue and PR.*
 
 ### C — Continuous integration (optional)
 
