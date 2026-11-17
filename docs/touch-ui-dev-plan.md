@@ -716,7 +716,7 @@ within a phase unless noted. Each task ends with tests/build passing.
   `station/sim/fixtures/captured/bambuddy/hotel.json` (+ `.ws.jsonl`) and
   replayed by `tests/test_captured_fixtures.py`. Remaining: writes on and
   the acceptance test with the user at the printer.*
-- [ ] **B11** Remaining weight on the H3C (open question 14): station sends
+- [x] **B11** Remaining weight on the H3C (open question 14): station sends
   `set_filament_weight` over MQTT (§6.7, `BAMBU_ACCESS_CODE`); Bambuddy issue
   and PR to send it with slot assignments.
   *2026-11-16: station side live (f73ba12). The access code is in
@@ -725,7 +725,11 @@ within a phase unless noted. Each task ends with tests/build passing.
   Spoolman's grams (969 → 96 %, 785 → 78 %, 340 → 34 %, 870 → 87 %). RFID
   slots were left alone and Spoolman was unchanged. RFID slots synced too
   (3a66f6a, user's choice): #81 33 → 37 %, #18 100 → 50 %, #13 100 → 86 %,
-  all accepted. Remaining: the Bambuddy issue and PR.*
+  all accepted. Upstream: maziggy/bambuddy#3585 (issue) and
+  maziggy/bambuddy#3586 (PR) send it on slot assignment and reinsertion,
+  gated on the model's capability flags, RFID clamped to 1000 g. Once that
+  ships, both send the same grams on assignment (harmless); the station's
+  sender still covers weighs and post-print usage.*
 
 ### C — Continuous integration (optional)
 
