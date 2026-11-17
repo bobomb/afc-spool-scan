@@ -18,6 +18,7 @@ PLACEHOLDER_HOSTS = {"spoolpi", "kilo", "yankee"}
 # Bambuddy API keys are "bb_" plus a long token; Bambu serials and access codes never belong in the repo.
 API_KEY = re.compile(r"\bbb_[A-Za-z0-9_-]{24,}")
 DEVICE_SECRET = re.compile(r"\"(serial_number|access_code|ip_address)\"\s*:\s*\"([^\"]+)\"")
+ACCESS_CODE = re.compile(r"BAMBU_ACCESS_CODE\s*=\s*[\"']?[A-Za-z0-9]{8}\b")
 
 
 def tracked_text_files() -> Iterator[tuple[str, str]]:
@@ -40,6 +41,7 @@ def test_tracked_files_use_placeholder_hosts() -> None:
         problems += [f"{name}: {path}" for path in USER_PATH.findall(text)]
         problems += [f"{name}: Bambuddy API key" for _ in API_KEY.findall(text)]
         problems += [f"{name}: {key}" for key, _ in DEVICE_SECRET.findall(text)]
+        problems += [f"{name}: Bambu access code" for _ in ACCESS_CODE.findall(text)]
     assert not problems, problems
 
 

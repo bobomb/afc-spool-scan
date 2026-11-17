@@ -22,6 +22,9 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
+from ..bambu_mqtt import WeightTarget
+from ..printer_client import PrinterCommandError, PrinterOffline
+
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "bambuddy"
 AMS_3H = 32
 SLOTS = 9
@@ -126,6 +129,7 @@ class SimBambuddy:
         self.rfid_delay_s = rfid_delay_s
         self.online = True
         self.requests: list[tuple[str, str, Any]] = []
+        self.weights: list[tuple[int, int, int, int]] = []
         self.sockets: set[web.WebSocketResponse] = set()
         self._tokens: set[str] = set()
         self._tasks: set[asyncio.Task[None]] = set()
@@ -287,6 +291,18 @@ class SimBambuddy:
         printer.status["connected"] = on
         await self.push(printer)
 
+    async def set_filament_weight(self, printer_id: int, ams_id: int, slot: int, total: int, remain: int) -> None:
+        """The printer side of the station's MQTT `set_filament_weight`: the tray reports `remain` in %."""
+        printer = self._printer(printer_id)
+        if not printer.status.get("connected", True):
+            raise PrinterOffline("the printer is off (simulated)")
+        if ams_id != AMS_3H or not 0 <= slot < SLOTS or not printer.tray(slot).get("exists") \
+                or not 1 <= remain <= total <= 10000:
+            raise PrinterCommandError("the printer refused it (simulated)")
+        self.weights.append((printer_id, slot, total, remain))
+        printer.tray(slot)["remain"] = remain * 100 // total
+        await self.push(printer)
+
     async def disconnect(self) -> None:
         """Bambuddy itself goes away."""
         self.online = False
@@ -320,7 +336,9 @@ class SimBambuddy:
         return self.printers.get(int(raw)) if raw.isdigit() else None
 
     async def _printers(self, request: web.Request) -> web.Response:
-        return web.json_response([{"id": p.id, "name": p.name, "model": p.model} for p in self.printers.values()])
+        # Placeholder address and serial, the fields the station's weight command needs.
+        return web.json_response([dict(id=p.id, name=p.name, model=p.model, ip_address=f"192.0.2.{30 + p.id}",
+                                       serial_number=f"SIM{p.id:012d}") for p in self.printers.values()])
 
     async def _status(self, request: web.Request) -> web.Response:
         printer = self._printer_from(request)
@@ -444,3 +462,16 @@ class SimBambuddy:
         if self._runner is not None:
             await self._runner.cleanup()
             self._runner = None
+
+
+class SimWeightSender:
+    """The station's MQTT weight command, delivered to the simulated printer instead."""
+
+    needs_address = False
+
+    def __init__(self, sim: SimBambuddy) -> None:
+        self.sim = sim
+
+    async def set_filament_weight(self, target: WeightTarget, ams_id: int, slot: int, total: int,
+                                  remain: int) -> None:
+        await self.sim.set_filament_weight(target.printer_id, ams_id, slot, total, remain)

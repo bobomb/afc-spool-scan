@@ -94,6 +94,25 @@ def test_bambuddy_key_file_problems(tmp_path: Path) -> None:
     assert simulated.bambuddy_api_key == "" and simulated.writes_enabled("bambuddy") is True
 
 
+def test_bambu_access_code(tmp_path: Path) -> None:
+    secrets = tmp_path / "bambu.env"
+    secrets.write_text("BAMBU_ACCESS_CODE=test-code\n", encoding="utf-8")
+    environ = {"PRINTERS": "Hotel=bambuddy:1", "BAMBUDDY_API_KEY": "key", "BAMBU_ACCESS_CODE_FILE": str(secrets)}
+    config = load_config([], environ=environ, platform="linux", repo_dir=tmp_path)
+    assert config.bambu_access_code == "test-code" and "test-code" not in repr(config)
+    direct = load_config([], environ={**environ, "BAMBU_ACCESS_CODE": "direct"}, platform="linux", repo_dir=tmp_path)
+    assert direct.bambu_access_code == "direct"
+    without = load_config([], environ={"PRINTERS": "Hotel=bambuddy:1", "BAMBUDDY_API_KEY": "key"}, platform="linux",
+                          repo_dir=tmp_path)
+    assert without.bambu_access_code == ""
+    simulated = load_config([], environ={**environ, "BAMBU_ACCESS_CODE_FILE": str(tmp_path / "missing.env")},
+                            platform="win32", repo_dir=tmp_path)
+    assert simulated.bambu_access_code == ""
+    with pytest.raises(ConfigError, match="BAMBU_ACCESS_CODE_FILE"):
+        load_config([], environ={**environ, "BAMBU_ACCESS_CODE_FILE": str(tmp_path / "missing.env")},
+                    platform="linux", repo_dir=tmp_path)
+
+
 def test_windows_defaults_are_safe(tmp_path: Path) -> None:
     config = load_config([], environ={"LOCALAPPDATA": str(tmp_path)}, platform="win32", repo_dir=tmp_path)
     assert (config.hardware, config.printers_mode, config.spoolman_mode, config.writes) == (

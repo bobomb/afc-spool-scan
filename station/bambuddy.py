@@ -1,10 +1,12 @@
 """Bambuddy REST + websocket client for one Bambu printer with an AMS 3H (dev plan §6.6).
 
 Bambuddy owns the printer connection and the slot -> Spoolman spool map; the
-station never talks MQTT. "Next spool" is an armed spool the station holds:
-when a spool goes into an empty AMS 3H slot while armed, the station assigns
-the armed spool to that slot (an RFID spool Bambuddy already knows keeps
-Bambuddy's match) and reports a LaneLoad, like AFC loading a lane.
+station talks MQTT to the printer only for what Bambuddy can't send, a slot's
+remaining weight (bambu_mqtt, dev plan §6.7). "Next spool" is an armed spool
+the station holds: when a spool goes into an empty AMS 3H slot while armed,
+the station assigns the armed spool to that slot (an RFID spool Bambuddy
+already knows keeps Bambuddy's match) and reports a LaneLoad, like AFC
+loading a lane.
 """
 
 from __future__ import annotations
@@ -13,12 +15,14 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
 from collections.abc import Callable, Iterable
 from dataclasses import replace
 from typing import Any
 
 import aiohttp
 
+from .bambu_mqtt import WeightSender, WeightTarget, filament_weight, remain_percent
 from .catalog import SpoolMeta
 from .config import PrinterConfig
 from .moonraker import clean_display_name, normalize_color
@@ -127,6 +131,8 @@ class BambuddyClient:
         settings_check_s: float = 10.0,
         usage_refresh_s: float = 30.0,
         ping_s: float = 30.0,
+        weight_sender: WeightSender | None = None,
+        weight_retry_s: float = 300.0,
     ) -> None:
         if printer.bambuddy_printer_id is None:
             raise ValueError(f"{printer.name} has no Bambuddy printer id")
@@ -150,6 +156,8 @@ class BambuddyClient:
         self.settings_check_s = settings_check_s
         self.usage_refresh_s = usage_refresh_s
         self.ping_s = ping_s
+        self.weight_sender = weight_sender
+        self.weight_retry_s = weight_retry_s
         self.state = PrinterState(key=printer.key, name=printer.name, kind="bambuddy",
                                   display_name=clean_display_name(display_name))
         self._status: dict[str, Any] = {}
@@ -168,6 +176,14 @@ class BambuddyClient:
         self._refresh_task: asyncio.Task[None] | None = None
         self._publish_handle: asyncio.TimerHandle | None = None
         self._last_failure: str | None = None
+        self._target = WeightTarget(self.printer_id)
+        # slot -> ((spool, total g, remain g), loop time before which that value is not sent again).
+        self._weight_sent: dict[int, tuple[tuple[int, int, int], float]] = {}
+        self._weight_tasks: dict[int, asyncio.Task[None]] = {}
+        self._weight_lock = asyncio.Lock()
+        self._weight_hold: dict[int, float] = {}
+        self._weights_hold_until = 0.0
+        self._weight_timer: asyncio.TimerHandle | None = None
 
     def __repr__(self) -> str:
         return f"BambuddyClient({self.printer.name!r}, printer_id={self.printer_id})"
@@ -197,7 +213,8 @@ class BambuddyClient:
         self._task = asyncio.create_task(self.run())
 
     async def stop(self) -> None:
-        tasks = [t for t in (self._task, self._refresh_task, *self._tasks, *self._inserts.values()) if t is not None]
+        tasks = [t for t in (self._task, self._refresh_task, *self._tasks, *self._inserts.values(),
+                             *self._weight_tasks.values()) if t is not None]
         for task in tasks:
             task.cancel()
         for task in tasks:
@@ -206,9 +223,11 @@ class BambuddyClient:
         self._task = self._refresh_task = None
         self._tasks.clear()
         self._inserts.clear()
-        if self._publish_handle is not None:
-            self._publish_handle.cancel()
-            self._publish_handle = None
+        self._weight_tasks.clear()
+        for handle in (self._publish_handle, self._weight_timer):
+            if handle is not None:
+                handle.cancel()
+        self._publish_handle = self._weight_timer = None
 
     def _spawn(self, coro: Any) -> asyncio.Task[None]:
         task = asyncio.get_running_loop().create_task(coro)
@@ -271,8 +290,22 @@ class BambuddyClient:
         if not isinstance(status, dict):
             raise PrinterCommandError("Bambuddy sent no printer status")
         self._update_name(status.get("name"))
+        if self.weight_sender is not None and self.weight_sender.needs_address:
+            await self._load_target()
         await self._load_assignments(announce=False)
         self._apply_status(status)
+
+    async def _load_target(self) -> None:
+        """The printer's LAN address and serial for the weight command (never logged or published)."""
+        rows = await self._request("GET", "/printers/")
+        row = next((r for r in rows if isinstance(r, dict) and _int(r.get("id")) == self.printer_id), None) \
+            if isinstance(rows, list) else None
+        host = row.get("ip_address") if row else None
+        serial = row.get("serial_number") if row else None
+        self._target = WeightTarget(self.printer_id, host if isinstance(host, str) and host else None,
+                                    serial if isinstance(serial, str) and serial else None)
+        if self._target.host is None or self._target.serial is None:
+            log.warning("%s: Bambuddy gave no printer address; remaining weights are not sent", self.printer.name)
 
     async def _read(self, ws: aiohttp.ClientWebSocketResponse) -> None:
         async for message in ws:
@@ -330,6 +363,9 @@ class BambuddyClient:
                 if _int(row.get("ams_id")) == AMS_3H and slot is not None and 0 <= slot < SLOTS and spool_id:
                     fresh[slot] = spool_id
             old, self._assignments = self._assignments, fresh
+        for slot in set(old) | set(fresh):
+            if old.get(slot) != fresh.get(slot):
+                self._hold_weight(slot)
         if not announce or not self._primed:
             return
         for slot, spool_id in fresh.items():
@@ -354,6 +390,7 @@ class BambuddyClient:
             return
         self._rebuild()
         self._publish_now()
+        self._reconcile_weights()
 
     # ---- state ------------------------------------------------------------------
 
@@ -386,6 +423,8 @@ class BambuddyClient:
         if self._primed:
             for slot, present in presence.items():
                 before = self._present.get(slot)
+                if present != bool(before):
+                    self._hold_weight(slot)
                 if present and before is False:
                     self._on_inserted(slot)
                 elif not present and before:
@@ -401,6 +440,7 @@ class BambuddyClient:
         self._schedule_publish()
         if print_ended:
             self._on_print_end()
+        self._reconcile_weights()
 
     def _rebuild(self) -> None:
         trays = self._trays()
@@ -457,6 +497,7 @@ class BambuddyClient:
         if self._status:
             self._rebuild()
         self._publish_now()
+        self._reconcile_weights()
 
     def _schedule_publish(self) -> None:
         if self.publish_delay <= 0:
@@ -655,6 +696,8 @@ class BambuddyClient:
         spools = set(self._assignments.values())
         self.spool_refresh(spools)
         self._spawn(self._refresh_later(spools))
+        # Spoolman learns the print's usage later; until then its grams are older than the printer's.
+        self._weights_hold_until = self._now() + self.usage_refresh_s + self.settings_check_s
         pending, self._pending_settings = self._pending_settings, set()
         for slot in sorted(pending):
             spool_id = self._assignments.get(slot)
@@ -678,6 +721,107 @@ class BambuddyClient:
             self._notice(f"{lane_name(slot)} settings not resent: {error or 'no reply'}", spool_id=spool_id)
             return
         await self._check_settings(slot, spool_id, retried=True)
+
+    # ---- remaining weight on the printer (MQTT, Bambuddy can't send it) --------------
+
+    def _now(self) -> float:
+        return asyncio.get_running_loop().time()
+
+    def _hold_weight(self, slot: int) -> None:
+        """A slot changed: let Bambuddy's filament settings land first (Bambu Studio sends the weight after them)."""
+        if self.weight_sender is not None:
+            self._weight_hold[slot] = self._now() + self.settings_check_s
+
+    def _wake_weights(self, delay: float) -> None:
+        when = self._now() + max(delay, 0.0) + 0.01
+        if self._weight_timer is not None:
+            if self._weight_timer.when() <= when:
+                return
+            self._weight_timer.cancel()
+        self._weight_timer = asyncio.get_running_loop().call_at(when, self._on_weight_timer)
+
+    def _on_weight_timer(self) -> None:
+        self._weight_timer = None
+        self._reconcile_weights()
+
+    def _desired_weight(self, slot: int) -> tuple[int, int, int] | None:
+        """(spool, total g, remain g) from Spoolman for an untagged spool; the printer tracks RFID spools itself."""
+        tray = self._tray(slot)
+        spool_id = self._assignments.get(slot)
+        if spool_id is None or not spool_present(tray) or tray_tag(tray) is not None or slot in self._pending_settings:
+            return None
+        meta = self.spool_meta(spool_id)
+        if meta is None or meta.archived:
+            return None
+        weights = filament_weight(meta.remaining_g, meta.initial_g)
+        return (spool_id, *weights) if weights is not None else None
+
+    def _reconcile_weights(self) -> None:
+        """Send Spoolman's grams to slots whose `remain` % disagrees, while the printer is idle.
+
+        A value the printer accepted is not sent again until Spoolman's grams change, so the printer's own
+        count-down is never fought; a failed send is retried after `weight_retry_s`.
+        """
+        if self.weight_sender is None or not self.online or self.active or not self._primed:
+            return
+        now = self._now()
+        if now < self._weights_hold_until:
+            self._wake_weights(self._weights_hold_until - now)
+            return
+        wake: float | None = None
+        for slot in range(SLOTS):
+            hold = self._weight_hold.get(slot, 0.0)
+            if now < hold:
+                wake = hold if wake is None else min(wake, hold)
+                continue
+            desired = self._desired_weight(slot)
+            if desired is None or slot in self._weight_tasks:
+                continue
+            _, total, remain = desired
+            if _int(self._tray(slot).get("remain")) == remain_percent(total, remain):
+                continue
+            last = self._weight_sent.get(slot)
+            if last is not None and last[0] == desired and now < last[1]:
+                if last[1] != math.inf:
+                    wake = last[1] if wake is None else min(wake, last[1])
+                continue
+            self._weight_sent[slot] = (desired, math.inf)
+            task = asyncio.get_running_loop().create_task(self._send_weight(slot, desired))
+            self._weight_tasks[slot] = task
+            task.add_done_callback(lambda done, slot=slot: self._weight_tasks.pop(slot, None)
+                                   if self._weight_tasks.get(slot) is done else None)
+        if wake is not None:
+            self._wake_weights(wake - now)
+
+    def _weight_still_wanted(self, slot: int, desired: tuple[int, int, int]) -> bool:
+        now = self._now()
+        return (self.online and not self.active and now >= self._weights_hold_until
+                and now >= self._weight_hold.get(slot, 0.0) and self._desired_weight(slot) == desired)
+
+    async def _send_weight(self, slot: int, desired: tuple[int, int, int]) -> None:
+        # One at a time, and checked again once its turn comes: the slot may hold another spool by then.
+        async with self._weight_lock:
+            await self._send_weight_now(slot, desired)
+        self._wake_weights(0.0)
+
+    async def _send_weight_now(self, slot: int, desired: tuple[int, int, int]) -> None:
+        assert self.weight_sender is not None
+        if not self._weight_still_wanted(slot, desired):
+            if self._weight_sent.get(slot, (None, 0.0))[0] == desired:
+                del self._weight_sent[slot]
+            return
+        spool_id, total, remain = desired
+        what = f"{self.label} {lane_name(slot)}: #{spool_id} {remain} g of {total} g"
+        if not self.writes:
+            log.info("%s: writes off, would send the remaining weight %s", self.printer.name, what)
+            return
+        try:
+            await self.weight_sender.set_filament_weight(self._target, AMS_3H, slot, total, remain)
+        except (PrinterCommandError, PrinterOffline, asyncio.TimeoutError, OSError) as error:
+            self._weight_sent[slot] = (desired, self._now() + self.weight_retry_s)
+            log.warning("%s: remaining weight not sent (%s): %s", self.printer.name, what, error or "no reply")
+            return
+        log.info("%s: remaining weight sent to the printer, %s", self.printer.name, what)
 
     # ---- lane assignment ------------------------------------------------------------
 

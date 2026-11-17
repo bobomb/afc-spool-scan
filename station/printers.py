@@ -11,6 +11,7 @@ from typing import Any
 import aiohttp
 
 from .bambuddy import BambuddyClient
+from .bambu_mqtt import WeightSender
 from .catalog import SpoolMeta
 from .config import BAMBUDDY, DEFAULT_BAMBUDDY_URL, PrinterConfig
 from .moonraker import MoonrakerClient
@@ -80,6 +81,7 @@ class PrinterManager:
         backoff: tuple[float, float] = (1.0, 30.0),
         publish_delay: float = 0.05,
         bambuddy_options: dict[str, float] | None = None,
+        weight_sender: WeightSender | None = None,
     ) -> None:
         urls = urls or {}
         self.names = DisplayNames(names_path)
@@ -95,7 +97,8 @@ class PrinterManager:
                 self.clients[config.key] = BambuddyClient(
                     config, session, writes=writes if bambuddy_writes is None else bambuddy_writes,
                     base_url=bambuddy_url, api_key=bambuddy_api_key, on_notice=on_notice,
-                    spool_refresh=spool_refresh, **common, **(bambuddy_options or {}),
+                    spool_refresh=spool_refresh, weight_sender=weight_sender, **common,
+                    **(bambuddy_options or {}),
                 )
             else:
                 self.clients[config.key] = MoonrakerClient(config, session, writes=writes, url=urls.get(config.key),

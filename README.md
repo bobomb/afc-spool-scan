@@ -222,6 +222,9 @@ include:
   `Name=bambuddy:<id>` per Bambuddy printer, in card order
 - `BAMBUDDY_URL`, `BAMBUDDY_API_KEY` or `BAMBUDDY_API_KEY_FILE`, and
   `BAMBUDDY_WRITES`: the Bambuddy API (keep the key out of the repo)
+- `BAMBU_ACCESS_CODE` or `BAMBU_ACCESS_CODE_FILE`: the Bambu printer's LAN
+  access code, so the station can send Spoolman's remaining grams to the
+  printer's AMS slots (optional; keep it out of the repo)
 
 ## User service
 

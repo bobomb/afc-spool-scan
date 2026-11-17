@@ -7,11 +7,12 @@ from typing import Any
 import aiohttp
 import pytest
 
+from station.bambu_mqtt import WeightTarget
 from station.bambuddy import BambuddyClient, hms_text, slot_of, spool_present, tray_tag
 from station.catalog import meta_from_api
 from station.config import PrinterConfig
 from station.printer_client import LaneLoad, PrinterCommandError, PrinterNotice, PrinterOffline
-from station.sim.bambuddy import SimBambuddy
+from station.sim.bambuddy import SimBambuddy, SimWeightSender
 from station.sim.spoolman import SimSpoolman
 from station.state import PrinterState
 
@@ -49,12 +50,15 @@ class Rig:
         return [body for method, url, body in self.sim.requests if method == "POST" and url == path]
 
 
-async def make_rig(writes: bool = True, api_key: str = KEY, **options: Any) -> tuple[Rig, aiohttp.ClientSession]:
+async def make_rig(writes: bool = True, api_key: str = KEY, sim_weights: bool = False,
+                   **options: Any) -> tuple[Rig, aiohttp.ClientSession]:
     spoolman = SimSpoolman()
     sim = SimBambuddy.from_fixtures({1: "hotel"}, spool_lookup=spoolman.get, api_key=KEY, auto_unassign_s=0.1)
     url = await sim.start()
     session = aiohttp.ClientSession()
     holder: list[Rig] = []
+    if sim_weights:
+        options["weight_sender"] = SimWeightSender(sim)
     client = BambuddyClient(
         PrinterConfig("Hotel", "bambuddy", 0, kind="bambuddy", bambuddy_printer_id=1), session,
         on_change=lambda state: holder[0].published.append(state) if holder else None, writes=writes,
@@ -330,3 +334,134 @@ async def test_hms_warning_is_the_printer_error(rig: Rig) -> None:
     await wait_until(lambda: rig.client.state.afc_error == "AMS slot 4 is stuck")
     await rig.sim.set_hms(1, None)
     await wait_until(lambda: rig.client.state.afc_error is None)
+
+
+# ---- remaining weight on the printer (dev plan §6.7) ---------------------------------
+
+
+class RecordingSender:
+    needs_address = True
+
+    def __init__(self, error: Exception | None = None, *, fail_times: int | None = None,
+                 delay: float = 0.0) -> None:
+        self.error = error
+        self.fail_times = fail_times
+        self.delay = delay
+        self.calls: list[tuple[WeightTarget, int, int, int, int]] = []
+
+    async def set_filament_weight(self, target: WeightTarget, ams_id: int, slot: int, total: int,
+                                  remain: int) -> None:
+        self.calls.append((target, ams_id, slot, total, remain))
+        await asyncio.sleep(self.delay)
+        if self.error is not None and (self.fail_times is None or len(self.calls) <= self.fail_times):
+            raise self.error
+
+
+async def close_rig(rig: Rig, session: aiohttp.ClientSession) -> None:
+    await rig.client.stop()
+    await session.close()
+    await rig.sim.stop()
+
+
+UNTAGGED = [(1, 2, 1000, 760), (1, 6, 1000, 530), (1, 7, 1000, 640), (1, 8, 1000, 300)]
+
+
+async def test_idle_printer_gets_spoolmans_grams_for_untagged_slots() -> None:
+    rig, session = await make_rig(sim_weights=True)
+    try:
+        await wait_until(lambda: rig.client.online)
+        await asyncio.sleep(0.2)
+        assert rig.sim.weights == [], "nothing is sent while the printer prints"
+        await rig.sim.set_print(1, "IDLE")
+        await wait_until(lambda: len(rig.sim.weights) == len(UNTAGGED))
+        assert sorted(rig.sim.weights) == UNTAGGED
+        assert rig.printer.tray(2)["remain"] == 76 and rig.printer.tray(0)["remain"] == 80
+        await rig.sim.set_hms(1, None)
+        rig.client.refresh()
+        await asyncio.sleep(0.1)
+        assert len(rig.sim.weights) == len(UNTAGGED), "a slot that already shows the grams is left alone"
+        rig.spoolman.patch(103, {"remaining_weight": 500})
+        rig.client.refresh()
+        await wait_until(lambda: rig.sim.weights[-1] == (1, 2, 1000, 500))
+        assert rig.printer.tray(2)["remain"] == 50
+    finally:
+        await close_rig(rig, session)
+
+
+async def test_inserted_spool_gets_its_weight_after_the_assignment() -> None:
+    rig, session = await make_rig(sim_weights=True)
+    try:
+        await wait_until(lambda: rig.client.online)
+        await rig.sim.set_print(1, "IDLE")
+        await wait_until(lambda: len(rig.sim.weights) == len(UNTAGGED))
+        await rig.client.set_next_spool(97)
+        await rig.sim.insert(1, 3, material="PLA", color="FFFFFF")
+        await wait_until(lambda: bool(rig.loads))
+        await wait_until(lambda: rig.sim.weights[-1] == (1, 3, 1000, 455))
+        assert rig.printer.tray(3)["remain"] == 45
+    finally:
+        await close_rig(rig, session)
+
+
+async def test_no_weight_with_writes_off() -> None:
+    rig, session = await make_rig(writes=False, sim_weights=True)
+    try:
+        await wait_until(lambda: rig.client.online)
+        await rig.sim.set_print(1, "IDLE")
+        await asyncio.sleep(0.3)
+        assert rig.sim.weights == []
+    finally:
+        await close_rig(rig, session)
+
+
+async def test_mqtt_sender_gets_the_address_and_a_refusal_is_not_repeated() -> None:
+    sender = RecordingSender(error=PrinterCommandError("the printer refused it"))
+    rig, session = await make_rig(weight_sender=sender, weight_retry_s=60)
+    try:
+        await wait_until(lambda: rig.client.online)
+        await rig.sim.set_print(1, "IDLE")
+        await wait_until(lambda: len(sender.calls) == len(UNTAGGED))
+        target, ams_id = sender.calls[0][:2]
+        assert (target.printer_id, target.host, target.serial, ams_id) == (1, "192.0.2.31", "SIM000000000001", 32)
+        assert "192.0.2.31" not in repr(target)
+        await rig.sim.set_hms(1, None)
+        rig.client.refresh()
+        await asyncio.sleep(0.1)
+        assert len(sender.calls) == len(UNTAGGED)
+    finally:
+        await close_rig(rig, session)
+
+
+async def test_failed_weights_are_retried_while_the_printer_stays_idle() -> None:
+    sender = RecordingSender(error=PrinterOffline("unreachable"), fail_times=len(UNTAGGED))
+    rig, session = await make_rig(weight_sender=sender, weight_retry_s=0.2)
+    try:
+        await wait_until(lambda: rig.client.online)
+        await rig.sim.set_print(1, "IDLE")
+        await wait_until(lambda: len(sender.calls) == 2 * len(UNTAGGED))
+        assert sorted(call[2:] for call in sender.calls[len(UNTAGGED):]) == [w[1:] for w in UNTAGGED]
+        await asyncio.sleep(0.3)
+        assert len(sender.calls) == 2 * len(UNTAGGED), "an accepted weight is not sent again"
+    finally:
+        await close_rig(rig, session)
+
+
+async def test_a_queued_weight_is_dropped_when_its_slot_changes() -> None:
+    sender = RecordingSender(delay=0.15)
+    rig, session = await make_rig(weight_sender=sender)
+    try:
+        await wait_until(lambda: rig.client.online)
+        await rig.sim.set_print(1, "IDLE")
+        await wait_until(lambda: bool(sender.calls))
+        await rig.sim.eject(1, 8)
+        await rig.client.set_next_spool(97)
+        await rig.sim.insert(1, 8, material="PLA", color="FFFFFF")
+        await wait_until(lambda: any(call[2:] == (8, 1000, 455) for call in sender.calls))
+        assert (8, 1000, 300) not in [call[2:] for call in sender.calls], "#107's grams never reach #97's slot"
+    finally:
+        await close_rig(rig, session)
+
+
+async def test_station_sends_weights_through_the_simulator(station3: Any) -> None:
+    await station3.sim_bambuddy.set_print(1, "IDLE")
+    await wait_until(lambda: sorted(station3.sim_bambuddy.weights) == UNTAGGED)

@@ -80,6 +80,8 @@ class Config:
     bambuddy_api_key: str = field(default="", repr=False)
     # None follows `writes`; set to keep Bambuddy read-only while Moonraker writes (or the reverse).
     bambuddy_writes: bool | None = None
+    # The Bambu printer's LAN access code, for the remaining-weight MQTT command Bambuddy doesn't send.
+    bambu_access_code: str = field(default="", repr=False)
 
     def writes_enabled(self, service: str) -> bool:
         """Simulated services are in-memory, so --writes only guards live ones."""
@@ -181,23 +183,28 @@ def parse_printers(spec: str, default_port: int = DEFAULT_MOONRAKER_PORT) -> tup
     return tuple(printers)
 
 
-def read_api_key(values: Mapping[str, str]) -> str:
-    """BAMBUDDY_API_KEY, else the BAMBUDDY_API_KEY line of BAMBUDDY_API_KEY_FILE (an env-style file)."""
-    key = values.get("BAMBUDDY_API_KEY", "").strip()
-    if key:
-        return key
-    path_text = values.get("BAMBUDDY_API_KEY_FILE", "").strip()
+def read_secret(values: Mapping[str, str], name: str) -> str:
+    """`name`, else the `name` line of `name`_FILE (an env-style file such as Bambuddy's secrets.env)."""
+    value = values.get(name, "").strip()
+    if value:
+        return value
+    path_text = values.get(f"{name}_FILE", "").strip()
     if not path_text:
         return ""
     path = Path(path_text).expanduser()
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as error:
-        raise ConfigError(f"BAMBUDDY_API_KEY_FILE {path_text!r} cannot be read: {error.strerror}") from error
-    key = parse_env_text(text).get("BAMBUDDY_API_KEY", "").strip()
-    if not key:
-        raise ConfigError(f"BAMBUDDY_API_KEY_FILE {path_text!r} has no BAMBUDDY_API_KEY line")
-    return key
+        raise ConfigError(f"{name}_FILE {path_text!r} cannot be read: {error.strerror}") from error
+    value = parse_env_text(text).get(name, "").strip()
+    if not value:
+        raise ConfigError(f"{name}_FILE {path_text!r} has no {name} line")
+    return value
+
+
+def read_api_key(values: Mapping[str, str]) -> str:
+    """BAMBUDDY_API_KEY, else the BAMBUDDY_API_KEY line of BAMBUDDY_API_KEY_FILE (an env-style file)."""
+    return read_secret(values, "BAMBUDDY_API_KEY")
 
 
 def _choice(values: Mapping[str, str], key: str, choices: Sequence[str]) -> str:
@@ -307,6 +314,7 @@ def load_config(
     printers_mode = _choice(values, "STATION_PRINTERS", ("sim", "live"))
     has_bambuddy = any(printer.kind == BAMBUDDY for printer in printers)
     api_key = read_api_key(values) if has_bambuddy and printers_mode == "live" else ""
+    access_code = read_secret(values, "BAMBU_ACCESS_CODE") if has_bambuddy and printers_mode == "live" else ""
 
     config = Config(
         hardware=_choice(values, "STATION_HARDWARE", ("sim", "real")),
@@ -333,6 +341,7 @@ def load_config(
         bambuddy_url=values.get("BAMBUDDY_URL", DEFAULT_BAMBUDDY_URL).strip().rstrip("/") or DEFAULT_BAMBUDDY_URL,
         bambuddy_api_key=api_key,
         bambuddy_writes=bambuddy_writes,
+        bambu_access_code=access_code,
     )
     return config
 

@@ -16,6 +16,7 @@ from . import __version__
 from .actions import Actions
 from .activity import ActivityLog
 from .audio import Audio
+from .bambu_mqtt import MqttWeightSender, WeightSender
 from .catalog import SpoolCatalog
 from .config import BAMBUDDY, Config
 from .ipc import PROTOCOL, IpcServer
@@ -28,7 +29,7 @@ from .scanflow import ScanFlow
 from .scanner.sim import SimScanner
 from .settings import Settings
 from .sim.bambuddy import FIXTURES as BAMBUDDY_FIXTURES
-from .sim.bambuddy import SimBambuddy
+from .sim.bambuddy import SimBambuddy, SimWeightSender
 from .sim.printers import FIXTURES as PRINTER_FIXTURES
 from .sim.printers import SimPrinterServer
 from .sim.spoolman import SimSpoolman, load_spool_fixtures
@@ -188,6 +189,14 @@ class Station:
         self.spoolman = SpoolmanClient(spoolman_url, self.session, writes=config.writes_enabled("spoolman"),
                                        on_health=self._on_spoolman_health)
         self.catalog = SpoolCatalog(self.spoolman, self._on_catalog_update)
+        weight_sender: WeightSender | None = None
+        if self.sim_bambuddy is not None:
+            weight_sender = SimWeightSender(self.sim_bambuddy)
+        elif bambu and config.bambu_access_code:
+            weight_sender = MqttWeightSender(config.bambu_access_code)
+        elif bambu:
+            log.info("No BAMBU_ACCESS_CODE: remaining weights are not sent to %s",
+                     ", ".join(p.name for p in bambu))
         self.printers = PrinterManager(
             config.printers, self.session, on_change=self.store.set_printer,
             writes=config.writes_enabled("printers"), low_stock_g=lambda: self.settings["low_stock_g"],
@@ -195,7 +204,7 @@ class Station:
             spool_refresh=self._refresh_spools, names_path=config.state_dir / "printer_names.json", urls=urls,
             bambuddy_url=bambuddy_url, bambuddy_api_key=config.bambuddy_api_key,
             bambuddy_writes=config.writes_enabled(BAMBUDDY), backoff=self.printer_backoff,
-            publish_delay=self.publish_delay, bambuddy_options=self.bambuddy_options,
+            publish_delay=self.publish_delay, bambuddy_options=self.bambuddy_options, weight_sender=weight_sender,
         )
         self._create_hardware()
         assert self.scale is not None

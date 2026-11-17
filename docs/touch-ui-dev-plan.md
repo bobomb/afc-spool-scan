@@ -128,6 +128,7 @@ only), so the `station/` directory must stay next to it.
 | `PRINTERS` | `Name=host:port,…` (order = card order, left to right); `Name=bambuddy:<printer id>` is a Bambu printer behind Bambuddy | `Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125` | same |
 | `BAMBUDDY_URL` | URL | `http://127.0.0.1:8010` | same |
 | `BAMBUDDY_API_KEY` / `BAMBUDDY_API_KEY_FILE` | key, or an env-style file with a `BAMBUDDY_API_KEY=` line (e.g. Bambuddy's `secrets.env`) | — | — |
+| `BAMBU_ACCESS_CODE` / `BAMBU_ACCESS_CODE_FILE` | the Bambu printer's LAN access code, or an env-style file with a `BAMBU_ACCESS_CODE=` line; enables the remaining-weight command (§6.7) | — | — (the simulator needs none) |
 | `--bambuddy-writes` / `BAMBUDDY_WRITES` | `on`, `off` | follows `--writes` | follows `--writes` |
 
 Precedence: platform defaults < `config.env` < environment < CLI flags.
@@ -148,7 +149,10 @@ Precedence: platform defaults < `config.env` < environment < CLI flags.
   local) and an insertion is logged as "Dry run: would assign …".
 - The Bambuddy API key is never logged or shown (`Config` hides it from
   `repr`); keep it in the git-ignored `config.env` or point
-  `BAMBUDDY_API_KEY_FILE` at Bambuddy's own secrets file.
+  `BAMBUDDY_API_KEY_FILE` at Bambuddy's own secrets file. The same goes for
+  `BAMBU_ACCESS_CODE`; the printer's LAN address and serial (read from
+  Bambuddy) are never logged or published either. `BAMBUDDY_WRITES` also
+  guards the remaining-weight command.
 - Never enable `--writes on` against the real printers from Windows except for
   a deliberate test with a known spare spool.
 - Tests never touch the network; they use mocks and fixtures.
@@ -417,8 +421,41 @@ Product plan §6.4 has the endpoints and decided behaviour. Implementation
 - `scripts/capture-fixtures.py --bambuddy [--bambuddy-ws-seconds N]` records
   status, assignments and the websocket read-only, scrubbed by
   `scrub_capture` (no serials, IPs, tokens, access codes, real tag IDs, file
-  names or names); `tests/test_placeholder_hosts.py` rejects `bb_…` API keys
-  and quoted serial/access-code/IP fields in tracked files.
+  names or names); `tests/test_placeholder_hosts.py` rejects `bb_…` API keys,
+  `BAMBU_ACCESS_CODE=` values that look like a code and quoted serial/access-code/IP
+  fields in tracked files.
+
+### 6.7 Remaining weight on a Bambu printer (MQTT)
+
+Product plan §6.4. Bambuddy 1.3.1 sends `ams_filament_setting` for a slot
+assignment but not the weight, and API keys never see the access code, so
+the station sends it itself (`station/bambu_mqtt.py`):
+
+- Command (from Bambu Studio's `DevFilaSystem::CtrlSetFilamentWeight`):
+  `{"print": {"command": "set_filament_weight", "sequence_id", "ams_id": 32,
+  "slot_id": n, "total": g, "remain": g, "src_id": 1}}` on
+  `device/<serial>/request`; the reply (`result: "success"`) comes on
+  `device/<serial>/report`. Limits 1–10000 g, remain ≤ total. The printer
+  then reports `remain` = ⌊remain × 100 / total⌋.
+- `MqttWeightSender`: one TLS connection per command (port 8883, user
+  `bblp`, the access code; self-signed certificate not verified), so it
+  never holds one of the printer's MQTT connections. Host and serial come
+  from Bambuddy's `GET /printers/` when the client connects.
+- `BambuddyClient._reconcile_weights`: for each present, untagged, assigned
+  slot without pending settings, `total` = Spoolman's initial weight and
+  `remain` = its remaining grams; sent when the tray's `remain` % differs.
+  Only while the printer is idle and online; a slot is held for
+  `settings_check_s` after its assignment or presence changes (settings
+  first, like Bambu Studio), and every slot for `usage_refresh_s +
+  settings_check_s` after a print ends (Spoolman learns the usage later).
+  Sends go one at a time and are checked again just before they go out, so
+  a slot that changed meanwhile never gets the old spool's grams. A value
+  the printer accepted is not sent again until Spoolman's grams change (the
+  printer's own count-down is never fought); a failed send is retried after
+  5 minutes. Runs on status pushes and catalog updates, so a weigh or a
+  print's usage reaches the printer.
+- Simulator: `SimWeightSender` sets the tray's `remain` in `SimBambuddy`
+  (`weights` records the commands).
 
 ## 7. UI design notes
 
@@ -674,6 +711,9 @@ within a phase unless noted. Each task ends with tests/build passing.
   `station/sim/fixtures/captured/bambuddy/hotel.json` (+ `.ws.jsonl`) and
   replayed by `tests/test_captured_fixtures.py`. Remaining: writes on and
   the acceptance test with the user at the printer.*
+- [ ] **B11** Remaining weight on the H3C (open question 14): station sends
+  `set_filament_weight` over MQTT (§6.7, `BAMBU_ACCESS_CODE`); Bambuddy issue
+  and PR to send it with slot assignments.
 
 ### C — Continuous integration (optional)
 
@@ -888,6 +928,7 @@ Append dated notes here (verified API details, gotchas, measurements).
   after `ams_filament_setting` succeeds; the printer then reports `remain`
   in % and counts it down while printing. Setting 965 g of 1000 g on slot
   3H-1 by hand gave `remain: 96`. Bambuddy has no API for it, so the
-  station would need it upstream in Bambuddy or its own MQTT connection
-  (the printer runs in developer mode). Bambuddy's weight sync is on but
-  left Spoolman's 966 g unchanged.
+  station sends it over its own short MQTT connection (§6.7, task B11; the
+  printer runs in developer mode), and a Bambuddy issue and PR propose it
+  upstream. Bambuddy's weight sync is on but left Spoolman's 966 g
+  unchanged.
