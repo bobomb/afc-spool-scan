@@ -605,8 +605,8 @@ class BambuddyClient:
                 return
             assigned = self._assignments.get(slot)
             tag = tray_tag(self._tray(slot))
-            # Bambuddy keeps a slot's assignment for 120 s after the slot empties, so an assignment only shows
-            # which RFID spool is in the slot when that spool carries the slot's tag.
+            # Bambuddy keeps a slot's assignment for 120 s after the slot empties, and through a print, so an
+            # assignment only shows which RFID spool is in the slot when that spool carries the slot's tag.
             if tag is not None and assigned is not None and self._known_tag(assigned) == tag:
                 if assigned != armed:
                     self._notice(f"{self.label} {lane} holds #{assigned} (RFID), not #{armed}; "
@@ -618,7 +618,9 @@ class BambuddyClient:
             learned = tag is not None and self._known_tag(armed) != tag
             if learned and tag is not None and not await self._link_tag(slot, tag, armed):
                 return
-            await self._assign_inserted(slot, armed, previous=assigned, linked=learned)
+            # The slot was empty a moment ago, so any assignment Bambuddy still holds there is a leftover: undo
+            # clears the slot rather than restoring it (live 2026-11-19: undo put the same spool back).
+            await self._assign_inserted(slot, armed, previous=None, linked=learned)
 
     def _known_tag(self, spool_id: int) -> str | None:
         meta = self.spool_meta(spool_id)

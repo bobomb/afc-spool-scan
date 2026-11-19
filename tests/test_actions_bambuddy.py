@@ -54,6 +54,21 @@ async def test_inserting_into_the_bambu_slot_assigns_and_clears_the_others(stati
         station3.sim_bambuddy.requests  # type: ignore[union-attr]
 
 
+async def test_undo_clears_a_slot_whose_old_assignment_bambuddy_still_held(station3: Station) -> None:
+    # Live 2026-11-19: #83 was still assigned to its empty slot from a print, went back in, and undo put it back.
+    await act(station3, "sim.printer", printer="hotel", op="eject", lane="3H-3")
+    await wait_until(lambda: not hotel_lane(station3, "3H-3").prep)
+    assert station3.sim_bambuddy.printers[1].assignments[2] == 103  # type: ignore[union-attr]
+    await act(station3, "load", spool_id=103)
+    await act(station3, "sim.printer", printer="hotel", op="insert", lane="3H-3", material="PETG", color="FF6A13")
+    await wait_until(lambda: station3.store.activity[0]["action"] == "spool_loaded")
+    undone = await act(station3, "undo", activity_id=station3.store.activity[0]["id"])
+    assert undone["ok"] and undone["message"] == "Undid automatic load of spool 103"
+    await wait_until(lambda: hotel_lane(station3, "3H-3").spool_id is None)
+    assert 2 not in station3.sim_bambuddy.printers[1].assignments  # type: ignore[union-attr]
+    assert pending(station3) == {"kilo": 103, "yankee": 103, "hotel": 103}
+
+
 async def test_a_powered_off_bambu_printer_is_skipped_quietly(station3: Station) -> None:
     await act(station3, "sim.printer", printer="hotel", op="power_off")
     await wait_until(lambda: station3.store.printers["hotel"].off)

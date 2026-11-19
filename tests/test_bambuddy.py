@@ -279,7 +279,7 @@ async def test_new_rfid_spool_in_a_slot_still_held_for_the_previous_spool() -> N
         await rig.sim.insert(1, 1, tray_uuid=UNKNOWN_TAG)
         await wait_until(lambda: bool(rig.loads))
         assert rig.notices == []
-        assert rig.loads[0].note == "assigned #97 to Heron 3H-2 (RFID tag learned)" and rig.loads[0].previous == 102
+        assert rig.loads[0].note == "assigned #97 to Heron 3H-2 (RFID tag learned)" and rig.loads[0].previous is None
         assert rig.sim.tags[UNKNOWN_TAG] == 97 and rig.printer.assignments[1] == 97
         assert rig.client.state.pending_spool is None
     finally:
