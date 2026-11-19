@@ -50,10 +50,11 @@ class Rig:
         return [body for method, url, body in self.sim.requests if method == "POST" and url == path]
 
 
-async def make_rig(writes: bool = True, api_key: str = KEY, sim_weights: bool = False,
+async def make_rig(writes: bool = True, api_key: str = KEY, sim_weights: bool = False, auto_unassign_s: float = 0.1,
                    **options: Any) -> tuple[Rig, aiohttp.ClientSession]:
     spoolman = SimSpoolman()
-    sim = SimBambuddy.from_fixtures({1: "hotel"}, spool_lookup=spoolman.get, api_key=KEY, auto_unassign_s=0.1)
+    sim = SimBambuddy.from_fixtures({1: "hotel"}, spool_lookup=spoolman.get, api_key=KEY,
+                                    auto_unassign_s=auto_unassign_s, spool_tagger=spoolman.set_tag)
     url = await sim.start()
     session = aiohttp.ClientSession()
     holder: list[Rig] = []
@@ -264,6 +265,35 @@ async def test_rfid_tag_of_another_spool_is_not_assigned(rig: Rig) -> None:
     await wait_until(lambda: bool(rig.notices))
     assert "belongs to another spool" in rig.notices[0].message and "#97 not assigned" in rig.notices[0].message
     assert rig.posts() == [] and rig.client.state.pending_spool == 97
+
+
+async def test_new_rfid_spool_in_a_slot_still_held_for_the_previous_spool() -> None:
+    # Live 2026-11-18: #18 (RFID) out of 3H-7, #19 (unknown tag) in while Bambuddy still held #18 there.
+    rig, session = await make_rig(auto_unassign_s=30.0)
+    try:
+        await wait_until(lambda: rig.client.online)
+        await rig.client.set_next_spool(97)
+        await rig.sim.eject(1, 1)
+        await wait_until(lambda: not rig.client.lane("3H-2").prep)
+        assert rig.printer.assignments[1] == 102
+        await rig.sim.insert(1, 1, tray_uuid=UNKNOWN_TAG)
+        await wait_until(lambda: bool(rig.loads))
+        assert rig.notices == []
+        assert rig.loads[0].note == "assigned #97 to Heron 3H-2 (RFID tag learned)" and rig.loads[0].previous == 102
+        assert rig.sim.tags[UNKNOWN_TAG] == 97 and rig.printer.assignments[1] == 97
+        assert rig.client.state.pending_spool is None
+    finally:
+        await close_rig(rig, session)
+
+
+async def test_held_spool_is_reinserted_with_its_own_tag(rig: Rig) -> None:
+    await rig.client.set_next_spool(102)
+    await rig.sim.eject(1, 1)
+    await wait_until(lambda: not rig.client.lane("3H-2").prep)
+    await rig.sim.insert(1, 1, tray_uuid="B2" * 16)
+    await wait_until(lambda: rig.client.state.pending_spool is None)
+    assert rig.loads[-1].spool_id == 102 and not rig.loads[-1].assigned
+    assert [m for m, _, _ in rig.sim.requests if m == "PATCH"] == []
 
 
 async def test_settings_refused_while_printing_are_sent_again_after_the_print(rig: Rig) -> None:
@@ -487,3 +517,20 @@ async def test_a_queued_weight_is_dropped_when_its_slot_changes() -> None:
 async def test_station_sends_weights_through_the_simulator(station3: Any) -> None:
     await station3.sim_bambuddy.set_print(1, "IDLE")
     await wait_until(lambda: sorted(station3.sim_bambuddy.weights) == SYNCED)
+
+
+async def test_no_weight_for_a_slot_that_holds_another_rfid_spool() -> None:
+    rig, session = await make_rig(sim_weights=True, auto_unassign_s=30.0)
+    try:
+        await wait_until(lambda: rig.client.online)
+        await rig.sim.eject(1, 1)
+        await wait_until(lambda: not rig.client.lane("3H-2").prep)
+        await rig.sim.insert(1, 1, tray_uuid=UNKNOWN_TAG)
+        assert rig.printer.assignments[1] == 102
+        await rig.sim.set_print(1, "IDLE")
+        expected = [w for w in SYNCED if w[1] != 1]
+        await wait_until(lambda: sorted(rig.sim.weights) == expected)
+        await asyncio.sleep(0.2)
+        assert all(w[1] != 1 for w in rig.sim.weights), "#102's grams never go to the spool now in 3H-2"
+    finally:
+        await close_rig(rig, session)

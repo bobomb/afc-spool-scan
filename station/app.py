@@ -183,6 +183,7 @@ class Station:
                 self.sim_bambuddy = SimBambuddy.from_fixtures(
                     {p.bambuddy_printer_id or 0: p.key for p in bambu}, spool_lookup=lookup,
                     directory=bambuddy_fixtures,
+                    spool_tagger=self.sim_spoolman.set_tag if self.sim_spoolman else None,
                 )
                 bambuddy_url = await self.sim_bambuddy.start()
 

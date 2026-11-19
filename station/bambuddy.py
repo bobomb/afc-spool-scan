@@ -605,7 +605,9 @@ class BambuddyClient:
                 return
             assigned = self._assignments.get(slot)
             tag = tray_tag(self._tray(slot))
-            if tag is not None and assigned is not None:
+            # Bambuddy keeps a slot's assignment for 120 s after the slot empties, so an assignment only shows
+            # which RFID spool is in the slot when that spool carries the slot's tag.
+            if tag is not None and assigned is not None and self._known_tag(assigned) == tag:
                 if assigned != armed:
                     self._notice(f"{self.label} {lane} holds #{assigned} (RFID), not #{armed}; "
                                  f"#{armed} stays next spool", spool_id=armed)
@@ -613,9 +615,14 @@ class BambuddyClient:
                     self._disarm(armed)
                     self.on_lane_loaded(LaneLoad(self.key, lane, armed, previous=assigned))
                 return
-            if tag is not None and not await self._link_tag(slot, tag, armed):
+            learned = tag is not None and self._known_tag(armed) != tag
+            if learned and tag is not None and not await self._link_tag(slot, tag, armed):
                 return
-            await self._assign_inserted(slot, armed, previous=assigned, linked=tag is not None)
+            await self._assign_inserted(slot, armed, previous=assigned, linked=learned)
+
+    def _known_tag(self, spool_id: int) -> str | None:
+        meta = self.spool_meta(spool_id)
+        return meta.tag if meta is not None else None
 
     async def _link_tag(self, slot: int, tag: str, spool_id: int) -> bool:
         """An RFID spool Spoolman doesn't know yet: record its tag on the scanned spool (learned for next time)."""
@@ -634,6 +641,7 @@ class BambuddyClient:
             self._notice(f"RFID tag in {lane_name(slot)} not linked to #{spool_id}: {error or 'no reply'}",
                          spool_id=spool_id)
             return False
+        self.spool_refresh([spool_id])
         return True
 
     async def _assign_inserted(self, slot: int, spool_id: int, *, previous: int | None, linked: bool) -> None:
@@ -764,7 +772,10 @@ class BambuddyClient:
         meta = self.spool_meta(spool_id)
         if meta is None or meta.archived:
             return None
-        cap = MAX_RFID_REMAIN_GRAMS if tray_tag(tray) is not None else MAX_GRAMS
+        tag = tray_tag(tray)
+        if tag is not None and meta.tag is not None and meta.tag != tag:
+            return None  # another RFID spool sits in the slot; its assignment is a leftover
+        cap = MAX_RFID_REMAIN_GRAMS if tag is not None else MAX_GRAMS
         weights = filament_weight(meta.remaining_g, meta.initial_g, cap)
         return (spool_id, *weights) if weights is not None else None
 

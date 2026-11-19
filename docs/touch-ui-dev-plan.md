@@ -407,6 +407,13 @@ Product plan §6.4 has the endpoints and decided behaviour. Implementation
   slot is reported as `LaneLoad` like AFC loading a lane.
 - `data.connected == false` → `off` (printer switched off); Bambuddy
   unreachable → offline. Both disarm.
+- An RFID spool counts as Bambuddy's match only when the slot's assigned
+  spool carries the tray's tag (Spoolman `extra.tag`, a JSON-encoded
+  `tray_uuid`). Bambuddy keeps a slot's assignment for 120 s after the slot
+  empties, so any other assignment there belongs to the previous spool: the
+  tag is linked to the armed spool and the armed spool assigned. Weights
+  are never sent to a slot whose tag belongs to a spool other than the one
+  assigned there.
 - Settings-pending slots are re-sent once when the print ends (state leaves
   RUNNING/PREPARE/SLICING/PAUSE); the same edge refreshes every assigned
   spool in the catalog right away and again 30 s later, after Bambuddy has
@@ -716,6 +723,13 @@ within a phase unless noted. Each task ends with tests/build passing.
   `station/sim/fixtures/captured/bambuddy/hotel.json` (+ `.ws.jsonl`) and
   replayed by `tests/test_captured_fixtures.py`. Remaining: writes on and
   the acceptance test with the user at the printer.*
+  *2026-11-18: writes on since 2026-11-16; untagged loads into an empty
+  slot while idle passed (#78, #34, #41, #59). Known RFID spool during a
+  print passed (#18 into 3H-7). An RFID spool with an unknown tag (#19) put
+  into 3H-7 within 120 s of #18 coming out was refused as "holds #18
+  (RFID)": Bambuddy's held assignment was taken for an RFID match. Fixed by
+  comparing the assigned spool's tag with the tray's. The rest of the
+  acceptance list (session file `h3c-acceptance-tests.md`) is still to run.*
 - [x] **B11** Remaining weight on the H3C (open question 14): station sends
   `set_filament_weight` over MQTT (§6.7, `BAMBU_ACCESS_CODE`); Bambuddy issue
   and PR to send it with slot assignments.

@@ -94,6 +94,13 @@ def test_meta_falls_back_to_filament_weight() -> None:
     assert (meta.remaining_g, meta.archived, meta.material) == (0.0, True, "PETG")
 
 
+def test_meta_reads_the_rfid_tag_spoolman_keeps_json_encoded() -> None:
+    assert meta_from_api({"extra": {"tag": '"ab12cd"'}, "filament": {}}).tag == "AB12CD"
+    assert meta_from_api({"extra": {"tag": ""}, "filament": {}}).tag is None
+    assert meta_from_api({"extra": {"tag": "42"}, "filament": {}}).tag is None
+    assert meta_from_api({"filament": {}}).tag is None
+
+
 def test_get_without_event_loop_returns_cached_only() -> None:
     catalog = SpoolCatalog(SpoolmanClient("http://127.0.0.1:9/api/v1", None, writes=False),  # type: ignore[arg-type]
                            lambda: None)

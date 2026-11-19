@@ -426,7 +426,7 @@
       "used_weight": 80.0,
       "location": "Hotel",
       "archived": false,
-      "extra": {}
+      "extra": {"tag": "\"A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1A1\""}
     },
     {
       "id": 102,
@@ -460,7 +460,7 @@
       "used_weight": 590.0,
       "location": "Hotel",
       "archived": false,
-      "extra": {}
+      "extra": {"tag": "\"B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2B2\""}
     },
     {
       "id": 103,
@@ -528,7 +528,7 @@
       "used_weight": 912.0,
       "location": "Hotel",
       "archived": false,
-      "extra": {}
+      "extra": {"tag": "\"C3C3C3C3C3C3C3C3C3C3C3C3C3C3C3C3\""}
     },
     {
       "id": 105,

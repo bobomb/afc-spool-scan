@@ -4,6 +4,7 @@ background."""
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from collections.abc import Callable, Iterable
@@ -28,6 +29,20 @@ class SpoolMeta:
     material: str | None = None
     remaining_g: float | None = None
     archived: bool = False
+    # Bambu RFID tray UUID linked to the spool (Spoolman extra.tag), upper case.
+    tag: str | None = None
+
+
+def spool_tag(data: dict[str, Any]) -> str | None:
+    """Spoolman keeps extra fields JSON-encoded, so the tag is a quoted string."""
+    raw = (data.get("extra") or {}).get("tag")
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        value = raw
+    return value.strip().upper() or None if isinstance(value, str) else None
 
 
 def meta_from_api(data: dict[str, Any]) -> SpoolMeta:
@@ -41,6 +56,7 @@ def meta_from_api(data: dict[str, Any]) -> SpoolMeta:
         material=material.strip() or None if isinstance(material, str) else None,
         remaining_g=round(max(remaining, 0.0), 1) if remaining is not None else None,
         archived=bool(data.get("archived")),
+        tag=spool_tag(data),
     )
 
 

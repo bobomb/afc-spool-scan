@@ -120,9 +120,11 @@ class SimBambuddy:
         tags: dict[str, int] | None = None,
         auto_unassign_s: float = 120.0,
         rfid_delay_s: float = 0.0,
+        spool_tagger: Callable[[int, str], None] | None = None,
     ) -> None:
         self.printers = printers
         self.spool_lookup = spool_lookup
+        self.spool_tagger = spool_tagger
         self.api_key = api_key
         self.tags: dict[str, int] = {k.upper(): v for k, v in (tags or {}).items()}
         self.auto_unassign_s = auto_unassign_s
@@ -402,6 +404,8 @@ class SimBambuddy:
             return _error(409, {"code": "tag_already_linked", "field": field, "spool_id": holder,
                                 "message": f"{field} is already linked to spool {holder}"})
         self.tags[tag] = spool_id
+        if self.spool_tagger is not None:
+            self.spool_tagger(spool_id, tag)
         return web.json_response({"id": spool_id, "tag": tag})
 
     async def _ws_token(self, request: web.Request) -> web.Response:

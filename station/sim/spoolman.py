@@ -44,6 +44,12 @@ class SimSpoolman:
         spool = self.spools.get(spool_id)
         return copy.deepcopy(spool) if spool else None
 
+    def set_tag(self, spool_id: int, tag: str) -> None:
+        """What Bambuddy writes when it links an RFID tag: extra.tag, JSON-encoded like every Spoolman extra."""
+        spool = self.spools.get(spool_id)
+        if spool is not None:
+            spool.setdefault("extra", {})["tag"] = json.dumps(tag.upper())
+
     def _initial(self, spool: dict[str, Any]) -> float | None:
         initial = spool.get("initial_weight")
         if not initial:
