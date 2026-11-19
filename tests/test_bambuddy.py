@@ -300,7 +300,7 @@ async def test_settings_refused_while_printing_are_sent_again_after_the_print(ri
     await rig.client.set_next_spool(97)
     await rig.sim.insert(1, 3)
     await wait_until(lambda: rig.client.lane("3H-4").spool_id == 97)
-    assert rig.client.lane("3H-4").settings_pending
+    await wait_until(lambda: rig.client.lane("3H-4").settings_pending)
     assert rig.printer.refused == [3] and rig.printer.tray(3)["tray_color"] == "808080FF"
     await rig.sim.set_print(1, "FINISH")
     await wait_until(lambda: len(rig.posts()) == 2)
@@ -310,6 +310,19 @@ async def test_settings_refused_while_printing_are_sent_again_after_the_print(ri
     assert 97 in rig.refreshed[0] and 101 in rig.refreshed[0]
     await asyncio.sleep(0.1)
     assert rig.notices == []
+
+
+async def test_settings_taken_during_a_print_are_not_pending(rig: Rig) -> None:
+    rig.printer.refuse_while_printing = False
+    await rig.client.set_next_spool(97)
+    await rig.sim.insert(1, 3)
+    await wait_until(lambda: rig.client.lane("3H-4").spool_id == 97)
+    assert rig.client.active and rig.printer.tray(3)["tray_color"] == "FFFFFFFF"
+    await asyncio.sleep(0.2)
+    assert not rig.client.lane("3H-4").settings_pending and rig.notices == []
+    await rig.sim.set_print(1, "FINISH")
+    await asyncio.sleep(0.2)
+    assert len(rig.posts()) == 1, "nothing to resend after the print"
 
 
 async def test_empty_slot_is_unassigned_by_bambuddy(rig: Rig) -> None:

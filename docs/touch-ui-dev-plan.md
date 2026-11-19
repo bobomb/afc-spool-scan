@@ -414,6 +414,10 @@ Product plan §6.4 has the endpoints and decided behaviour. Implementation
   tag is linked to the armed spool and the armed spool assigned. Weights
   are never sent to a slot whose tag belongs to a spool other than the one
   assigned there.
+- A slot is checked `settings_check_s` after the station assigns it (its
+  tray colour against the spool's). It is marked settings-pending only if
+  the settings didn't land while the printer prints; idle, it is resent
+  once, then a notice.
 - Settings-pending slots are re-sent once when the print ends (state leaves
   RUNNING/PREPARE/SLICING/PAUSE); the same edge refreshes every assigned
   spool in the catalog right away and again 30 s later, after Bambuddy has
@@ -728,7 +732,10 @@ within a phase unless noted. Each task ends with tests/build passing.
   print passed (#18 into 3H-7). An RFID spool with an unknown tag (#19) put
   into 3H-7 within 120 s of #18 coming out was refused as "holds #18
   (RFID)": Bambuddy's held assignment was taken for an RFID match. Fixed by
-  comparing the assigned spool's tag with the tray's. The rest of the
+  comparing the assigned spool's tag with the tray's (bcaa744). Redone at
+  23:09, it passed: "assigned #19 to H3C 3H-7 (RFID tag learned)". During
+  that print the H3C also took 3H-7's settings, so a slot is now marked
+  pending only after checking that its settings didn't land. The rest of the
   acceptance list (session file `h3c-acceptance-tests.md`) is still to run.*
 - [x] **B11** Remaining weight on the H3C (open question 14): station sends
   `set_filament_weight` over MQTT (§6.7, `BAMBU_ACCESS_CODE`); Bambuddy issue

@@ -83,6 +83,8 @@ class SimBambuddyPrinter:
         self.status.setdefault("connected", True)
         self.assignments: dict[int, int] = {int(k): int(v) for k, v in (fixture.get("assignments") or {}).items()}
         self.refused: list[int] = []
+        # The H3C has refused slot settings during a print, and has also taken them for a slot the print didn't use.
+        self.refuse_while_printing = True
         trays = {int(t["id"]): t for t in self.unit().get("tray") or []}
         self.unit()["tray"] = [trays.get(slot) or empty_tray(slot) for slot in range(SLOTS)]
 
@@ -187,7 +189,7 @@ class SimBambuddy:
         tray = printer.tray(slot)
         if not tray.get("exists"):
             return
-        if not printer.status.get("connected", True) or printer.printing:
+        if not printer.status.get("connected", True) or (printer.printing and printer.refuse_while_printing):
             printer.refused.append(slot)
             return
         filament = spool.get("filament") or {}

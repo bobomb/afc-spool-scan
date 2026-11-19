@@ -685,10 +685,9 @@ class BambuddyClient:
         return meta.colors[0].upper() == tray_color.upper()
 
     def _after_assign(self, slot: int, spool_id: int) -> None:
-        if self.active:
-            self._mark_settings_pending(slot)
-        else:
-            self._spawn(self._check_settings(slot, spool_id, retried=False))
+        # The H3C may still take a slot's settings during a print (seen live for a slot the print doesn't use),
+        # so a slot is only marked pending once its colour shows the settings did not land.
+        self._spawn(self._check_settings(slot, spool_id, retried=False))
 
     def _mark_settings_pending(self, slot: int) -> None:
         self._pending_settings.add(slot)
@@ -701,11 +700,13 @@ class BambuddyClient:
             return
         if self._settings_match(slot, spool_id):
             return
-        if self.active and not retried:
-            self._mark_settings_pending(slot)
-        else:
+        if retried:
             self._notice(f"{self.label} {lane_name(slot)} did not take the settings of #{spool_id}; "
                          f"set the slot in Bambuddy", spool_id=spool_id)
+        elif self.active:
+            self._mark_settings_pending(slot)
+        else:
+            await self._resend_settings(slot, spool_id)
 
     def _on_print_end(self) -> None:
         spools = set(self._assignments.values())

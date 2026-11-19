@@ -385,10 +385,13 @@ Behaviour, decided 2026-11-15:
   (warn only, no block). A tag no spool has yet is linked to the armed spool,
   so reinserting it later needs no scan; if the tag belongs to another spool
   nothing is assigned and the Log says so.
-- **Slot settings while printing:** the H3C refuses Bambuddy's settings push
-  during a print (the assignment is saved anyway). The slot is marked
-  settings-pending and the assignment is sent once more when the print ends;
-  if the slot still differs, the Log says so.
+- **Slot settings while printing:** the H3C has refused Bambuddy's settings
+  push during a print, and has also taken it for a slot the print didn't use
+  (2026-11-18). About 10 s after an assignment the service checks the slot.
+  If the settings didn't land during a print, the slot is marked
+  settings-pending and the assignment is sent once more when the print
+  ends. If they didn't land while idle, it is sent once more right away.
+  If the slot still differs after that, the Log says so.
 - **Off vs offline:** printer switched off (Bambuddy reports it
   disconnected) → "Off", not an error, Load skips it; Bambuddy unreachable →
   offline, an error. Both clear the armed spool.
