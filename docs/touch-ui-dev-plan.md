@@ -719,7 +719,7 @@ within a phase unless noted. Each task ends with tests/build passing.
   nine slots, kind-aware wording; samples `three`, `three_off`.
 - [x] **B9** Read-only capture script for Bambuddy with scrubbing;
   placeholder guard for API keys and device secrets.
-- [ ] **B10** Rollout on spoolpi: deploy with `BAMBUDDY_WRITES=off` and
+- [x] **B10** Rollout on spoolpi: deploy with `BAMBUDDY_WRITES=off` and
   `Hotel=bambuddy:1` appended to `PRINTERS`, watch the dry-run log, capture
   fixtures, then writes on and the acceptance test (product plan §6.4).
   *2026-11-16: deployed read-only (writes off), live status and all nine
@@ -742,7 +742,13 @@ within a phase unless noted. Each task ends with tests/build passing.
   the end; grams and the H3C's % matched). A2 and A7 passed. A4 failed: 3H-8
   still held #83 from the night's prints, and undo restored that leftover
   assignment instead of clearing the slot. An insertion now records no
-  previous assignment, so undo always clears the slot.*
+  previous assignment, so undo always clears the slot (c5840a9); redone, it
+  passed. A5 passed: Assign, then Undo of that entry, removed the
+  assignment in Bambuddy. A6 passed: #84 weighed 411 g and was back in 3H-4
+  within 2 minutes; the H3C showed 41 %. A8 passed: with the H3C off, Load
+  set the next spool on the Vorons only, without an error; after power-on
+  all nine slots came back with their tags, and every slot's % matched
+  Spoolman. Acceptance test complete.*
 - [x] **B11** Remaining weight on the H3C (open question 14): station sends
   `set_filament_weight` over MQTT (§6.7, `BAMBU_ACCESS_CODE`); Bambuddy issue
   and PR to send it with slot assignments.
