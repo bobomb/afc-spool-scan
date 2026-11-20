@@ -458,7 +458,7 @@ class BambuddyClient:
         for slot in range(SLOTS) if trays is not None else []:
             tray = trays.get(slot) or {}
             present = spool_present(tray)
-            spool_id = self._assignments.get(slot) if present else None
+            spool_id = self._slot_spool(slot) if present else None
             meta = self.spool_meta(spool_id) if spool_id is not None else None
             tray_color = normalize_color(tray.get("tray_color")) if present else None
             colors = list(meta.colors) if meta is not None and meta.colors else ([tray_color] if tray_color else [])
@@ -626,6 +626,18 @@ class BambuddyClient:
         meta = self.spool_meta(spool_id)
         return meta.tag if meta is not None else None
 
+    def _slot_spool(self, slot: int) -> int | None:
+        """The slot's assigned spool, unless the RFID tag in the tray is known to be another spool's.
+
+        Bambuddy keeps an emptied slot's assignment for 120 s, and through a print, so another RFID spool can sit
+        under it (live 2026-11-19: #41 in 3H-9 was shown as #18).
+        """
+        spool_id = self._assignments.get(slot)
+        tag = tray_tag(self._tray(slot))
+        if spool_id is not None and tag is not None and self._known_tag(spool_id) not in (None, tag):
+            return None
+        return spool_id
+
     async def _link_tag(self, slot: int, tag: str, spool_id: int) -> bool:
         """An RFID spool Spoolman doesn't know yet: record its tag on the scanned spool (learned for next time)."""
         if not self.writes:
@@ -769,16 +781,13 @@ class BambuddyClient:
     def _desired_weight(self, slot: int) -> tuple[int, int, int] | None:
         """(spool, total g, remain g) from Spoolman; an RFID spool is capped at 1000 g left, the printer's limit."""
         tray = self._tray(slot)
-        spool_id = self._assignments.get(slot)
+        spool_id = self._slot_spool(slot)
         if spool_id is None or not spool_present(tray) or slot in self._pending_settings:
             return None
         meta = self.spool_meta(spool_id)
         if meta is None or meta.archived:
             return None
-        tag = tray_tag(tray)
-        if tag is not None and meta.tag is not None and meta.tag != tag:
-            return None  # another RFID spool sits in the slot; its assignment is a leftover
-        cap = MAX_RFID_REMAIN_GRAMS if tag is not None else MAX_GRAMS
+        cap = MAX_RFID_REMAIN_GRAMS if tray_tag(tray) is not None else MAX_GRAMS
         weights = filament_weight(meta.remaining_g, meta.initial_g, cap)
         return (spool_id, *weights) if weights is not None else None
 

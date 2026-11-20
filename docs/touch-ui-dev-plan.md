@@ -411,9 +411,9 @@ Product plan §6.4 has the endpoints and decided behaviour. Implementation
   spool carries the tray's tag (Spoolman `extra.tag`, a JSON-encoded
   `tray_uuid`). Bambuddy keeps a slot's assignment for 120 s after the slot
   empties, so any other assignment there belongs to the previous spool: the
-  tag is linked to the armed spool and the armed spool assigned. Weights
-  are never sent to a slot whose tag belongs to a spool other than the one
-  assigned there.
+  tag is linked to the armed spool and the armed spool assigned. A slot
+  whose assigned spool has a known tag other than the tray's shows no spool
+  (the tray's own material and colour), and gets no weight.
 - A slot is checked `settings_check_s` after the station assigns it (its
   tray colour against the spool's). It is marked settings-pending only if
   the settings didn't land while the printer prints; idle, it is resent
@@ -749,6 +749,11 @@ within a phase unless noted. Each task ends with tests/build passing.
   set the next spool on the Vorons only, without an error; after power-on
   all nine slots came back with their tags, and every slot's % matched
   Spoolman. Acceptance test complete.*
+  *2026-11-19, later: the Pi's Bambuddy updated to #3586 with its tag check
+  (825b265 on 1.3.1). #41 (tag not in Spoolman) went into 3H-9 while
+  Bambuddy still held #18 there: Bambuddy sent no weight, but the station
+  showed the slot as #18. A slot whose assigned spool has another tag now
+  shows no spool.*
 - [x] **B11** Remaining weight on the H3C (open question 14): station sends
   `set_filament_weight` over MQTT (§6.7, `BAMBU_ACCESS_CODE`); Bambuddy issue
   and PR to send it with slot assignments.

@@ -296,6 +296,25 @@ async def test_held_spool_is_reinserted_with_its_own_tag(rig: Rig) -> None:
     assert [m for m, _, _ in rig.sim.requests if m == "PATCH"] == []
 
 
+async def test_a_held_slot_shows_no_spool_while_another_rfid_spool_is_in_it() -> None:
+    # Live 2026-11-19: #18 out of 3H-9, #41 (tag not in Spoolman) in; Bambuddy still held #18 and the station showed it.
+    rig, session = await make_rig(auto_unassign_s=30.0)
+    try:
+        await wait_until(lambda: rig.client.online)
+        await rig.sim.eject(1, 1)
+        await wait_until(lambda: not rig.client.lane("3H-2").prep)
+        await rig.sim.insert(1, 1, material="PETG", color="A6A9AA", tray_uuid=UNKNOWN_TAG)
+        await wait_until(lambda: rig.client.lane("3H-2").prep)
+        lane = rig.client.lane("3H-2")
+        assert rig.printer.assignments[1] == 102
+        assert (lane.spool_id, lane.material, lane.colors, lane.remaining_g) == (None, "PETG", ["#A6A9AA"], None)
+        await rig.sim.eject(1, 1)
+        await rig.sim.insert(1, 1, tray_uuid="B2" * 16)
+        await wait_until(lambda: rig.client.lane("3H-2").spool_id == 102)
+    finally:
+        await close_rig(rig, session)
+
+
 async def test_settings_refused_while_printing_are_sent_again_after_the_print(rig: Rig) -> None:
     await rig.client.set_next_spool(97)
     await rig.sim.insert(1, 3)

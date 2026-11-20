@@ -384,7 +384,8 @@ Behaviour, decided 2026-11-15:
   it differs from the armed spool, the Log warns and the spool stays armed
   (warn only, no block). A tag no spool has yet is linked to the armed spool,
   so reinserting it later needs no scan; if the tag belongs to another spool
-  nothing is assigned and the Log says so.
+  nothing is assigned and the Log says so. A slot Bambuddy still holds for a
+  spool with a different tag shows no spool, and gets no weight.
 - **Slot settings while printing:** the H3C has refused Bambuddy's settings
   push during a print, and has also taken it for a slot the print didn't use
   (2026-11-18). About 10 s after an assignment the service checks the slot.
