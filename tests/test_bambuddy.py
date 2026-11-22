@@ -135,7 +135,7 @@ async def test_status_maps_to_slots(rig: Rig) -> None:
     assert (hotel3.material, hotel3.remaining_g, hotel3.remaining_pct, hotel3.colors) == ("PETG", 760.0, 76.0,
                                                                                          ["#FF6A13"])
     assert lanes["3H-5"].low_stock and not lanes["3H-1"].low_stock
-    assert [lanes[f"3H-{n}"].map for n in range(1, 10)] == [f"T{n}" for n in range(9)]
+    assert [lanes[f"3H-{n}"].map for n in range(1, 10)] == [f"T{n}" for n in range(1, 10)]
     assert (lanes["3H-1"].nozzle, lanes["3H-5"].nozzle, lanes["3H-8"].nozzle) == ("0.4", "0.6 HF", "0.4 HT")
     assert lanes["3H-4"].nozzle == "0.4" and lanes["3H-4"].spool_id is None
 

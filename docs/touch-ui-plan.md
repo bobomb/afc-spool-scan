@@ -266,7 +266,7 @@ screen.
   compact cards: the two four-lane printers side by side on top, the Bambu
   printer (nine AMS 3H slots) across the full width below. Each card has a
   header column (name, status, ↓ next spool #) and compact tiles: the tool
-  on top (with the hotend's nozzle on the Bambu printer, e.g. "T4 0.6 HF"),
+  on top (with the hotend's nozzle on the Bambu printer, e.g. "T5 0.6 HF"),
   a 38 px ring with grams left, then material and spool #; LOW replaces the
   material, an amber dot marks slot settings that apply after the print, the
   loaded lane or slot has a blue outline. With one or two four-lane printers
@@ -282,7 +282,7 @@ screen.
 │ ┌ Kilo      [T0 ][T1 ][T2 ][T3 ] ┐ ┌ Yankee   [T0 ][T1 ][T2 ][T3 ] ┐ │
 │ │ Complete   888  612  74   -    │ │ Printing  950  321  ?   45   │ │
 │ │ ↓ #93      PLA  PLA PETG Empty │ │ ↓ #93     PLA PETG Untag ABS │ │
-│ ┌ Hotel     [T0 0.4][T1 0.4] … [T4 0.6 HF] … [T8 0.4]              ┐ │
+│ ┌ Hotel     [T1 0.4][T2 0.4] … [T5 0.6 HF] … [T9 0.4]              ┐ │
 │ │ Printing    920    410   …     88        …   300                 │ │
 │ │ ↓ #93       PLA    PLA   …    LOW        …   TPU                 │ │
 ```
@@ -315,13 +315,14 @@ printer, decided 2026-11-15, mockup option P1). Each shows:
 - Lanes 1–4: color swatch, material, spool ID, remaining g (bar), tool map
   (T0–T3), `filament_status`, loaded lane highlighted, low-stock highlight.
   The Bambu printer shows its nine AMS 3H slots (`3H-1`…`3H-9`) as a 3×3
-  grid of cells filled with the spool colour: slot and tool ("3H-5  T4"),
+  grid of cells filled with the spool colour: slot and tool ("3H-5  T5"),
   spool #, material or LOW, grams, the nozzle of the slot's hotend ("0.4",
   "0.6 HF"), the amber settings-pending dot and the blue in-tool outline.
 - **Bambu tool and nozzle (user, 2026-11-21).** AMS 3H slot *k* feeds
-  hotend *k* (Bambu Studio's `DevAmsTray::get_nozzle_addr_id`), so slot
-  3H-1 is tool T0 … 3H-9 is T8, numbered like the Vorons' T0–T3 (an
-  assumption the user can change; Bambuddy numbers the rack positions 1–9).
+  hotend *k* (Bambu Studio's `DevAmsTray::get_nozzle_addr_id`). Tools are
+  numbered from 1 as on the H3C (user, 2026-11-22): slot 3H-1 is tool T1 …
+  3H-9 is T9, matching Bambuddy's rack positions 1–9; the Vorons keep
+  Klipper's T0–T3.
   The nozzle comes from Bambuddy's `nozzle_rack`: diameter, plus the flow
   when it isn't standard (HF = high flow, other codes as reported, e.g.
   "HT"); the web view shows the material and flow in words.
@@ -565,5 +566,6 @@ Detailed tasks: dev plan §8.
 | 2026-11-16 | User (open question 14): show Spoolman's grams on the H3C itself. The station sends `set_filament_weight` over the printer's MQTT (needs `BAMBU_ACCESS_CODE`), and Bambuddy is asked upstream (issue + PR) to send it with slot assignments. Changes §6.4 "the station never talks MQTT". |
 | 2026-11-16 | User: Bambu RFID spools get Spoolman's grams too, not the printer's own estimate (capped at 1000 g left, the H3C's limit for tagged spools; its profile allows RFID edits). |
 | 2026-11-21 | User: a web UI to see the station (§3.4). Proposed details: served by the service on port 7914, read-only, same content as the touch UI. The panel UI stays LVGL. |
-| 2026-11-21 | User: each H3C square shows its tool and, where known, the nozzle of the hotend it feeds (§5.1, §5.2). Tools are numbered T0–T8 like the Vorons (slot 3H-1 = T0), chosen without the user's answer; the station tiles also show the Vorons' T0–T3. |
+| 2026-11-21 | User: each H3C square shows its tool and, where known, the nozzle of the hotend it feeds (§5.1, §5.2). The station tiles also show the Vorons' T0–T3. |
+| 2026-11-22 | User: the H3C's tools are numbered from 1 (3H-1 = T1 … 3H-9 = T9), not T0–T8 as first chosen without the user's answer. |
 | 2026-11-21 | User, changes §5.1: taller station tiles; the "PRINTERS · Load sets the next spool…" line is removed and the bottom buttons are lower (46 px). |

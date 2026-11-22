@@ -103,8 +103,8 @@ def tray_tag(tray: dict[str, Any] | None) -> str | None:
 
 
 def tool_name(slot: int) -> str:
-    """AMS 3H slot k feeds hotend k (Bambu Studio's DevAmsTray::get_nozzle_addr_id); named like AFC's T0, T1."""
-    return f"T{slot}"
+    """AMS 3H slot k feeds hotend k (Bambu Studio's DevAmsTray::get_nozzle_addr_id), numbered 1-9 as on the H3C."""
+    return f"T{slot + 1}"
 
 
 def rack_hotends(status: dict[str, Any]) -> dict[int, dict[str, Any]]:

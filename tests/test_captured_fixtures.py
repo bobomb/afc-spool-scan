@@ -115,7 +115,7 @@ async def test_station_replays_captured_bambuddy(tmp_path: Path) -> None:
             assert lane.spool_id == expected
             if present:
                 assert lane.material and lane.color
-        assert [lane.map for lane in printer.lanes] == [f"T{slot}" for slot in range(9)]
+        assert [lane.map for lane in printer.lanes] == [f"T{slot}" for slot in range(1, 10)]
         assert [lane.nozzle for lane in printer.lanes] == ["0.4"] * 7 + ["0.4 HT", "0.4"]
     finally:
         await station.stop()

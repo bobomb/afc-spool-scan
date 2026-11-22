@@ -171,7 +171,7 @@ private:
         lv_obj_t* line2;
         lv_obj_t* low;
         lv_obj_t* pending;
-        // Bambu slot: the hotend it feeds (T0-T8).
+        // Bambu slot: the hotend it feeds (T1-T9).
         lv_obj_t* tool;
         lv_grad_dsc_t grad;
     };
