@@ -93,6 +93,9 @@ class LaneState:
     colors: list[str] = field(default_factory=list)
     # Bambuddy: the slot's filament settings could not be pushed yet (printer busy printing).
     settings_pending: bool = False
+    # Bambuddy: the hotend the slot feeds, short ("0.4", "0.4 HF") and in words.
+    nozzle: str | None = None
+    nozzle_detail: str | None = None
 
 
 @dataclass

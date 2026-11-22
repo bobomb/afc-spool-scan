@@ -142,6 +142,8 @@ private:
     App& app_;
     std::string key_;
     int width_ = 0;
+    // Tile height; the tile content keeps its size and is centred in it.
+    int tile_h_ = 0;
     lv_obj_t* root_ = nullptr;
     lv_obj_t* dot_ = nullptr;
     lv_obj_t* name_ = nullptr;
@@ -169,6 +171,8 @@ private:
         lv_obj_t* line2;
         lv_obj_t* low;
         lv_obj_t* pending;
+        // Bambu slot: the hotend it feeds (T0-T8).
+        lv_obj_t* tool;
         lv_grad_dsc_t grad;
     };
     void build_tiles(std::size_t count);
@@ -359,8 +363,6 @@ private:
     App& app_;
     lv_obj_t* root_ = nullptr;
     std::unique_ptr<SpoolHero> hero_;
-    lv_obj_t* targets_label_ = nullptr;
-    lv_obj_t* targets_hint_ = nullptr;
     lv_obj_t* no_printers_ = nullptr;
     std::vector<std::unique_ptr<TargetCard>> cards_;
     std::vector<std::unique_ptr<CompactCard>> compact_;

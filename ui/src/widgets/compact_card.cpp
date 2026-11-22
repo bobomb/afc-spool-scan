@@ -11,7 +11,9 @@ constexpr int kInsetY = 7;
 constexpr int kRightInset = 10;
 constexpr int kTileGap = 5;
 constexpr int kMaxTileW = 58;
-constexpr int kRing = 34;
+constexpr int kRing = 38;
+constexpr int kRingY = 18;
+constexpr int kLineY = kRingY + kRing + 2;
 constexpr int kOutline = 4;
 
 }  // namespace
@@ -67,29 +69,34 @@ void CompactCard::build_tiles(std::size_t count)
         lv_obj_set_style_outline_color(tile->root, theme.primary(), 0);
         lv_obj_set_style_outline_pad(tile->root, 2, 0);
 
+        tile->tool = ui::label(tile->root, theme.tiny(), theme.text(), "");
+        lv_obj_set_size(tile->tool, tile_w - 2, 15);
+        lv_obj_set_style_text_align(tile->tool, LV_TEXT_ALIGN_CENTER, 0);
+        lv_label_set_long_mode(tile->tool, LV_LABEL_LONG_MODE_CLIP);
+        lv_obj_set_pos(tile->tool, 1, 2);
         tile->ring = ui::ring(tile->root, kRing, 5);
-        lv_obj_align(tile->ring, LV_ALIGN_TOP_MID, 0, 4);
+        lv_obj_align(tile->ring, LV_ALIGN_TOP_MID, 0, kRingY);
         tile->value = ui::label(tile->ring, theme.tiny(), theme.text(), "");
         lv_obj_center(tile->value);
         tile->line1 = ui::label(tile->root, theme.tiny(), theme.text(), "");
         lv_obj_set_size(tile->line1, tile_w - 2, 15);
         lv_obj_set_style_text_align(tile->line1, LV_TEXT_ALIGN_CENTER, 0);
         lv_label_set_long_mode(tile->line1, LV_LABEL_LONG_MODE_CLIP);
-        lv_obj_set_pos(tile->line1, 1, 40);
+        lv_obj_set_pos(tile->line1, 1, kLineY);
         tile->low = ui::label(tile->root, theme.tiny(), lv_color_hex(0x1A1206), "LOW");
         lv_obj_set_style_bg_color(tile->low, theme.warn(), 0);
         lv_obj_set_style_bg_opa(tile->low, LV_OPA_COVER, 0);
         lv_obj_set_style_radius(tile->low, 6, 0);
         lv_obj_set_style_pad_hor(tile->low, 3, 0);
         lv_obj_set_style_outline_width(tile->low, 1, 0);
-        lv_obj_align(tile->low, LV_ALIGN_TOP_MID, 0, 40);
+        lv_obj_align(tile->low, LV_ALIGN_TOP_MID, 0, kLineY);
         tile->line2 = ui::label(tile->root, theme.tiny(), theme.text(), "");
         lv_obj_set_size(tile->line2, tile_w - 2, 15);
         lv_obj_set_style_text_align(tile->line2, LV_TEXT_ALIGN_CENTER, 0);
         lv_label_set_long_mode(tile->line2, LV_LABEL_LONG_MODE_CLIP);
-        lv_obj_set_pos(tile->line2, 1, 54);
+        lv_obj_set_pos(tile->line2, 1, kLineY + 15);
         tile->pending = ui::dot(tile->root, 9, theme.warn());
-        lv_obj_align(tile->pending, LV_ALIGN_TOP_RIGHT, -3, 3);
+        lv_obj_align(tile->pending, LV_ALIGN_TOP_RIGHT, -2, kRingY);
         lv_obj_set_style_border_width(tile->pending, 2, 0);
         tiles_.push_back(std::move(tile));
     }
@@ -156,6 +163,8 @@ void CompactCard::update(const Printer& printer, bool online)
         lv_obj_set_style_text_color(tile.value, mark, 0);
         lv_obj_set_style_text_color(tile.line1, mark, 0);
         lv_obj_set_style_text_color(tile.line2, mark, 0);
+        ui::set_text(tile.tool, lane.map + (lane.nozzle.empty() ? "" : " " + lane.nozzle));
+        lv_obj_set_style_text_color(tile.tool, mark, 0);
         lv_obj_set_style_outline_color(tile.low, mark, 0);
         lv_obj_set_style_border_color(tile.pending, mark, 0);
         ui::set_hidden(tile.low, !low);

@@ -262,7 +262,7 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `scale` | `stable`; derived against the current spool: `tare_g`, `net_g`, `expected_g`, `delta_g`, `check` (`ok`, `warn`, `tare_unknown` or null) — the sanity rule stays in the service |
 | `scan` | `countdown` `{spool_id, action, remaining_s}` (published each second) and `prompt` `{kind: "confirm_weigh", spool_id, message, gross_g, tare_g, net_g, expected_g, delta_g}` when an immediate scan skipped saving a suspicious weight |
 | `spool` | `found` (false → `{id, found, message}` only), `initial_weight_g`, `used_weight_g`, `tare_source` (`spool`, `filament`, `vendor`), `colors` (every filament colour, from `multi_color_hexes`; `color` is the first) |
-| `printers[]` | `key`, `display_name` (the printer name set in Mainsail or Bambuddy, else null; the UI shows it instead of `name`), `kind` (`moonraker` or `bambuddy`), `off` (a Bambu printer switched off while Bambuddy runs: not an error, Load skips it), `klippy_state` (Bambuddy: `ready`, `off` or `disconnected`), `filename`, `pending_confirmed`; `afc_state`/`afc_error` carry the filament system state/error (Bambu: the HMS warning or error); lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known), `colors` (Spoolman colours, else the AFC lane or AMS tray colour) and `settings_pending` (Bambu slot settings apply after the print). Bambu lanes are the AMS 3H slots `3H-1`…`3H-9`; `prep` means a spool is in the slot |
+| `printers[]` | `key`, `display_name` (the printer name set in Mainsail or Bambuddy, else null; the UI shows it instead of `name`), `kind` (`moonraker` or `bambuddy`), `off` (a Bambu printer switched off while Bambuddy runs: not an error, Load skips it), `klippy_state` (Bambuddy: `ready`, `off` or `disconnected`), `filename`, `pending_confirmed`; `afc_state`/`afc_error` carry the filament system state/error (Bambu: the HMS warning or error); lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known), `colors` (Spoolman colours, else the AFC lane or AMS tray colour) and `settings_pending` (Bambu slot settings apply after the print). Bambu lanes are the AMS 3H slots `3H-1`…`3H-9`; `map` is the tool their hotend is (`T0`…`T8`), and `nozzle` / `nozzle_detail` describe that hotend's nozzle (`"0.6 HF"` / `"0.6 mm, hardened steel, high flow"`; null without `nozzle_rack` data); `prep` means a spool is in the slot |
 | `health` | `scale_status` |
 | `activity[]` | `code`, `dry_run`, `undone`; `action` may also be `scan`, `clear_pending`, `undo`, `spool_loaded` (a lane took the spool, so the service cleared it as next spool on the other printers; for a Bambu slot it also records the assignment, and undo unassigns it and arms the printers again), `sleep` (pending next spools cleared when the station went to sleep) and `printer` (a printer reports something to see, e.g. an RFID spool that differs from the scan; `code: printer_notice`) |
 | `result` | `code`, `dry_run`, `data` (e.g. sanity figures with `needs_confirm`) |
@@ -632,6 +632,11 @@ within a phase unless noted. Each task ends with tests/build passing.
   *Done 2026-10-15; replaces the header, numpad, scale tile, spool card and
   target selector widgets; see §10. Printer selection removed 2026-10-19
   (F11).*
+- [x] **U11** Taller station tiles (product plan §5.1, user 2026-11-21): no
+  "PRINTERS · Load sets…" line, a 46 px action bar; compact rows 107 px with
+  the tool (and Bambu nozzle) above a 38 px ring; two-printer tiles grow with
+  their content centred.
+  *Done 2026-11-21; screenshots of `three`, `main` and `three_off`.*
 
 ### F — Features (service + UI)
 
@@ -798,6 +803,12 @@ within a phase unless noted. Each task ends with tests/build passing.
   gated on the model's capability flags, RFID clamped to 1000 g. Once that
   ships, both send the same grams on assignment (harmless); the station's
   sender still covers weighs and post-print usage.*
+- [x] **B12** H3C tool and nozzle on every slot (product plan §5.1, §5.2,
+  2026-11-21): slot k is tool `T{k}` (lane `map`), its hotend's nozzle from
+  Bambuddy's `nozzle_rack` (`nozzle`, `nozzle_detail`); station tiles,
+  Printers grid, assign dialog and web view show them.
+  *Done 2026-11-21; tests in `test_bambuddy.py` and on the captured H3C
+  fixture (all 0.4, 3H-8's hotend `HT01`).*
 
 ### C — Continuous integration (optional)
 

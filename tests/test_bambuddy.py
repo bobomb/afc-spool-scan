@@ -8,7 +8,15 @@ import aiohttp
 import pytest
 
 from station.bambu_mqtt import WeightTarget
-from station.bambuddy import BambuddyClient, hms_text, slot_of, spool_present, tray_tag
+from station.bambuddy import (
+    BambuddyClient,
+    hms_text,
+    hotend_text,
+    rack_hotends,
+    slot_of,
+    spool_present,
+    tray_tag,
+)
 from station.catalog import meta_from_api
 from station.config import PrinterConfig
 from station.printer_client import LaneLoad, PrinterCommandError, PrinterNotice, PrinterOffline
@@ -96,6 +104,21 @@ def test_helpers() -> None:
     assert hms_text([{"severity": 2, "code": "0700_2000", "description": ""}]) == "HMS 0700_2000"
 
 
+def test_hotends_by_rack_position() -> None:
+    rack = rack_hotends({"nozzle_rack": [
+        {"id": 17, "addr_id": 1, "nozzle_type": "HS01", "nozzle_diameter": "0.4"},
+        {"id": 0, "addr_id": 1, "nozzle_type": "HH01", "nozzle_diameter": "0.6"},
+        {"id": 18, "nozzle_type": "HS01", "nozzle_diameter": "0.2"},
+        {"id": 30, "addr_id": 9, "nozzle_type": "HS01", "nozzle_diameter": "0.4"},
+    ]})
+    assert sorted(rack) == [1, 2] and rack[1]["id"] == 0 and rack[2]["nozzle_diameter"] == "0.2"
+    assert hotend_text(rack[2]) == ("0.2", "0.2 mm, hardened steel, standard flow")
+    assert hotend_text(rack[1]) == ("0.6 HF", "0.6 mm, hardened steel, high flow")
+    assert hotend_text({"nozzle_type": "HT01", "nozzle_diameter": "0.4"}) == ("0.4 HT", "0.4 mm, hardened steel (HT01)")
+    assert hotend_text({"nozzle_type": "", "nozzle_diameter": ""}) == (None, None)
+    assert hotend_text(None) == (None, None)
+
+
 async def test_status_maps_to_slots(rig: Rig) -> None:
     state = rig.client.state
     assert (state.kind, state.connected, state.off, state.display_name, rig.client.label) == (
@@ -112,6 +135,9 @@ async def test_status_maps_to_slots(rig: Rig) -> None:
     assert (hotel3.material, hotel3.remaining_g, hotel3.remaining_pct, hotel3.colors) == ("PETG", 760.0, 76.0,
                                                                                          ["#FF6A13"])
     assert lanes["3H-5"].low_stock and not lanes["3H-1"].low_stock
+    assert [lanes[f"3H-{n}"].map for n in range(1, 10)] == [f"T{n}" for n in range(9)]
+    assert (lanes["3H-1"].nozzle, lanes["3H-5"].nozzle, lanes["3H-8"].nozzle) == ("0.4", "0.6 HF", "0.4 HT")
+    assert lanes["3H-4"].nozzle == "0.4" and lanes["3H-4"].spool_id is None
 
 
 async def test_wrong_api_key_stays_offline() -> None:

@@ -105,7 +105,7 @@ void PrinterCard::build_lanes(std::size_t count, bool grid)
             lv_obj_set_style_radius(row.low, 6, 0);
             lv_obj_set_style_pad_hor(row.low, 3, 0);
             lv_obj_set_style_outline_width(row.low, 1, 0);
-            lv_obj_align(row.low, LV_ALIGN_BOTTOM_LEFT, 7, -4);
+            lv_obj_set_pos(row.low, 7, 40);
             row.pending = ui::dot(row.root, 10, theme.warn());
             lv_obj_set_style_border_width(row.pending, 2, 0);
             lv_obj_align(row.pending, LV_ALIGN_TOP_RIGHT, -4, 4);
@@ -286,7 +286,9 @@ void PrinterCard::update_cell(LaneRow& row, const Lane& lane, bool loaded)
         ui::set_text(row.spool, "#" + std::to_string(*lane.spool_id));
         ui::set_text(row.material, lane.material.empty() ? "--" : lane.material);
         ui::set_text(row.weight, lane.remaining_g ? fmt_grams(lane.remaining_g) : "");
-        ui::set_text(row.status, lane.settings_pending ? "Pending" : lane.filament_status);
+        // The hotend's nozzle when known; the outline and the amber dot show in-tool and pending.
+        ui::set_text(row.status, !lane.nozzle.empty() ? lane.nozzle
+                                 : lane.settings_pending ? std::string("Pending") : lane.filament_status);
     } else {
         lv_obj_set_style_bg_grad(row.root, nullptr, 0);
         lv_obj_set_style_bg_color(row.root, lane.prep ? theme.surface_alt() : theme.bg(), 0);
@@ -295,7 +297,7 @@ void PrinterCard::update_cell(LaneRow& row, const Lane& lane, bool loaded)
         ui::set_text(row.spool, "");
         ui::set_text(row.material, lane.prep ? "No tag" : "Empty");
         ui::set_text(row.weight, "");
-        ui::set_text(row.status, "");
+        ui::set_text(row.status, lane.nozzle);
     }
     lv_obj_set_style_text_font(row.material, has_spool ? theme.tiny() : theme.caption(), 0);
     lv_obj_set_pos(row.material, has_spool ? 7 : 4, has_spool ? 40 : 24);
@@ -307,10 +309,10 @@ void PrinterCard::update_cell(LaneRow& row, const Lane& lane, bool loaded)
     }
     lv_obj_set_style_outline_color(row.low, mark, 0);
     lv_obj_set_style_border_color(row.pending, mark, 0);
-    ui::set_text(row.name, lane.lane);
+    ui::set_text(row.name, lane.map.empty() ? lane.lane : lane.lane + "  " + lane.map);
     const bool low = has_spool && lane.low_stock;
     ui::set_hidden(row.low, !low);
-    ui::set_hidden(row.status, low);
+    ui::set_hidden(row.material, low);
     ui::set_hidden(row.pending, !(has_spool && lane.settings_pending));
     lv_obj_set_style_outline_width(row.root, loaded ? 2 : 0, 0);
 }

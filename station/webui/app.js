@@ -310,9 +310,13 @@
   function slotTile(lane, loaded) {
     const hasSpool = lane.spool_id !== null && lane.spool_id !== undefined;
     const tile = el("div", `slot${hasSpool ? "" : lane.prep ? " untagged" : " empty"}${loaded ? " loaded" : ""}`);
-    tile.append(el("div", "slot-name", lane.lane));
+    const head = el("div", "slot-name", lane.map ? `${lane.lane}  ${lane.map}` : lane.lane);
+    tile.append(head);
+    if (lane.nozzle_detail) tile.title = `${lane.map ? `${lane.map}: ` : ""}${lane.nozzle_detail} nozzle`;
+    const nozzle = lane.nozzle ? el("div", "slot-nozzle", `${lane.nozzle} nozzle`) : null;
     if (!hasSpool) {
       tile.append(el("div", "slot-empty", lane.prep ? "No tag" : "Empty"));
+      if (nozzle) tile.append(nozzle);
       return tile;
     }
     paint(tile, colorsOf(lane.colors, lane.color));
@@ -321,6 +325,7 @@
     if (lane.low_stock) tile.append(el("span", "tag low", "LOW"));
     else tile.append(el("div", null, lane.settings_pending ? "Pending" : lane.filament_status || ""));
     if (lane.settings_pending) tile.append(el("span", "pending"));
+    if (nozzle) tile.append(nozzle);
     return tile;
   }
 

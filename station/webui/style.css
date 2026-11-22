@@ -302,10 +302,11 @@ main {
 .slot.empty { background: var(--bg); color: var(--muted); }
 .slot.untagged { border-color: transparent; color: var(--muted); }
 .slot.loaded { outline: 2px solid var(--primary); outline-offset: 1px; }
-.slot .slot-name { opacity: 0.8; }
+.slot .slot-name { opacity: 0.8; white-space: pre; }
 .slot .slot-id { font-size: 18px; font-weight: 600; }
 .slot .slot-empty { font-size: 14px; margin-top: 8px; }
-.slot .tag.low { outline: 1px solid currentColor; }
+.slot .slot-nozzle { margin-top: 2px; opacity: 0.85; white-space: nowrap; }
+.slot .tag.low { display: inline-block; outline: 1px solid currentColor; }
 
 .slot .pending {
   position: absolute;

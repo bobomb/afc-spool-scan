@@ -56,6 +56,11 @@ PRINT_STATES = {"RUNNING": "printing", "PREPARE": "printing", "SLICING": "printi
 HMS_SHOWN = (1, 2)
 CONFLICT = 409
 LANE_PREFIX = "3H-"
+# Hotend codes such as "HS01": flow (first two letters), then material (as Bambuddy decodes them).
+NOZZLE_FLOWS = {"HS": "standard flow", "HH": "high flow"}
+NOZZLE_SHORT_FLOWS = {"HH": "HF"}
+NOZZLE_MATERIALS = {"00": "stainless steel", "01": "hardened steel", "05": "tungsten carbide"}
+RACK_BASE_ID = 16
 
 
 def lane_name(slot: int) -> str:
@@ -95,6 +100,47 @@ def tray_tag(tray: dict[str, Any] | None) -> str | None:
     if not isinstance(raw, str) or not raw.strip() or set(raw.strip()) == {"0"}:
         return None
     return raw.strip().upper()
+
+
+def tool_name(slot: int) -> str:
+    """AMS 3H slot k feeds hotend k (Bambu Studio's DevAmsTray::get_nozzle_addr_id); named like AFC's T0, T1."""
+    return f"T{slot}"
+
+
+def rack_hotends(status: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    """The H3C's hotends by rack position (`addr_id`; rack ids 16-24 also say it). The mounted one wins."""
+    hotends: dict[int, dict[str, Any]] = {}
+    for entry in status.get("nozzle_rack") or []:
+        if not isinstance(entry, dict):
+            continue
+        nozzle_id = _int(entry.get("id"))
+        addr = _int(entry.get("addr_id"))
+        if addr is None and nozzle_id is not None and nozzle_id >= RACK_BASE_ID:
+            addr = nozzle_id - RACK_BASE_ID
+        if addr is None or not 0 <= addr < SLOTS:
+            continue
+        if addr not in hotends or (nozzle_id is not None and nozzle_id < RACK_BASE_ID):
+            hotends[addr] = entry
+    return hotends
+
+
+def hotend_text(entry: dict[str, Any] | None) -> tuple[str | None, str | None]:
+    """("0.4", "0.4 mm, hardened steel, standard flow") for a hotend; a non-standard flow shows in the short form."""
+    if not entry:
+        return None, None
+    diameter = str(entry.get("nozzle_diameter") or "").strip()
+    code = str(entry.get("nozzle_type") or "").strip().upper()
+    if not diameter and not code:
+        return None, None
+    flow, material = code[:2], code[2:4]
+    short = diameter or "?"
+    if flow and flow != "HS":
+        short += f" {NOZZLE_SHORT_FLOWS.get(flow, flow)}"
+    parts = [f"{diameter} mm" if diameter else "", NOZZLE_MATERIALS.get(material, ""), NOZZLE_FLOWS.get(flow, "")]
+    detail = ", ".join(part for part in parts if part)
+    if code and (flow not in NOZZLE_FLOWS or material not in NOZZLE_MATERIALS):
+        detail = f"{detail} ({code})" if detail else code
+    return short, detail
 
 
 def hms_text(errors: Any) -> str | None:
@@ -454,6 +500,7 @@ class BambuddyClient:
         tray_now = _int(self._status.get("tray_now"))
         loaded = tray_now - TRAY_NOW_BASE if tray_now is not None and 0 <= tray_now - TRAY_NOW_BASE < SLOTS else None
         threshold = self.low_stock_g()
+        hotends = rack_hotends(self._status)
         lanes = []
         for slot in range(SLOTS) if trays is not None else []:
             tray = trays.get(slot) or {}
@@ -469,8 +516,10 @@ class BambuddyClient:
             material = (meta.material if meta is not None else None) or (str(tray.get("tray_type") or "") or None
                                                                           if present else None)
             state = _int(tray.get("state"))
+            nozzle, nozzle_detail = hotend_text(hotends.get(slot))
             lanes.append(LaneState(
                 lane=lane_name(slot),
+                map=tool_name(slot),
                 spool_id=spool_id,
                 material=material,
                 color=colors[0] if colors else None,
@@ -484,6 +533,8 @@ class BambuddyClient:
                 remaining_pct=pct,
                 colors=colors,
                 settings_pending=slot in self._pending_settings and spool_id is not None,
+                nozzle=nozzle,
+                nozzle_detail=nozzle_detail,
             ))
         state_text = str(self._status.get("state") or "").upper()
         progress = self._status.get("progress")

@@ -94,7 +94,9 @@
             "colors": [
               "#F5F5F5"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane2",
@@ -113,7 +115,9 @@
             "colors": [
               "#1A1A1A"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane3",
@@ -132,7 +136,9 @@
             "colors": [
               "#1E5AA8"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane4",
@@ -149,7 +155,9 @@
             "low_stock": false,
             "remaining_pct": null,
             "colors": [],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           }
         ],
         "display_name": "Kestrel",
@@ -187,7 +195,9 @@
             "colors": [
               "#D32F2F"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane2",
@@ -206,7 +216,9 @@
             "colors": [
               "#F57C00"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane3",
@@ -223,7 +235,9 @@
             "low_stock": false,
             "remaining_pct": null,
             "colors": [],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane4",
@@ -242,7 +256,9 @@
             "colors": [
               "#8A8D91"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           }
         ],
         "display_name": "Yeti",
@@ -265,7 +281,7 @@
         "lanes": [
           {
             "lane": "3H-1",
-            "map": null,
+            "map": "T0",
             "spool_id": 101,
             "material": "PLA",
             "color": "#00AE42",
@@ -280,11 +296,13 @@
             "colors": [
               "#00AE42"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": "0.4",
+            "nozzle_detail": "0.4 mm, hardened steel, standard flow"
           },
           {
             "lane": "3H-2",
-            "map": null,
+            "map": "T1",
             "spool_id": 102,
             "material": "PLA",
             "color": "#000000",
@@ -299,11 +317,13 @@
             "colors": [
               "#000000"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": "0.4",
+            "nozzle_detail": "0.4 mm, hardened steel, standard flow"
           },
           {
             "lane": "3H-3",
-            "map": null,
+            "map": "T2",
             "spool_id": 103,
             "material": "PETG",
             "color": "#FF6A13",
@@ -318,11 +338,13 @@
             "colors": [
               "#FF6A13"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": "0.4",
+            "nozzle_detail": "0.4 mm, hardened steel, standard flow"
           },
           {
             "lane": "3H-4",
-            "map": null,
+            "map": "T3",
             "spool_id": 99,
             "material": "PETG",
             "color": "#E0F2F1",
@@ -337,11 +359,13 @@
             "colors": [
               "#E0F2F1"
             ],
-            "settings_pending": true
+            "settings_pending": false,
+            "nozzle": "0.4",
+            "nozzle_detail": "0.4 mm, hardened steel, standard flow"
           },
           {
             "lane": "3H-5",
-            "map": null,
+            "map": "T4",
             "spool_id": 104,
             "material": "PLA",
             "color": "#F2F2F2",
@@ -356,11 +380,13 @@
             "colors": [
               "#F2F2F2"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": "0.6 HF",
+            "nozzle_detail": "0.6 mm, hardened steel, high flow"
           },
           {
             "lane": "3H-6",
-            "map": null,
+            "map": "T5",
             "spool_id": null,
             "material": "PLA",
             "color": "#7C594A",
@@ -375,11 +401,13 @@
             "colors": [
               "#7C594A"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": "0.4",
+            "nozzle_detail": "0.4 mm, hardened steel, standard flow"
           },
           {
             "lane": "3H-7",
-            "map": null,
+            "map": "T6",
             "spool_id": 105,
             "material": "PLA",
             "color": "#D4AF37",
@@ -394,11 +422,13 @@
             "colors": [
               "#D4AF37"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": "0.2",
+            "nozzle_detail": "0.2 mm, hardened steel, standard flow"
           },
           {
             "lane": "3H-8",
-            "map": null,
+            "map": "T7",
             "spool_id": 106,
             "material": "ABS",
             "color": "#8A8A8A",
@@ -413,11 +443,13 @@
             "colors": [
               "#8A8A8A"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": "0.4 HT",
+            "nozzle_detail": "0.4 mm, hardened steel (HT01)"
           },
           {
             "lane": "3H-9",
-            "map": null,
+            "map": "T8",
             "spool_id": 107,
             "material": "TPU",
             "color": "#1F4FB4",
@@ -432,7 +464,9 @@
             "colors": [
               "#1F4FB4"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": "0.4",
+            "nozzle_detail": "0.4 mm, hardened steel, standard flow"
           }
         ],
         "display_name": "Heron",

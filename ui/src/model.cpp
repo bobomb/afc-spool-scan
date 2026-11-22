@@ -190,6 +190,7 @@ Printer parse_printer(const json& data)
             lane.tool_loaded = boolean(item, "tool_loaded");
             lane.low_stock = boolean(item, "low_stock");
             lane.settings_pending = boolean(item, "settings_pending");
+            lane.nozzle = str(item, "nozzle");
             printer.lanes.push_back(std::move(lane));
         }
     }

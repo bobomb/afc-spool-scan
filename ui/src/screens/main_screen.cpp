@@ -9,15 +9,14 @@ namespace {
 
 constexpr int kHeroY = 12;
 constexpr int kHeroH = 128;
-constexpr int kLabelY = 150;
-constexpr int kCardsY = 174;
-constexpr int kCardH = 178;
-constexpr int kBarY = 364;
-constexpr int kBarH = 60;
 constexpr int kGap = 8;
+constexpr int kCardsY = kHeroY + kHeroH + kGap;
+constexpr int kBarH = 46;
+constexpr int kBarY = layout::kBodyH - kBarH;
+constexpr int kCardH = kBarY - kGap - kCardsY;
 constexpr std::size_t kMaxCards = 2;
 constexpr std::size_t kMaxLanes = 4;
-constexpr int kRowH = 85;
+constexpr int kRowH = (kCardH - kGap) / 2;
 
 struct Slot {
     std::size_t printer;
@@ -72,15 +71,6 @@ MainScreen::MainScreen(App& app, lv_obj_t* parent) : app_(app)
 
     hero_ = std::make_unique<SpoolHero>(app, root_, x, kHeroY, w, kHeroH);
 
-    targets_label_ = ui::container(root_);
-    lv_obj_set_pos(targets_label_, x, kLabelY);
-    lv_obj_set_size(targets_label_, w, 20);
-    lv_obj_set_flex_flow(targets_label_, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(targets_label_, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(targets_label_, 10, 0);
-    lv_obj_t* cap = ui::label(targets_label_, theme.caption(), theme.muted(), "PRINTERS");
-    lv_obj_set_style_text_letter_space(cap, 1, 0);
-    targets_hint_ = ui::label(targets_label_, theme.caption(), theme.muted(), "");
     no_printers_ = ui::label(root_, theme.normal(), theme.muted(), "No printers configured");
     lv_obj_set_pos(no_printers_, x, kCardsY + 70);
 
@@ -141,11 +131,8 @@ void MainScreen::update(const State& state, std::uint32_t topics, bool online)
                 shown_.push_back(i);
             }
         }
-        ui::set_text(targets_hint_, printers.size() == 2 ? "\xE2\x80\xA2  Load sets the next spool on both"
-                                                         : "\xE2\x80\xA2  Load sets the next spool on every printer");
     }
     ui::set_hidden(no_printers_, !shown_.empty());
-    ui::set_hidden(targets_label_, shown_.empty());
     if (rebuilt || (topics & (kTopicPrinters | kTopicConnection | kTopicService))) {
         for (std::size_t i = 0; i < shown_.size(); ++i) {
             const Printer& printer = printers[shown_[i]];

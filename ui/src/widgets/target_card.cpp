@@ -15,7 +15,8 @@ constexpr int kOutline = 4;
 
 }  // namespace
 
-TargetCard::TargetCard(App& app, lv_obj_t* parent, int x, int y, int w, int h) : app_(app), width_(w)
+TargetCard::TargetCard(App& app, lv_obj_t* parent, int x, int y, int w, int h)
+    : app_(app), width_(w), tile_h_(std::max(kTileH, h - kLanesY - 32))
 {
     Theme& theme = app.theme();
     root_ = ui::container(parent);
@@ -41,7 +42,7 @@ TargetCard::TargetCard(App& app, lv_obj_t* parent, int x, int y, int w, int h) :
     // Room around the tiles for the in-tool outline, which would otherwise be clipped.
     lanes_box_ = ui::container(root_);
     lv_obj_set_pos(lanes_box_, kInset - kOutline, kLanesY - kOutline);
-    lv_obj_set_size(lanes_box_, w - 2 * kInset + 2 * kOutline, kTileH + 2 * kOutline);
+    lv_obj_set_size(lanes_box_, w - 2 * kInset + 2 * kOutline, tile_h_ + 2 * kOutline);
 
     footer_ = ui::label(root_, theme.caption(), theme.info(), "");
     lv_obj_set_pos(footer_, kInset + 2, h - 24);
@@ -58,19 +59,20 @@ void TargetCard::build_tiles(std::size_t count)
     const int n = static_cast<int>(count);
     const int tile_w = n == 0 ? kTileW : std::min(kTileW, (inner - (n - 1) * kTileGap) / n);
     const int ring = std::min(48, tile_w - 12);
+    const int dy = (tile_h_ - kTileH) / 2;
     for (int i = 0; i < n; ++i) {
         auto tile = std::make_unique<LaneTile>();
         tile->grad = {};
         tile->root = ui::container(lanes_box_);
         lv_obj_set_pos(tile->root, kOutline + i * (tile_w + kTileGap), kOutline);
-        lv_obj_set_size(tile->root, tile_w, kTileH);
+        lv_obj_set_size(tile->root, tile_w, tile_h_);
         lv_obj_set_style_radius(tile->root, 12, 0);
         lv_obj_set_style_border_color(tile->root, theme.border(), 0);
         lv_obj_set_style_outline_color(tile->root, theme.primary(), 0);
         lv_obj_set_style_outline_pad(tile->root, 2, 0);
 
         tile->ring = ui::ring(tile->root, ring, 6);
-        lv_obj_align(tile->ring, LV_ALIGN_TOP_MID, 0, 7);
+        lv_obj_align(tile->ring, LV_ALIGN_TOP_MID, 0, 7 + dy);
         lv_obj_t* center = ui::container(tile->ring);
         lv_obj_set_size(center, ring - 12, ring - 12);
         lv_obj_center(center);
@@ -84,11 +86,11 @@ void TargetCard::build_tiles(std::size_t count)
         lv_obj_set_size(tile->material, tile_w - 4, 18);
         lv_obj_set_style_text_align(tile->material, LV_TEXT_ALIGN_CENTER, 0);
         lv_label_set_long_mode(tile->material, LV_LABEL_LONG_MODE_DOTS);
-        lv_obj_set_pos(tile->material, 2, 59);
+        lv_obj_set_pos(tile->material, 2, 59 + dy);
 
         lv_obj_t* row = ui::container(tile->root);
         lv_obj_set_size(row, tile_w, 16);
-        lv_obj_set_pos(row, 0, 77);
+        lv_obj_set_pos(row, 0, 77 + dy);
         lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
         lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_column(row, 4, 0);

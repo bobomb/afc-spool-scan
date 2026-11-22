@@ -94,7 +94,9 @@
             "colors": [
               "#F5F5F5"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane2",
@@ -113,7 +115,9 @@
             "colors": [
               "#1A1A1A"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane3",
@@ -132,7 +136,9 @@
             "colors": [
               "#1E5AA8"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane4",
@@ -149,7 +155,9 @@
             "low_stock": false,
             "remaining_pct": null,
             "colors": [],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           }
         ],
         "display_name": "Kestrel",
@@ -187,7 +195,9 @@
             "colors": [
               "#D32F2F"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane2",
@@ -206,7 +216,9 @@
             "colors": [
               "#F57C00"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane3",
@@ -227,7 +239,9 @@
               "#33B5E5",
               "#F2C14E"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           },
           {
             "lane": "lane4",
@@ -246,7 +260,9 @@
             "colors": [
               "#8A8D91"
             ],
-            "settings_pending": false
+            "settings_pending": false,
+            "nozzle": null,
+            "nozzle_detail": null
           }
         ],
         "display_name": "Yeti",

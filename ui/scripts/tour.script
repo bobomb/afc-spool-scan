@@ -4,8 +4,8 @@
 #   station-ui --snapshot out/tour --connect --script ui/scripts/tour.script
 #
 # Coordinates are for the 800x480 layout: side rail x 0-72 (Station y 42, Printers 110,
-# Log 178, Settings 438), top spool box y 12-140, printer cards y 174-352 (Kilo x 88-428,
-# Yankee x 444-784), action bar y 364-424 (More 136, Weigh 267, Load 425, Weigh + Load 646).
+# Log 178, Settings 438), top spool box y 12-140, printer cards y 148-370 (Kilo x 88-428,
+# Yankee x 444-784), action bar y 378-424 (More 136, Weigh 267, Load 425, Weigh + Load 646).
 # Requests go through the UI's own IPC connection, so sim.* actions only work while the
 # service is simulated.
 

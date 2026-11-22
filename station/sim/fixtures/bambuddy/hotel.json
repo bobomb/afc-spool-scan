@@ -120,7 +120,18 @@
     ],
     "vt_tray": [],
     "tray_now": 29,
-    "active_extruder": 0
+    "active_extruder": 0,
+    "nozzle_rack": [
+      {"id": 0, "addr_id": 1, "stat": 176, "nozzle_type": "HS01", "nozzle_diameter": "0.4"},
+      {"id": 16, "addr_id": 0, "stat": 160, "nozzle_type": "HS01", "nozzle_diameter": "0.4"},
+      {"id": 18, "addr_id": 2, "stat": 160, "nozzle_type": "HS01", "nozzle_diameter": "0.4"},
+      {"id": 19, "addr_id": 3, "stat": 160, "nozzle_type": "HS01", "nozzle_diameter": "0.4"},
+      {"id": 20, "addr_id": 4, "stat": 160, "nozzle_type": "HH01", "nozzle_diameter": "0.6"},
+      {"id": 21, "addr_id": 5, "stat": 160, "nozzle_type": "HS01", "nozzle_diameter": "0.4"},
+      {"id": 22, "addr_id": 6, "stat": 160, "nozzle_type": "HS01", "nozzle_diameter": "0.2"},
+      {"id": 23, "addr_id": 7, "stat": 1, "nozzle_type": "HT01", "nozzle_diameter": "0.4"},
+      {"id": 24, "addr_id": 8, "stat": 160, "nozzle_type": "HS01", "nozzle_diameter": "0.4"}
+    ]
   },
   "assignments": {
     "0": 101,
