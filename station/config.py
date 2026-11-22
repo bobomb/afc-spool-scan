@@ -17,6 +17,7 @@ REPO_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_PRINTERS = "Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125"
 DEFAULT_MOONRAKER_PORT = 7125
 DEFAULT_IPC_PORT = 7913
+DEFAULT_WEB_PORT = 7914
 DEFAULT_BAMBUDDY_URL = "http://127.0.0.1:8010"
 # PRINTERS entry `Name=bambuddy:<printer id>` is a Bambu printer managed by Bambuddy.
 BAMBUDDY = "bambuddy"
@@ -60,6 +61,9 @@ class Config:
     writes: bool = False
     ipc_host: str = "127.0.0.1"
     ipc_port: int = DEFAULT_IPC_PORT
+    web_host: str = "127.0.0.1"
+    # The read-only web view; None = not served.
+    web_port: int | None = None
     printers: tuple[PrinterConfig, ...] = ()
     spoolman_url: str = "http://127.0.0.1:7912/api/v1"
     spoolman_prefix: str = "web+spoolman:s-"
@@ -104,9 +108,9 @@ class Config:
 def platform_defaults(platform: str) -> dict[str, str]:
     if platform == "win32":
         return {"STATION_HARDWARE": "sim", "STATION_PRINTERS": "sim",
-                "STATION_SPOOLMAN": "sim", "STATION_WRITES": "off"}
+                "STATION_SPOOLMAN": "sim", "STATION_WRITES": "off", "STATION_WEB_HOST": "127.0.0.1"}
     return {"STATION_HARDWARE": "real", "STATION_PRINTERS": "live",
-            "STATION_SPOOLMAN": "live", "STATION_WRITES": "on"}
+            "STATION_SPOOLMAN": "live", "STATION_WRITES": "on", "STATION_WEB_HOST": "0.0.0.0"}
 
 
 def _unquote(raw: str) -> str:
@@ -233,6 +237,19 @@ def _number(values: Mapping[str, str], key: str, default: float) -> float:
         raise ConfigError(f"{key} must be a number (got {raw!r})") from error
 
 
+def _port(values: Mapping[str, str], key: str, default: int, *, optional: bool = False) -> int | None:
+    raw = values.get(key, "").strip() or str(default)
+    if optional and raw.lower() in {"off", "none"}:
+        return None
+    try:
+        port = int(raw)
+    except ValueError as error:
+        raise ConfigError(f"{key} must be an integer{' or off' if optional else ''}") from error
+    if not 0 <= port < 65536:
+        raise ConfigError(f"{key} is out of range")
+    return port
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m station", description="AFC spool station service")
     parser.add_argument("--config", type=Path, help="config.env path (default: repository config.env)")
@@ -244,6 +261,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
                         help="writes to Bambuddy (default: follow --writes)")
     parser.add_argument("--ipc-host")
     parser.add_argument("--ipc-port", type=int)
+    parser.add_argument("--web-host", help="address of the read-only web view (default: 0.0.0.0 on Linux)")
+    parser.add_argument("--web-port", help=f"port of the web view, or off (default: {DEFAULT_WEB_PORT})")
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--sim-fixtures", type=Path,
                         help="fixture directory for the simulators, e.g. station/sim/fixtures/captured")
@@ -273,6 +292,8 @@ def load_config(
         "BAMBUDDY_WRITES": args.bambuddy_writes,
         "STATION_IPC_HOST": args.ipc_host,
         "STATION_IPC_PORT": None if args.ipc_port is None else str(args.ipc_port),
+        "STATION_WEB_HOST": args.web_host,
+        "STATION_WEB_PORT": args.web_port,
         "STATION_STATE_DIR": None if args.state_dir is None else str(args.state_dir),
         "STATION_SIM_FIXTURES": None if args.sim_fixtures is None else str(args.sim_fixtures),
         "STATION_LOG_LEVEL": args.log_level,
@@ -287,12 +308,9 @@ def load_config(
     else:
         printers = parse_printers(DEFAULT_PRINTERS, moonraker_port)
 
-    try:
-        ipc_port = int(values.get("STATION_IPC_PORT", DEFAULT_IPC_PORT))
-    except ValueError as error:
-        raise ConfigError("STATION_IPC_PORT must be an integer") from error
-    if not 0 <= ipc_port < 65536:
-        raise ConfigError("STATION_IPC_PORT is out of range")
+    ipc_port = _port(values, "STATION_IPC_PORT", DEFAULT_IPC_PORT)
+    assert ipc_port is not None
+    web_port = _port(values, "STATION_WEB_PORT", DEFAULT_WEB_PORT, optional=True)
 
     product_ids = frozenset(
         part.strip().lower() for part in values.get("SCALE_PRODUCT_IDS", "8003").split(",") if part.strip()
@@ -323,6 +341,8 @@ def load_config(
         writes=_bool(values, "STATION_WRITES"),
         ipc_host=values.get("STATION_IPC_HOST", "127.0.0.1").strip() or "127.0.0.1",
         ipc_port=ipc_port,
+        web_host=values.get("STATION_WEB_HOST", "127.0.0.1").strip() or "127.0.0.1",
+        web_port=web_port,
         printers=printers,
         spoolman_url=values.get("SPOOLMAN_URL", "http://127.0.0.1:7912/api/v1").strip().rstrip("/"),
         spoolman_prefix=values.get("SPOOLMAN_PREFIX", "web+spoolman:s-"),

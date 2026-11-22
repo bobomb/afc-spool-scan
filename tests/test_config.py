@@ -122,6 +122,7 @@ def test_windows_defaults_are_safe(tmp_path: Path) -> None:
     assert [p.name for p in config.printers] == ["Kilo", "Yankee"]
     assert config.ipc_host == "127.0.0.1"
     assert config.ipc_port == 7913
+    assert (config.web_host, config.web_port) == ("127.0.0.1", 7914)
 
 
 def test_linux_defaults_use_real_services(tmp_path: Path) -> None:
@@ -130,6 +131,20 @@ def test_linux_defaults_use_real_services(tmp_path: Path) -> None:
         "real", "live", "live", True,
     )
     assert config.state_dir == tmp_path / "spool-station"
+    assert (config.web_host, config.web_port) == ("0.0.0.0", 7914)
+
+
+def test_web_view_port_and_off(tmp_path: Path) -> None:
+    def load(argv: list[str], environ: dict[str, str]) -> Config:
+        return load_config(argv, environ=environ, platform="linux", repo_dir=tmp_path)
+
+    assert load([], {"STATION_WEB_PORT": "off"}).web_port is None
+    assert load(["--web-port", "8100", "--web-host", "127.0.0.1"], {"STATION_WEB_PORT": "off"}).web_port == 8100
+    assert load(["--web-port", "off"], {}).web_port is None
+    with pytest.raises(ConfigError, match="STATION_WEB_PORT must be an integer or off"):
+        load([], {"STATION_WEB_PORT": "web"})
+    with pytest.raises(ConfigError, match="STATION_WEB_PORT is out of range"):
+        load([], {"STATION_WEB_PORT": "70000"})
 
 
 def test_precedence_env_file_then_environment_then_cli(tmp_path: Path) -> None:

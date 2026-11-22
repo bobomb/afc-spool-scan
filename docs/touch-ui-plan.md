@@ -92,6 +92,7 @@ flowchart LR
   S <-->|WebSocket subscribe| Y[Yankee Moonraker]
   S <-->|REST + WebSocket| B[Bambuddy] --> H[Hotel: Bambu H3C + AMS 3H]
   S --> AU[Audio cues]
+  S -->|HTTP + WebSocket, read-only| W[Web view<br/>any browser on the LAN]
 ```
 
 - **spool-station service (Python):** sole owner of the scale and QR scanner
@@ -103,6 +104,8 @@ flowchart LR
   which Bambuddy can't (§6.4, added 2026-11-16).
 - **Touch UI (LVGL, C):** stateless view. Renders state pushed by the service
   and sends action requests. No network code beyond local IPC.
+- **Web view (added 2026-11-21):** a page the service serves itself, showing
+  the same state in any browser on the LAN. Read-only (§3.4).
 - Existing scripts (`dymo-scale-read.py`, `audible-cue.py`) are reused as
   modules; the shell scripts remain as a CLI fallback.
 
@@ -141,6 +144,26 @@ WPE WebKit (`cog`), Qt/QML (PySide6), Kivy, extending KlipperScreen.
   Windows simulator at 800×480.
 - Code is pushed to `github.com/bobomb/afc-spool-scan` branch `touch-ui` and
   pulled onto spoolpi for real-hardware testing and deployment.
+
+### 3.4 Web view — **Decided** (user, 2026-11-21); details **Proposed**
+
+The user wants a web UI to see the station. The panel UI stays LVGL (§3.1);
+the web view is a second view for other devices.
+
+- Served by the spool-station service itself (aiohttp, no extra process or
+  build step) at `http://<spoolpi>:7914/`; `STATION_WEB_PORT="off"` turns it
+  off. On spoolpi it listens on all addresses; on Windows on `127.0.0.1`.
+- **Read-only:** it shows what the touch UI shows and has no buttons. A
+  viewer can't load, weigh, assign or undo anything, so it needs no login.
+- Shows the scale and its check, the selected spool, a countdown or prompt,
+  each printer card (status, job progress, next spool, lanes or the 3×3
+  slot grid), the log and the health summary, in the touch UI's words and
+  colours. Live over a WebSocket; it reconnects and keeps the last state
+  greyed out while the station is unreachable.
+- Fits a phone (one column) and a desktop (station and log left, printers
+  right); follows the browser's light or dark setting.
+- Actions from the web view (with some form of login) are out of scope until
+  the user asks for them.
 
 ## 4. Functions
 
@@ -529,3 +552,4 @@ Detailed tasks: dev plan §8.
 | 2026-11-15 | Bambuddy writes have their own switch (`BAMBUDDY_WRITES`), so the Bambu printer can start read-only while the Vorons keep writing. |
 | 2026-11-16 | User (open question 14): show Spoolman's grams on the H3C itself. The station sends `set_filament_weight` over the printer's MQTT (needs `BAMBU_ACCESS_CODE`), and Bambuddy is asked upstream (issue + PR) to send it with slot assignments. Changes §6.4 "the station never talks MQTT". |
 | 2026-11-16 | User: Bambu RFID spools get Spoolman's grams too, not the printer's own estimate (capped at 1000 g left, the H3C's limit for tagged spools; its profile allows RFID edits). |
+| 2026-11-21 | User: a web UI to see the station (§3.4). Proposed details: served by the service on port 7914, read-only, same content as the touch UI. The panel UI stays LVGL. |

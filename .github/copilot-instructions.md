@@ -24,6 +24,9 @@ silently change a **Decided** item.
 - `ui/` (C++20, LVGL v9.6) is a thin client over TCP `127.0.0.1:7913`
   newline-delimited JSON (dev plan §5). It holds no business logic and makes
   no network calls other than the IPC connection.
+- `station/web.py` + `station/webui/` serve a read-only web view of the same
+  state on port 7914 (dev plan §5.4). Keep it read-only and free of external
+  resources (no CDN, strict CSP, `textContent` only).
 - Existing bash/Python scripts in the repo root are in production on spoolpi;
   keep them working until the cutover task P4.
 

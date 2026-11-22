@@ -66,7 +66,8 @@ py -3.13 -m venv .venv
 pip install -e ".[dev]"
 pytest
 
-# Service with simulated scale, scanner, printers and Spoolman (IPC on 127.0.0.1:7913)
+# Service with simulated scale, scanner, printers and Spoolman (IPC on 127.0.0.1:7913,
+# read-only web view on http://127.0.0.1:7914/)
 python -m station --hardware sim --printers sim --spoolman sim --writes off
 
 # In another terminal: drive the simulation
@@ -114,6 +115,12 @@ python -m station.simctl printer hotel --insert 3H-4 --material ABS --color FFFF
 
 Load arms the Bambu printer; the spool is assigned in Bambuddy to the AMS
 slot it goes into (product plan §6.4).
+
+The service also serves a read-only web view of the station: open
+`http://<spoolpi>:7914/` from any browser on the LAN (on Windows
+`http://127.0.0.1:7914/`). It shows the scale, the selected spool, every
+printer's lanes or slots, the log and the health summary, live, but has no
+buttons. `STATION_WEB_PORT="off"` turns it off (dev plan §5.4).
 
 Headless screenshots (no window, no service needed):
 

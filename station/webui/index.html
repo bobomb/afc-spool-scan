@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Spool station</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="brand">Spool station</h1>
+    <span id="health" class="pill">Connecting</span>
+    <span id="conn" class="conn"><span class="dot"></span><span class="conn-text">Connecting</span></span>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+  <main>
+    <section id="station" class="panel station" aria-label="Station"></section>
+    <section id="printers" class="printers" aria-label="Printers"></section>
+    <section class="panel log" aria-label="Log">
+      <h2>Log</h2>
+      <ol id="activity" class="activity"></ol>
+    </section>
+  </main>
+  <footer id="service" class="service"></footer>
+</body>
+</html>

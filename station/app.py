@@ -36,6 +36,7 @@ from .sim.spoolman import SimSpoolman, load_spool_fixtures
 from .simcontrol import SimControl
 from .spoolman import SpoolmanClient
 from .state import ServiceInfo, Store
+from .web import WebServer
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ class Station:
         self.actions: Actions | None = None
         self.scan_flow: ScanFlow | None = None
         self.ipc: IpcServer | None = None
+        self.web: WebServer | None = None
         self._health_task: asyncio.Task[None] | None = None
         self._tasks: set[asyncio.Task[None]] = set()
 
@@ -243,13 +245,28 @@ class Station:
         self.scan_flow.start()
         self._health_task = asyncio.create_task(self._health_loop())
         await self.ipc.start()
+        if config.web_port is not None:
+            await self._start_web(config.web_host, config.web_port)
         log.info(
             "Station %s started: hardware=%s printers=%s spoolman=%s writes=%s",
             __version__, config.hardware, config.printers_mode, config.spoolman_mode,
             "on" if config.writes else "off",
         )
 
+    async def _start_web(self, host: str, port: int) -> None:
+        """The web view is optional: the station keeps running without it if its port is taken."""
+        web = WebServer(self.store, host, port)
+        try:
+            await web.start()
+        except OSError as error:
+            log.error("Web view not started on %s:%d: %s", host, port, error.strerror or error)
+            return
+        self.web = web
+
     async def stop(self) -> None:
+        if self.web is not None:
+            await self.web.stop()
+            self.web = None
         if self.ipc is not None:
             await self.ipc.stop()
         if self._health_task is not None:

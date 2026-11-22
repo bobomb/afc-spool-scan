@@ -76,6 +76,8 @@ afc-spool-scan/
 │  ├─ config.py                config.env + env vars + CLI flags
 │  ├─ state.py                 state model and change notifications
 │  ├─ ipc.py                   TCP NDJSON server (§5)
+│  ├─ web.py                   read-only web view: page, /api/state, /ws (§5.4)
+│  ├─ webui/                   the web view's index.html, style.css, app.js
 │  ├─ qr.py                    spool ID extraction (port of bash parser)
 │  ├─ rules.py                 weight acceptance, sanity check (pure)
 │  ├─ actions.py               lookup, weigh, load, assign, empty, undo
@@ -121,6 +123,8 @@ only), so the `station/` directory must stay next to it.
 | `--writes` / `STATION_WRITES` | `off`, `on` | `off` | `on` |
 | `--ipc-host` / `STATION_IPC_HOST` | address | `127.0.0.1` | `127.0.0.1` |
 | `--ipc-port` / `STATION_IPC_PORT` | port | `7913` | `7913` |
+| `--web-host` / `STATION_WEB_HOST` | address of the read-only web view (§5.4) | `127.0.0.1` | `0.0.0.0` |
+| `--web-port` / `STATION_WEB_PORT` | port, or `off` | `7914` | `7914` |
 | `--state-dir` / `STATION_STATE_DIR` | path | `%LOCALAPPDATA%\spool-station` | `~/.local/state/spool-station` |
 | `--log-level` / `STATION_LOG_LEVEL` | `DEBUG`…`ERROR` | `INFO` | `INFO` |
 | `--sim-fixtures` / `STATION_SIM_FIXTURES` | fixture dir | built-in synthetic | — |
@@ -304,6 +308,28 @@ an unknown spool aborts the scan.
 
 Version rule: additive changes keep `protocol: 1`; breaking changes bump it
 and the UI shows "incompatible service".
+
+### 5.4 Web view (read-only)
+
+`station/web.py` serves the web view (product plan §3.4) on
+`STATION_WEB_HOST:STATION_WEB_PORT` (default port 7914):
+
+| Path | Content |
+|---|---|
+| `/` | `webui/index.html` |
+| `/static/…` | `webui/style.css`, `webui/app.js` (no build step, no CDN) |
+| `/api/state` | the §5.2 snapshot as JSON |
+| `/ws` | WebSocket: `hello` (`read_only: true`), `snapshot`, then the same `event` messages as IPC |
+
+- No actions: anything a viewer sends on `/ws` is ignored.
+- A WebSocket whose `Origin` isn't the page's own host is refused (403), so
+  another site's page can't read the state.
+- Pages carry a strict `Content-Security-Policy` (`default-src 'self'`);
+  `app.js` builds the page with `textContent` only.
+- A viewer whose queue fills up gets a fresh snapshot instead of the missed
+  events.
+- If the port is taken the service logs an error and runs without the web
+  view; the touch UI is unaffected.
 
 ## 6. Service design notes
 
@@ -640,6 +666,10 @@ within a phase unless noted. Each task ends with tests/build passing.
   screen, the assign dialog, the status line and in result messages; card
   order follows `PRINTERS`.
   *Done 2026-10-19; unit and UI model tests, screenshots.*
+- [x] **F13** Read-only web view (product plan §3.4, 2026-11-21): the service
+  serves a page with the touch UI's content on port 7914 (§5.4).
+  *Done 2026-11-21; tests `test_web.py`, `test_config.py`; screenshots of
+  desktop, phone, light theme, errors and offline against the simulators.*
 
 ### P — spoolpi deployment
 
