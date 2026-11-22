@@ -101,8 +101,11 @@ struct Lane {
     bool low_stock = false;
     // Bambu slot: its filament settings are applied after the current print.
     bool settings_pending = false;
-    // Bambu slot: the nozzle of the hotend it feeds, e.g. "0.4" or "0.6 HF" (empty if unknown).
+    // Bambu slot: the nozzle of the hotend it feeds, e.g. "0.4", "0.6 HF" or "0.4 2.85mm" (empty if unknown).
     std::string nozzle;
+    // Filament diameter the lane's tool takes (mm); whether the lane's spool is another size in Spoolman.
+    std::optional<double> filament_mm;
+    bool wrong_filament = false;
 };
 
 struct Printer {

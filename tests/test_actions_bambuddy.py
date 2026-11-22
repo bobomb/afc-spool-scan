@@ -98,6 +98,29 @@ async def test_rfid_mismatch_is_logged_as_a_printer_notice(station3: Station) ->
     assert pending(station3)["hotel"] == 97
 
 
+async def test_a_spool_of_the_wrong_size_is_not_assigned_to_the_2_85_mm_hotend(station3: Station) -> None:
+    # Live 2026-11-22: a 1.75 mm spool went into the slot of the H3C's 2.85 mm TPU hotend (tool 8).
+    await act(station3, "sim.printer", printer="hotel", op="print", state="IDLE")
+    await act(station3, "sim.printer", printer="hotel", op="eject", lane="3H-8")
+    await wait_until(lambda: not hotel_lane(station3, "3H-8").prep)
+    await act(station3, "load", spool_id=97)
+    await act(station3, "sim.printer", printer="hotel", op="insert", lane="3H-8", material="ABS", color="FFFFFF")
+    await wait_until(lambda: station3.store.activity[0]["action"] == "printer")
+    entry = station3.store.activity[0]
+    assert entry["message"] == ("#97 is 1.75 mm filament in Spoolman, but Heron 3H-8 (T8) takes 2.85 mm; "
+                                "#97 not assigned and stays next spool")
+    assert entry["ok"] is False and station3.cues.played[-1] == "error"  # type: ignore[attr-defined]
+    assert pending(station3) == {"kilo": 97, "yankee": 97, "hotel": 97}
+    assert bambuddy_posts(station3) == []
+
+    refused = await act(station3, "assign_lane", spool_id=97, printer="hotel", lane="3H-8")
+    assert not refused["ok"] and refused["code"] == "invalid_args"
+    assert refused["message"] == "Spool 97 is 1.75 mm filament in Spoolman, but Heron 3H-8 (T8) takes 2.85 mm"
+    assert bambuddy_posts(station3) == []
+    assert (await act(station3, "assign_lane", spool_id=106, printer="hotel", lane="3H-8"))["ok"]
+    assert not hotel_lane(station3, "3H-8").wrong_filament
+
+
 async def test_sleep_disarms_the_bambu_printer(station3: Station) -> None:
     await act(station3, "load", spool_id=97)
     result = await act(station3, "sleep")

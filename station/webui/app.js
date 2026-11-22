@@ -313,19 +313,31 @@
     const head = el("div", "slot-name", lane.map ? `${lane.lane}  ${lane.map}` : lane.lane);
     tile.append(head);
     if (lane.nozzle_detail) tile.title = `${lane.map ? `${lane.map}: ` : ""}${lane.nozzle_detail} nozzle`;
-    const nozzle = lane.nozzle ? el("div", "slot-nozzle", `${lane.nozzle} nozzle`) : null;
+    const wide = typeof lane.filament_mm === "number" && Math.abs(lane.filament_mm - 1.75) > 0.2;
+    const extra = [];
+    if (lane.nozzle) {
+      const [diameter, ...type] = lane.nozzle.split(" ");
+      extra.push(el("div", "slot-nozzle", `${diameter} nozzle${type.length && !wide ? ` ${type.join(" ")}` : ""}`));
+    }
+    if (wide) extra.push(el("div", "slot-filament", `${lane.filament_mm} mm filament`));
     if (!hasSpool) {
-      tile.append(el("div", "slot-empty", lane.prep ? "No tag" : "Empty"));
-      if (nozzle) tile.append(nozzle);
+      tile.append(el("div", "slot-empty", lane.prep ? "No tag" : "Empty"), ...extra);
       return tile;
     }
     paint(tile, colorsOf(lane.colors, lane.color));
     tile.append(el("div", "slot-id", `#${lane.spool_id}`), el("div", null, lane.material || "--"));
     if (lane.remaining_g !== null && lane.remaining_g !== undefined) tile.append(el("div", null, grams(lane.remaining_g)));
-    if (lane.low_stock) tile.append(el("span", "tag low", "LOW"));
-    else tile.append(el("div", null, lane.settings_pending ? "Pending" : lane.filament_status || ""));
+    if (lane.wrong_filament) {
+      const flag = el("span", "tag wrong", "WRONG SIZE");
+      flag.title = `This tool takes ${lane.filament_mm} mm filament; the spool's diameter in Spoolman differs.`;
+      tile.append(flag);
+    } else if (lane.low_stock) {
+      tile.append(el("span", "tag low", "LOW"));
+    } else {
+      tile.append(el("div", null, lane.settings_pending ? "Pending" : lane.filament_status || ""));
+    }
     if (lane.settings_pending) tile.append(el("span", "pending"));
-    if (nozzle) tile.append(nozzle);
+    tile.append(...extra);
     return tile;
   }
 

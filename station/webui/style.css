@@ -306,7 +306,9 @@ main {
 .slot .slot-id { font-size: 18px; font-weight: 600; }
 .slot .slot-empty { font-size: 14px; margin-top: 8px; }
 .slot .slot-nozzle { margin-top: 2px; opacity: 0.85; white-space: nowrap; }
+.slot .slot-filament { opacity: 0.85; font-weight: 600; }
 .slot .tag.low { display: inline-block; outline: 1px solid currentColor; }
+.slot .tag.wrong { display: inline-block; background: var(--error); color: #fff; outline: 1px solid currentColor; }
 
 .slot .pending {
   position: absolute;

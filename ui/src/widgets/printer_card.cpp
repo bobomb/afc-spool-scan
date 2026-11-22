@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include "app.hpp"
 #include "format.hpp"
 #include "ui.hpp"
@@ -279,6 +281,9 @@ void PrinterCard::update_cell(LaneRow& row, const Lane& lane, bool loaded)
     Theme& theme = app_.theme();
     lv_color_t mark = theme.muted();
     const bool has_spool = lane.spool_id.has_value();
+    // A tool for another filament size shows that size: the cell is too narrow for both.
+    const bool wide = lane.filament_mm && std::fabs(*lane.filament_mm - 1.75) > 0.2;
+    const std::string nozzle = wide ? fmt_number(*lane.filament_mm, 2) + "mm" : lane.nozzle;
     if (has_spool) {
         std::vector<std::uint32_t> colors = parse_colors(lane.colors);
         if (colors.empty()) colors.push_back(theme.palette().surface_alt);
@@ -287,7 +292,7 @@ void PrinterCard::update_cell(LaneRow& row, const Lane& lane, bool loaded)
         ui::set_text(row.material, lane.material.empty() ? "--" : lane.material);
         ui::set_text(row.weight, lane.remaining_g ? fmt_grams(lane.remaining_g) : "");
         // The hotend's nozzle when known; the outline and the amber dot show in-tool and pending.
-        ui::set_text(row.status, !lane.nozzle.empty() ? lane.nozzle
+        ui::set_text(row.status, !nozzle.empty() ? nozzle
                                  : lane.settings_pending ? std::string("Pending") : lane.filament_status);
     } else {
         lv_obj_set_style_bg_grad(row.root, nullptr, 0);
@@ -297,7 +302,7 @@ void PrinterCard::update_cell(LaneRow& row, const Lane& lane, bool loaded)
         ui::set_text(row.spool, "");
         ui::set_text(row.material, lane.prep ? "No tag" : "Empty");
         ui::set_text(row.weight, "");
-        ui::set_text(row.status, lane.nozzle);
+        ui::set_text(row.status, nozzle);
     }
     lv_obj_set_style_text_font(row.material, has_spool ? theme.tiny() : theme.caption(), 0);
     lv_obj_set_pos(row.material, has_spool ? 7 : 4, has_spool ? 40 : 24);
@@ -307,12 +312,13 @@ void PrinterCard::update_cell(LaneRow& row, const Lane& lane, bool loaded)
     for (lv_obj_t* label : {row.name, row.spool, row.material, row.weight, row.status}) {
         lv_obj_set_style_text_color(label, mark, 0);
     }
-    lv_obj_set_style_outline_color(row.low, mark, 0);
     lv_obj_set_style_border_color(row.pending, mark, 0);
     ui::set_text(row.name, lane.map.empty() ? lane.lane : lane.lane + "  " + lane.map);
     const bool low = has_spool && lane.low_stock;
-    ui::set_hidden(row.low, !low);
-    ui::set_hidden(row.material, low);
+    const bool wrong = has_spool && lane.wrong_filament;
+    ui::set_flag_pill(row.low, wrong ? "SIZE" : "LOW", wrong ? theme.error() : theme.warn(), mark);
+    ui::set_hidden(row.low, !(low || wrong));
+    ui::set_hidden(row.material, low || wrong);
     ui::set_hidden(row.pending, !(has_spool && lane.settings_pending));
     lv_obj_set_style_outline_width(row.root, loaded ? 2 : 0, 0);
 }

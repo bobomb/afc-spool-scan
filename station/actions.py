@@ -9,7 +9,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from .activity import ActivityLog, UndoStep
-from .catalog import SpoolCatalog
+from .catalog import SpoolCatalog, filament_mismatch, fmt_mm
 from .config import Config
 from .printer_client import LaneLoad, PrinterClient, PrinterCommandError, PrinterNotice, PrinterOffline
 from .printers import PrinterManager, UnknownPrinter
@@ -478,6 +478,16 @@ class Actions:
             except ActionError as error:
                 self._fail(error)
                 raise
+            meta = self.catalog.get(spool_id) if self.catalog is not None else None
+            spool_mm = meta.diameter_mm if meta is not None else None
+            if filament_mismatch(lane.filament_mm, spool_mm):
+                assert lane.filament_mm is not None and spool_mm is not None
+                tool = f" ({lane.map})" if lane.map else ""
+                error = ActionError("invalid_args", f"Spool {spool_id} is {fmt_mm(spool_mm)} filament in Spoolman, "
+                                                    f"but {client.label} {lane.lane}{tool} takes "
+                                                    f"{fmt_mm(lane.filament_mm)}")
+                self._fail(error)
+                raise error
             previous = lane.spool_id
             try:
                 result = await client.set_lane_spool(lane.lane, spool_id)

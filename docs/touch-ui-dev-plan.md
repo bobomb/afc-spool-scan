@@ -262,7 +262,7 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `scale` | `stable`; derived against the current spool: `tare_g`, `net_g`, `expected_g`, `delta_g`, `check` (`ok`, `warn`, `tare_unknown` or null) — the sanity rule stays in the service |
 | `scan` | `countdown` `{spool_id, action, remaining_s}` (published each second) and `prompt` `{kind: "confirm_weigh", spool_id, message, gross_g, tare_g, net_g, expected_g, delta_g}` when an immediate scan skipped saving a suspicious weight |
 | `spool` | `found` (false → `{id, found, message}` only), `initial_weight_g`, `used_weight_g`, `tare_source` (`spool`, `filament`, `vendor`), `colors` (every filament colour, from `multi_color_hexes`; `color` is the first) |
-| `printers[]` | `key`, `display_name` (the printer name set in Mainsail or Bambuddy, else null; the UI shows it instead of `name`), `kind` (`moonraker` or `bambuddy`), `off` (a Bambu printer switched off while Bambuddy runs: not an error, Load skips it), `klippy_state` (Bambuddy: `ready`, `off` or `disconnected`), `filename`, `pending_confirmed`; `afc_state`/`afc_error` carry the filament system state/error (Bambu: the HMS warning or error); lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known), `colors` (Spoolman colours, else the AFC lane or AMS tray colour) and `settings_pending` (Bambu slot settings apply after the print). Bambu lanes are the AMS 3H slots `3H-1`…`3H-9`; `map` is the tool their hotend is (`T1`…`T9`, numbered from 1 as on the H3C), and `nozzle` / `nozzle_detail` describe that hotend's nozzle (`"0.6 HF"` / `"0.6 mm, hardened steel, high flow"`; null without `nozzle_rack` data); `prep` means a spool is in the slot |
+| `printers[]` | `key`, `display_name` (the printer name set in Mainsail or Bambuddy, else null; the UI shows it instead of `name`), `kind` (`moonraker` or `bambuddy`), `off` (a Bambu printer switched off while Bambuddy runs: not an error, Load skips it), `klippy_state` (Bambuddy: `ready`, `off` or `disconnected`), `filename`, `pending_confirmed`; `afc_state`/`afc_error` carry the filament system state/error (Bambu: the HMS warning or error); lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known), `colors` (Spoolman colours, else the AFC lane or AMS tray colour) and `settings_pending` (Bambu slot settings apply after the print). Bambu lanes are the AMS 3H slots `3H-1`…`3H-9`; `map` is the tool their hotend is (`T1`…`T9`, numbered from 1 as on the H3C), and `nozzle` / `nozzle_detail` describe that hotend's nozzle (`"0.6 HF"` / `"0.6 mm, hardened steel, high flow"`; `"0.4 2.85mm"` for a TPU285 hotend; null without `nozzle_rack` data), `filament_mm` is the filament diameter the tool takes (2.85 for a TPU285 hotend, else 1.75; null when unknown) and `wrong_filament` that the lane's spool has another diameter in Spoolman; `prep` means a spool is in the slot |
 | `health` | `scale_status` |
 | `activity[]` | `code`, `dry_run`, `undone`; `action` may also be `scan`, `clear_pending`, `undo`, `spool_loaded` (a lane took the spool, so the service cleared it as next spool on the other printers; for a Bambu slot it also records the assignment, and undo unassigns it and arms the printers again), `sleep` (pending next spools cleared when the station went to sleep) and `printer` (a printer reports something to see, e.g. an RFID spool that differs from the scan; `code: printer_notice`) |
 | `result` | `code`, `dry_run`, `data` (e.g. sanity figures with `needs_confirm`) |
@@ -808,7 +808,16 @@ within a phase unless noted. Each task ends with tests/build passing.
   Bambuddy's `nozzle_rack` (`nozzle`, `nozzle_detail`); station tiles,
   Printers grid, assign dialog and web view show them.
   *Done 2026-11-21; tests in `test_bambuddy.py` and on the captured H3C
-  fixture (all 0.4, 3H-8's hotend `HT01`).*
+  fixture (all 0.4, 3H-8's hotend `HT01`). 2026-11-22: numbered T1–T9
+  (user).*
+- [x] **B13** Filament size per H3C tool (product plan §5.2, user
+  2026-11-22): `HT01` is Bambu Studio's "TPU285" hotend (2.85 mm). Lanes
+  carry `filament_mm` and `wrong_filament`; an armed spool of another
+  Spoolman `diameter` is not assigned on insertion (notice, stays armed) and
+  `assign_lane` refuses it; tiles flag SIZE.
+  *Done 2026-11-22; tests `test_actions_bambuddy.py` (the live case: 1.75 mm
+  #97 into 3H-8), `test_bambuddy.py`; the simulator's 3H-8 has the TPU285
+  hotend and a 2.85 mm TPU spool (#106).*
 
 ### C — Continuous integration (optional)
 

@@ -45,6 +45,8 @@ lv_obj_t* button_label(lv_obj_t* button);
 lv_obj_t* dot(lv_obj_t* parent, int size, lv_color_t color);
 lv_obj_t* chip(lv_obj_t* parent, Theme& theme, const std::string& text, lv_color_t color);
 void set_chip(lv_obj_t* chip, const std::string& text, lv_color_t color);
+// A filled flag label such as LOW or SIZE: `text` on `fill`, outlined in `outline` (the tile's mark colour).
+void set_flag_pill(lv_obj_t* label, const std::string& text, lv_color_t fill, lv_color_t outline);
 void on_click(lv_obj_t* obj, std::function<void()> callback);
 void set_text(lv_obj_t* label, const std::string& text);
 void set_hidden(lv_obj_t* obj, bool hidden);

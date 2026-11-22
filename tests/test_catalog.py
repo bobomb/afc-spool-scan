@@ -42,7 +42,7 @@ async def test_fetches_in_background_then_caches(rig) -> None:  # noqa: ANN001
     assert catalog.get(93) is None
     await wait_until(lambda: updates)
     assert catalog.get(93) == SpoolMeta(initial_g=1000.0, colors=("#C94CE0", "#33B5E5", "#F2C14E"), material="PLA",
-                                        remaining_g=701.0)
+                                        remaining_g=701.0, diameter_mm=1.75)
     assert gets(sim, 93) == 1
     clock.now += 61
     assert catalog.get(93) is not None

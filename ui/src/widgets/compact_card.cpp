@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include "app.hpp"
 #include "format.hpp"
 #include "ui.hpp"
@@ -163,12 +165,16 @@ void CompactCard::update(const Printer& printer, bool online)
         lv_obj_set_style_text_color(tile.value, mark, 0);
         lv_obj_set_style_text_color(tile.line1, mark, 0);
         lv_obj_set_style_text_color(tile.line2, mark, 0);
-        ui::set_text(tile.tool, lane.map + (lane.nozzle.empty() ? "" : " " + lane.nozzle));
+        // Tiles are narrow: a tool for another filament size shows that size instead of its nozzle.
+        const bool wide = lane.filament_mm && std::fabs(*lane.filament_mm - 1.75) > 0.2;
+        const std::string extra = wide ? fmt_number(*lane.filament_mm, 2) : lane.nozzle;
+        ui::set_text(tile.tool, lane.map + (extra.empty() ? "" : " " + extra));
         lv_obj_set_style_text_color(tile.tool, mark, 0);
-        lv_obj_set_style_outline_color(tile.low, mark, 0);
+        const bool wrong = lane.spool_id && lane.wrong_filament;
+        ui::set_flag_pill(tile.low, wrong ? "SIZE" : "LOW", wrong ? theme.error() : theme.warn(), mark);
         lv_obj_set_style_border_color(tile.pending, mark, 0);
-        ui::set_hidden(tile.low, !low);
-        ui::set_hidden(tile.line1, low);
+        ui::set_hidden(tile.low, !(low || wrong));
+        ui::set_hidden(tile.line1, low || wrong);
         ui::set_hidden(tile.pending, !(lane.spool_id && lane.settings_pending));
     }
 }

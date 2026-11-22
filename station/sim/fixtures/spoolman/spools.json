@@ -572,7 +572,7 @@
       "filament": {
         "id": 36,
         "registered": "2026-11-01T10:00:00Z",
-        "name": "ABS Grey",
+        "name": "TPU 85A Grey",
         "vendor": {
           "id": 9,
           "registered": "2026-01-10T10:00:00Z",
@@ -580,14 +580,14 @@
           "empty_spool_weight": 200.0,
           "extra": {}
         },
-        "material": "ABS",
+        "material": "TPU",
         "price": 20.0,
-        "density": 1.24,
-        "diameter": 1.75,
+        "density": 1.21,
+        "diameter": 2.85,
         "weight": 1000.0,
         "color_hex": "8A8A8A",
-        "settings_extruder_temp": 255,
-        "settings_bed_temp": 100,
+        "settings_extruder_temp": 230,
+        "settings_bed_temp": 45,
         "extra": {}
       },
       "remaining_weight": 640.0,

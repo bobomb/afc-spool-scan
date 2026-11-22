@@ -30,7 +30,7 @@ from .bambu_mqtt import (
     filament_weight,
     remain_percent,
 )
-from .catalog import SpoolMeta
+from .catalog import SpoolMeta, filament_mismatch, fmt_mm
 from .config import PrinterConfig
 from .moonraker import clean_display_name, normalize_color
 from .printer_client import (
@@ -56,10 +56,15 @@ PRINT_STATES = {"RUNNING": "printing", "PREPARE": "printing", "SLICING": "printi
 HMS_SHOWN = (1, 2)
 CONFLICT = 409
 LANE_PREFIX = "3H-"
-# Hotend codes such as "HS01": flow (first two letters), then material (as Bambuddy decodes them).
-NOZZLE_FLOWS = {"HS": "standard flow", "HH": "high flow"}
-NOZZLE_SHORT_FLOWS = {"HH": "HF"}
+# Hotend codes such as "HS01" (Bambu Studio's DevNozzleSystem): the second letter is the type, the digits the
+# material. Only the "TPU285" hotend takes 2.85 mm filament.
+NOZZLE_FLOWS = {"S": "standard flow", "H": "high flow", "U": "TPU high flow", "T": "for 2.85 mm TPU",
+                "B": "E3D high flow"}
+NOZZLE_SHORT_FLOWS = {"H": "HF", "U": "TPU", "T": "2.85mm", "B": "E3D"}
 NOZZLE_MATERIALS = {"00": "stainless steel", "01": "hardened steel", "05": "tungsten carbide"}
+WIDE_FILAMENT_FLOW = "T"
+FILAMENT_MM = 1.75
+WIDE_FILAMENT_MM = 2.85
 RACK_BASE_ID = 16
 
 
@@ -125,22 +130,30 @@ def rack_hotends(status: dict[str, Any]) -> dict[int, dict[str, Any]]:
 
 
 def hotend_text(entry: dict[str, Any] | None) -> tuple[str | None, str | None]:
-    """("0.4", "0.4 mm, hardened steel, standard flow") for a hotend; a non-standard flow shows in the short form."""
+    """("0.4", "0.4 mm, hardened steel, standard flow") for a hotend; a non-standard type shows in the short form."""
     if not entry:
         return None, None
     diameter = str(entry.get("nozzle_diameter") or "").strip()
     code = str(entry.get("nozzle_type") or "").strip().upper()
     if not diameter and not code:
         return None, None
-    flow, material = code[:2], code[2:4]
+    flow, material = code[1:2], code[2:4]
     short = diameter or "?"
-    if flow and flow != "HS":
+    if flow and flow != "S":
         short += f" {NOZZLE_SHORT_FLOWS.get(flow, flow)}"
     parts = [f"{diameter} mm" if diameter else "", NOZZLE_MATERIALS.get(material, ""), NOZZLE_FLOWS.get(flow, "")]
     detail = ", ".join(part for part in parts if part)
     if code and (flow not in NOZZLE_FLOWS or material not in NOZZLE_MATERIALS):
         detail = f"{detail} ({code})" if detail else code
     return short, detail
+
+
+def hotend_filament_mm(entry: dict[str, Any] | None) -> float | None:
+    """The filament diameter a hotend takes, from its type code; None when the hotend reports no type."""
+    code = str((entry or {}).get("nozzle_type") or "").strip().upper()
+    if len(code) < 2:
+        return None
+    return WIDE_FILAMENT_MM if code[1] == WIDE_FILAMENT_FLOW else FILAMENT_MM
 
 
 def hms_text(errors: Any) -> str | None:
@@ -517,6 +530,7 @@ class BambuddyClient:
                                                                           if present else None)
             state = _int(tray.get("state"))
             nozzle, nozzle_detail = hotend_text(hotends.get(slot))
+            tool_mm = hotend_filament_mm(hotends.get(slot))
             lanes.append(LaneState(
                 lane=lane_name(slot),
                 map=tool_name(slot),
@@ -535,6 +549,8 @@ class BambuddyClient:
                 settings_pending=slot in self._pending_settings and spool_id is not None,
                 nozzle=nozzle,
                 nozzle_detail=nozzle_detail,
+                filament_mm=tool_mm,
+                wrong_filament=filament_mismatch(tool_mm, meta.diameter_mm if meta is not None else None),
             ))
         state_text = str(self._status.get("state") or "").upper()
         progress = self._status.get("progress")
@@ -602,6 +618,8 @@ class BambuddyClient:
         """Arm (or disarm) locally; nothing is sent until a spool goes into a slot."""
         if spool_id is not None and not self.online:
             raise PrinterOffline(f"{self.label} is {'off' if self.state.off else 'offline'}")
+        if spool_id is not None:
+            self.spool_meta(spool_id)  # its filament size is checked when it goes into a slot
         if self.state.pending_spool != spool_id or self.state.pending_confirmed != (spool_id is not None):
             self.state = replace(self.state, pending_spool=spool_id, pending_confirmed=spool_id is not None)
             self._publish_now()
@@ -667,6 +685,10 @@ class BambuddyClient:
                     self.on_lane_loaded(LaneLoad(self.key, lane, armed, previous=assigned))
                 return
             learned = tag is not None and self._known_tag(armed) != tag
+            wrong = self._filament_conflict(slot, armed)
+            if wrong is not None:
+                self._notice(f"{wrong}; #{armed} not assigned and stays next spool", spool_id=armed)
+                return
             if learned and tag is not None and not await self._link_tag(slot, tag, armed):
                 return
             # The slot was empty a moment ago, so any assignment Bambuddy still holds there is a leftover: undo
@@ -676,6 +698,17 @@ class BambuddyClient:
     def _known_tag(self, spool_id: int) -> str | None:
         meta = self.spool_meta(spool_id)
         return meta.tag if meta is not None else None
+
+    def _filament_conflict(self, slot: int, spool_id: int) -> str | None:
+        """Why the spool's filament doesn't fit the slot's hotend (live 2026-11-22: 1.75 mm PLA in the 2.85 mm
+        TPU hotend's slot), or None when it fits or either size is unknown."""
+        tool_mm = hotend_filament_mm(rack_hotends(self._status).get(slot))
+        meta = self.spool_meta(spool_id)
+        spool_mm = meta.diameter_mm if meta is not None else None
+        if tool_mm is None or spool_mm is None or not filament_mismatch(tool_mm, spool_mm):
+            return None
+        return (f"#{spool_id} is {fmt_mm(spool_mm)} filament in Spoolman, but {self.label} {lane_name(slot)} "
+                f"({tool_name(slot)}) takes {fmt_mm(tool_mm)}")
 
     def _slot_spool(self, slot: int) -> int | None:
         """The slot's assigned spool, unless the RFID tag in the tray is known to be another spool's.

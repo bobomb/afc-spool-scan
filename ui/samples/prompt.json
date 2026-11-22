@@ -61,7 +61,7 @@
       "used_weight_g": 545.3,
       "tare_source": "spool",
       "location": "Dry box A",
-      "last_used": "2026-11-22T16:20:42Z",
+      "last_used": "2026-11-22T17:15:41Z",
       "archived": false,
       "low_stock": false,
       "message": null,
@@ -103,7 +103,9 @@
             ],
             "settings_pending": false,
             "nozzle": null,
-            "nozzle_detail": null
+            "nozzle_detail": null,
+            "filament_mm": null,
+            "wrong_filament": false
           },
           {
             "lane": "lane2",
@@ -124,7 +126,9 @@
             ],
             "settings_pending": false,
             "nozzle": null,
-            "nozzle_detail": null
+            "nozzle_detail": null,
+            "filament_mm": null,
+            "wrong_filament": false
           },
           {
             "lane": "lane3",
@@ -145,7 +149,9 @@
             ],
             "settings_pending": false,
             "nozzle": null,
-            "nozzle_detail": null
+            "nozzle_detail": null,
+            "filament_mm": null,
+            "wrong_filament": false
           },
           {
             "lane": "lane4",
@@ -164,7 +170,9 @@
             "colors": [],
             "settings_pending": false,
             "nozzle": null,
-            "nozzle_detail": null
+            "nozzle_detail": null,
+            "filament_mm": null,
+            "wrong_filament": false
           }
         ],
         "display_name": "Kestrel",
@@ -204,7 +212,9 @@
             ],
             "settings_pending": false,
             "nozzle": null,
-            "nozzle_detail": null
+            "nozzle_detail": null,
+            "filament_mm": null,
+            "wrong_filament": false
           },
           {
             "lane": "lane2",
@@ -225,7 +235,9 @@
             ],
             "settings_pending": false,
             "nozzle": null,
-            "nozzle_detail": null
+            "nozzle_detail": null,
+            "filament_mm": null,
+            "wrong_filament": false
           },
           {
             "lane": "lane3",
@@ -248,7 +260,9 @@
             ],
             "settings_pending": false,
             "nozzle": null,
-            "nozzle_detail": null
+            "nozzle_detail": null,
+            "filament_mm": null,
+            "wrong_filament": false
           },
           {
             "lane": "lane4",
@@ -269,7 +283,9 @@
             ],
             "settings_pending": false,
             "nozzle": null,
-            "nozzle_detail": null
+            "nozzle_detail": null,
+            "filament_mm": null,
+            "wrong_filament": false
           }
         ],
         "display_name": "Yeti",

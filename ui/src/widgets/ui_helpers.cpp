@@ -118,6 +118,16 @@ void set_chip(lv_obj_t* chip, const std::string& text, lv_color_t color)
     set_text(text_label, text);
 }
 
+void set_flag_pill(lv_obj_t* label, const std::string& text, lv_color_t fill, lv_color_t outline)
+{
+    set_text(label, text);
+    lv_obj_set_style_bg_color(label, fill, 0);
+    // Near-black on amber, white on red: whichever reads better on the fill.
+    const std::uint32_t rgb = lv_color_to_u32(fill) & 0xFFFFFFu;
+    lv_obj_set_style_text_color(label, lv_color_hex(mark_color({rgb}) == kMarkLight ? 0xFFFFFF : 0x1A1206), 0);
+    lv_obj_set_style_outline_color(label, outline, 0);
+}
+
 void on_click(lv_obj_t* obj, std::function<void()> callback)
 {
     auto* stored = new std::function<void()>(std::move(callback));

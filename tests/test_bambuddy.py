@@ -11,6 +11,7 @@ from station.bambu_mqtt import WeightTarget
 from station.bambuddy import (
     BambuddyClient,
     hms_text,
+    hotend_filament_mm,
     hotend_text,
     rack_hotends,
     slot_of,
@@ -114,9 +115,13 @@ def test_hotends_by_rack_position() -> None:
     assert sorted(rack) == [1, 2] and rack[1]["id"] == 0 and rack[2]["nozzle_diameter"] == "0.2"
     assert hotend_text(rack[2]) == ("0.2", "0.2 mm, hardened steel, standard flow")
     assert hotend_text(rack[1]) == ("0.6 HF", "0.6 mm, hardened steel, high flow")
-    assert hotend_text({"nozzle_type": "HT01", "nozzle_diameter": "0.4"}) == ("0.4 HT", "0.4 mm, hardened steel (HT01)")
+    tpu285 = {"nozzle_type": "HT01", "nozzle_diameter": "0.4"}
+    assert hotend_text(tpu285) == ("0.4 2.85mm", "0.4 mm, hardened steel, for 2.85 mm TPU")
+    assert hotend_text({"nozzle_type": "HX07", "nozzle_diameter": "0.4"}) == ("0.4 X", "0.4 mm (HX07)")
     assert hotend_text({"nozzle_type": "", "nozzle_diameter": ""}) == (None, None)
     assert hotend_text(None) == (None, None)
+    assert [hotend_filament_mm(entry) for entry in (rack[1], rack[2], tpu285, {"nozzle_type": ""}, None)] == [
+        1.75, 1.75, 2.85, None, None]
 
 
 async def test_status_maps_to_slots(rig: Rig) -> None:
@@ -136,7 +141,9 @@ async def test_status_maps_to_slots(rig: Rig) -> None:
                                                                                          ["#FF6A13"])
     assert lanes["3H-5"].low_stock and not lanes["3H-1"].low_stock
     assert [lanes[f"3H-{n}"].map for n in range(1, 10)] == [f"T{n}" for n in range(1, 10)]
-    assert (lanes["3H-1"].nozzle, lanes["3H-5"].nozzle, lanes["3H-8"].nozzle) == ("0.4", "0.6 HF", "0.4 HT")
+    assert (lanes["3H-1"].nozzle, lanes["3H-5"].nozzle, lanes["3H-8"].nozzle) == ("0.4", "0.6 HF", "0.4 2.85mm")
+    assert (lanes["3H-1"].filament_mm, lanes["3H-8"].filament_mm) == (1.75, 2.85)
+    assert not any(lane.wrong_filament for lane in lanes.values())
     assert lanes["3H-4"].nozzle == "0.4" and lanes["3H-4"].spool_id is None
 
 
@@ -308,6 +315,20 @@ async def test_new_rfid_spool_in_a_slot_still_held_for_the_previous_spool() -> N
         assert rig.loads[0].note == "assigned #97 to Heron 3H-2 (RFID tag learned)" and rig.loads[0].previous is None
         assert rig.sim.tags[UNKNOWN_TAG] == 97 and rig.printer.assignments[1] == 97
         assert rig.client.state.pending_spool is None
+    finally:
+        await close_rig(rig, session)
+
+
+async def test_a_slot_holding_a_spool_of_another_size_is_flagged() -> None:
+    rig, session = await make_rig()
+    try:
+        await wait_until(lambda: rig.client.online)
+        await rig.sim.set_print(1, "IDLE")
+        await rig.client.set_lane_spool("3H-8", 97)
+        await wait_until(lambda: rig.client.lane("3H-8").spool_id == 97)
+        lane = rig.client.lane("3H-8")
+        assert (lane.filament_mm, lane.wrong_filament) == (2.85, True)
+        assert not rig.client.lane("3H-9").wrong_filament
     finally:
         await close_rig(rig, session)
 

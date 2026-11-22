@@ -323,9 +323,21 @@ printer, decided 2026-11-15, mockup option P1). Each shows:
   numbered from 1 as on the H3C (user, 2026-11-22): slot 3H-1 is tool T1 …
   3H-9 is T9, matching Bambuddy's rack positions 1–9; the Vorons keep
   Klipper's T0–T3.
-  The nozzle comes from Bambuddy's `nozzle_rack`: diameter, plus the flow
-  when it isn't standard (HF = high flow, other codes as reported, e.g.
-  "HT"); the web view shows the material and flow in words.
+  The nozzle comes from Bambuddy's `nozzle_rack`: diameter, plus the type
+  when it isn't standard, decoded as in Bambu Studio (`DevNozzleSystem`):
+  the second letter of the code is S standard, H high flow ("HF"), U TPU
+  high flow, T "TPU285" and B E3D high flow; the digits are the material.
+  The web view shows the material and type in words.
+- **Filament size (user, 2026-11-22).** A "TPU285" hotend takes 2.85 mm
+  filament, every other one 1.75 mm. The tool shows that size instead of
+  its nozzle where space is short ("T8 2.85", "2.85mm"). A spool whose
+  filament diameter in Spoolman differs is never assigned to that slot:
+  inserting the next spool there logs "#97 is 1.75 mm filament in Spoolman,
+  but H3C 3H-8 (T8) takes 2.85 mm; #97 not assigned and stays next spool",
+  and **Assign** refuses it with the same reason. A slot that already holds
+  a spool of the wrong size (assigned before this check, or by Bambuddy)
+  shows a red **SIZE** flag in place of the material. A wrong diameter in
+  Spoolman is fixed there.
 - Tapping a lane or slot opens **Assign to lane** with the current spool ID;
   nothing is sent until **Assign** is tapped (§4.1). For the Bambu printer
   Assign sets the slot's spool in Bambuddy.
@@ -568,4 +580,5 @@ Detailed tasks: dev plan §8.
 | 2026-11-21 | User: a web UI to see the station (§3.4). Proposed details: served by the service on port 7914, read-only, same content as the touch UI. The panel UI stays LVGL. |
 | 2026-11-21 | User: each H3C square shows its tool and, where known, the nozzle of the hotend it feeds (§5.1, §5.2). The station tiles also show the Vorons' T0–T3. |
 | 2026-11-22 | User: the H3C's tools are numbered from 1 (3H-1 = T1 … 3H-9 = T9), not T0–T8 as first chosen without the user's answer. |
+| 2026-11-22 | User (a 1.75 mm spool went into the slot of tool 8, a 2.85 mm TPU hotend): the station knows each H3C tool's filament size and does not assign a spool of another size (Spoolman `diameter`); such a slot is flagged SIZE (§5.2). |
 | 2026-11-21 | User, changes §5.1: taller station tiles; the "PRINTERS · Load sets the next spool…" line is removed and the bottom buttons are lower (46 px). |

@@ -116,7 +116,8 @@ async def test_station_replays_captured_bambuddy(tmp_path: Path) -> None:
             if present:
                 assert lane.material and lane.color
         assert [lane.map for lane in printer.lanes] == [f"T{slot}" for slot in range(1, 10)]
-        assert [lane.nozzle for lane in printer.lanes] == ["0.4"] * 7 + ["0.4 HT", "0.4"]
+        assert [lane.nozzle for lane in printer.lanes] == ["0.4"] * 7 + ["0.4 2.85mm", "0.4"]
+        assert [lane.filament_mm for lane in printer.lanes] == [1.75] * 7 + [2.85, 1.75]
     finally:
         await station.stop()
 

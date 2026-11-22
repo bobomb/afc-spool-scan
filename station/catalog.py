@@ -31,6 +31,21 @@ class SpoolMeta:
     archived: bool = False
     # Bambu RFID tray UUID linked to the spool (Spoolman extra.tag), upper case.
     tag: str | None = None
+    # Filament diameter in Spoolman (1.75, 2.85 mm).
+    diameter_mm: float | None = None
+
+
+# Diameters within this of each other count as the same filament size.
+DIAMETER_TOLERANCE_MM = 0.2
+
+
+def filament_mismatch(tool_mm: float | None, spool_mm: float | None) -> bool:
+    """A tool for one filament size and a spool of another; unknown sizes never conflict."""
+    return tool_mm is not None and spool_mm is not None and abs(tool_mm - spool_mm) > DIAMETER_TOLERANCE_MM
+
+
+def fmt_mm(value: float) -> str:
+    return f"{value:g} mm"
 
 
 def spool_tag(data: dict[str, Any]) -> str | None:
@@ -57,6 +72,7 @@ def meta_from_api(data: dict[str, Any]) -> SpoolMeta:
         remaining_g=round(max(remaining, 0.0), 1) if remaining is not None else None,
         archived=bool(data.get("archived")),
         tag=spool_tag(data),
+        diameter_mm=_positive(filament.get("diameter")),
     )
 
 

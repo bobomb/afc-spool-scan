@@ -191,6 +191,8 @@ Printer parse_printer(const json& data)
             lane.low_stock = boolean(item, "low_stock");
             lane.settings_pending = boolean(item, "settings_pending");
             lane.nozzle = str(item, "nozzle");
+            lane.filament_mm = number(item, "filament_mm");
+            lane.wrong_filament = boolean(item, "wrong_filament");
             printer.lanes.push_back(std::move(lane));
         }
     }
