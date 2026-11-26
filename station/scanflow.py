@@ -1,4 +1,4 @@
-"""Scan handling by scan_mode: immediate, countdown or fill (dev plan §6.4)."""
+"""Scan handling by scan_mode (immediate, countdown or fill) and the selected scan action (dev plan §6.4)."""
 
 from __future__ import annotations
 
@@ -72,13 +72,14 @@ class ScanFlow:
         log.info("Scanned code: %s", code)
         spool_id = extract_spool_id(code, self.prefix)
         self.cancel()
-        self.store.set_scan(ScanState(last_code=code, spool_id=spool_id, at=self.clock()))
+        action = self.store.scan.action
+        self.store.set_scan(ScanState(last_code=code, spool_id=spool_id, at=self.clock(), action=action))
         if spool_id is None:
             log.info("Ignored unrecognized QR code.")
             return
         mode = self.settings["scan_mode"]
         if mode == "immediate":
-            outcome = await self.actions.weigh_load({"spool_id": spool_id}, source="scan")
+            outcome = await self.actions.run_scan(spool_id, action)
             log.info("Scan of spool %d: %s", spool_id, outcome.message)
             return
         result = await self.actions.handle("lookup", {"spool_id": spool_id})
@@ -87,18 +88,18 @@ class ScanFlow:
             log.info("Scan of spool %d: %s", spool_id, result["message"])
             return
         if mode == "countdown":
-            self._countdown = asyncio.create_task(self._run_countdown(spool_id))
+            self._countdown = asyncio.create_task(self._run_countdown(spool_id, action))
 
     def _set_countdown(self, countdown: Countdown | None) -> None:
         self.store.set_scan(replace(self.store.scan, countdown=countdown))
 
-    async def _run_countdown(self, spool_id: int) -> None:
+    async def _run_countdown(self, spool_id: int, action: str) -> None:
         for remaining in range(self.countdown_s, 0, -1):
-            self._set_countdown(Countdown(spool_id=spool_id, action="weigh_load", remaining_s=remaining))
+            self._set_countdown(Countdown(spool_id=spool_id, action=action, remaining_s=remaining))
             await asyncio.sleep(self.tick_s)
         self._set_countdown(None)
         self._countdown = None
-        outcome = await self.actions.weigh_load({"spool_id": spool_id}, source="scan")
+        outcome = await self.actions.run_scan(spool_id, action)
         log.info("Countdown for spool %d: %s", spool_id, outcome.message)
 
     def cancel(self) -> bool:

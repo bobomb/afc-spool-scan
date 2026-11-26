@@ -75,24 +75,30 @@ MainScreen::MainScreen(App& app, lv_obj_t* parent) : app_(app)
     lv_obj_set_pos(no_printers_, x, kCardsY + 70);
 
     const int more_w = 96;
-    const int button_w = 150;
     more_ = ui::button(root_, theme, "More", ui::ButtonStyle::Ghost, theme.medium());
     lv_obj_set_size(more_, more_w, kBarH);
     lv_obj_set_pos(more_, x, kBarY);
     ui::on_click(more_, [this] { app_.open_more(); });
-    weigh_ = ui::button(root_, theme, "Weigh", ui::ButtonStyle::Normal, theme.medium());
-    lv_obj_set_size(weigh_, button_w, kBarH);
-    lv_obj_set_pos(weigh_, x + more_w + kGap, kBarY);
-    ui::on_click(weigh_, [this] { app_.weigh(); });
-    load_ = ui::button(root_, theme, "Load", ui::ButtonStyle::Normal, theme.medium());
-    lv_obj_set_size(load_, button_w, kBarH);
-    lv_obj_set_pos(load_, x + more_w + button_w + 2 * kGap, kBarY);
-    ui::on_click(load_, [this] { app_.load(); });
-    const int primary_x = x + more_w + 2 * button_w + 3 * kGap;
-    weigh_load_ = ui::button(root_, theme, "Weigh + Load", ui::ButtonStyle::Primary, theme.normal());
-    lv_obj_set_size(weigh_load_, x + w - primary_x, kBarH);
-    lv_obj_set_pos(weigh_load_, primary_x, kBarY);
-    ui::on_click(weigh_load_, [this] { app_.weigh_load(); });
+
+    // What the next scan does; the service resets it to Weigh + Load when the station sleeps.
+    const int caption_x = x + more_w + kGap;
+    const int caption_w = 76;
+    lv_obj_t* caption = ui::container(root_);
+    lv_obj_set_pos(caption, caption_x, kBarY);
+    lv_obj_set_size(caption, caption_w, kBarH);
+    lv_obj_center(ui::label(caption, theme.caption(), theme.muted(), "ON SCAN"));
+    const int segments_x = caption_x + caption_w;
+    const int segment_w = (x + w - segments_x - 2 * kGap) / 3;
+    const std::pair<const char*, const char*> actions[] = {
+        {"weigh", "Weigh"}, {"load", "Load"}, {"weigh_load", "Weigh + Load"}};
+    for (int i = 0; i < 3; ++i) {
+        lv_obj_t* button = ui::button(root_, theme, actions[i].second, ui::ButtonStyle::Segment, theme.medium());
+        lv_obj_set_size(button, segment_w, kBarH);
+        lv_obj_set_pos(button, segments_x + i * (segment_w + kGap), kBarY);
+        const std::string value = actions[i].first;
+        ui::on_click(button, [this, value] { app_.set_scan_action(value); });
+        scan_actions_.emplace_back(value, button);
+    }
 }
 
 void MainScreen::update(const State& state, std::uint32_t topics, bool online)
@@ -143,9 +149,10 @@ void MainScreen::update(const State& state, std::uint32_t topics, bool online)
 
     const bool has_spool = online && app_.spool_id().has_value();
     ui::set_disabled(more_, !has_spool);
-    ui::set_disabled(weigh_, !has_spool);
-    ui::set_disabled(load_, !has_spool);
-    ui::set_disabled(weigh_load_, !has_spool);
+    for (const auto& [value, button] : scan_actions_) {
+        ui::set_checked(button, value == state.scan.action);
+        ui::set_disabled(button, !online);
+    }
 }
 
 }  // namespace station

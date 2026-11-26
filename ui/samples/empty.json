@@ -36,7 +36,8 @@
       "spool_id": 97,
       "at": "2026-10-13T20:59:58Z",
       "countdown": null,
-      "prompt": null
+      "prompt": null,
+      "action": "weigh"
     },
     "spool": null,
     "printers": [

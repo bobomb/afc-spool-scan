@@ -59,6 +59,8 @@ struct ScanState {
     std::string at;
     std::optional<Countdown> countdown;
     std::optional<Prompt> prompt;
+    // What a scan does: "weigh_load" (default), "weigh" or "load".
+    std::string action = "weigh_load";
 };
 
 struct SpoolInfo {

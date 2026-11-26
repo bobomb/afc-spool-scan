@@ -67,6 +67,9 @@ public:
     void weigh(bool confirm = false);
     void weigh_load(bool confirm = false);
     void load();
+    // Pick what a scan does (the station screen's selector), and run that action on the selected spool.
+    void set_scan_action(const std::string& action);
+    void run_scan_action();
     void empty_spool();
     void open_assign(std::string printer = std::string(), std::string lane = std::string());
     void assign(int spool_id, const std::string& printer, const std::string& lane);

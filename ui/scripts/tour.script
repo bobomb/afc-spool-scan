@@ -5,7 +5,9 @@
 #
 # Coordinates are for the 800x480 layout: side rail x 0-72 (Station y 42, Printers 110,
 # Log 178, Settings 438), top spool box y 12-140, printer cards y 148-370 (Kilo x 88-428,
-# Yankee x 444-784), action bar y 378-424 (More 136, Weigh 267, Load 425, Weigh + Load 646).
+# Yankee x 444-784), action bar y 378-424 (More 136; scan action selector: Weigh 351,
+# Load 525, Weigh + Load 699). The More menu's rows: run the selected action now y 192,
+# Assign to lane 256, Record empty spool 320 (x 224).
 # Requests go through the UI's own IPC connection, so sim.* actions only work while the
 # service is simulated.
 
@@ -29,8 +31,10 @@ shot 03-lookup
 tap 614 200
 wait 300
 
-# Weigh + Load to both printers.
-tap 646 394
+# Weigh + Load (the selected scan action) for the typed spool, from More.
+tap 136 394
+wait 300
+tap 224 192
 wait 900
 shot 04-weigh-load
 
@@ -64,12 +68,18 @@ shot 10-undo
 tap 36 42
 request sim.scale {"grams": 984}
 wait 400
-tap 267 394
+tap 351 394
+wait 300
+tap 136 394
+wait 300
+tap 224 192
 wait 700
 shot 11-confirm
 tap 514 377
 wait 900
 shot 12-confirmed
+tap 699 394
+wait 300
 
 # A scan in immediate mode with a suspicious weight prompts on screen.
 request sim.scan {"code": "WEB+SPOOLMAN:S-86"}
@@ -139,8 +149,12 @@ shot 24-light-main
 request set_setting {"key": "theme", "value": "dark"}
 wait 1200
 
-# Sleep: a scan in immediate mode sets the next spool on both printers; when the screen goes
-# off the spool is deselected and both pending next spools are cleared.
+# Sleep: with Load picked, a scan sets the next spool on both printers; when the screen goes
+# off the spool is deselected, both pending next spools are cleared and scans go back to
+# Weigh + Load.
+tap 525 394
+wait 300
+shot 25a-scan-load
 request sim.scan {"code": "web+spoolman:s-97"}
 wait 1200
 idle off

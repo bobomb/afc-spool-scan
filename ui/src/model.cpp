@@ -89,6 +89,7 @@ ScanState parse_scan(const json& data)
     scan.last_code = str(data, "last_code");
     scan.spool_id = integer(data, "spool_id");
     scan.at = str(data, "at");
+    scan.action = str(data, "action", scan.action);
     const json& countdown = field(data, "countdown");
     if (countdown.is_object()) {
         scan.countdown = Countdown{integer(countdown, "spool_id").value_or(0), str(countdown, "action"),

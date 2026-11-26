@@ -372,9 +372,8 @@ private:
     std::vector<std::size_t> shown_;
     std::string layout_key_;
     lv_obj_t* more_ = nullptr;
-    lv_obj_t* weigh_ = nullptr;
-    lv_obj_t* load_ = nullptr;
-    lv_obj_t* weigh_load_ = nullptr;
+    // The scan action selector: value and button.
+    std::vector<std::pair<std::string, lv_obj_t*>> scan_actions_;
 };
 
 class PrintersScreen {

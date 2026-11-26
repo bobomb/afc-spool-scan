@@ -204,6 +204,18 @@ async def test_sleep_skips_printers_without_a_next_spool(station: Station) -> No
     assert result["message"] == "Station asleep: next spool cleared on Yeti"
 
 
+async def test_scan_action_is_picked_until_the_station_sleeps(station: Station) -> None:
+    assert station.store.scan.action == "weigh_load"
+    for bad in ({}, {"action": "lookup"}, {"action": ["weigh"]}):
+        assert (await station.actions.handle("set_scan_action", bad))["code"] == "invalid_args"
+    result = await station.actions.handle("set_scan_action", {"action": "load"})
+    assert result == {"ok": True, "message": "On scan: Load"}
+    assert station.store.snapshot()["scan"]["action"] == "load"
+    assert station.store.activity == [] and station.cues.played == []
+    assert (await act(station, "sleep"))["message"] == "Asleep"
+    assert station.store.scan.action == "weigh_load"
+
+
 async def test_lanes_carry_remaining_percent_and_colours(station: Station) -> None:
     def lane(printer: str, index: int):  # noqa: ANN202
         return station.store.printers[printer].lanes[index]

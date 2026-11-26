@@ -260,7 +260,7 @@ Additive fields implemented beyond the example above (all protocol 1):
 |---|---|
 | `service` | `version`, `protocol`, `hardware`, `printers`, `spoolman`, `writes`, `dry_run` (writes off with a live service), `bambuddy_writes` (only with a Bambuddy printer) |
 | `scale` | `stable`; derived against the current spool: `tare_g`, `net_g`, `expected_g`, `delta_g`, `check` (`ok`, `warn`, `tare_unknown` or null) — the sanity rule stays in the service |
-| `scan` | `countdown` `{spool_id, action, remaining_s}` (published each second) and `prompt` `{kind: "confirm_weigh", spool_id, message, gross_g, tare_g, net_g, expected_g, delta_g}` when an immediate scan skipped saving a suspicious weight |
+| `scan` | `action` (what a scan runs: `weigh_load` (default), `weigh` or `load`; picked with `set_scan_action`, back to `weigh_load` on `sleep` and at service start), `countdown` `{spool_id, action, remaining_s}` (published each second) and `prompt` `{kind: "confirm_weigh", spool_id, message, gross_g, tare_g, net_g, expected_g, delta_g}` when a scan skipped saving a suspicious weight |
 | `spool` | `found` (false → `{id, found, message}` only), `initial_weight_g`, `used_weight_g`, `tare_source` (`spool`, `filament`, `vendor`), `colors` (every filament colour, from `multi_color_hexes`; `color` is the first) |
 | `printers[]` | `key`, `display_name` (the printer name set in Mainsail or Bambuddy, else null; the UI shows it instead of `name`), `kind` (`moonraker` or `bambuddy`), `off` (a Bambu printer switched off while Bambuddy runs: not an error, Load skips it), `klippy_state` (Bambuddy: `ready`, `off` or `disconnected`), `filename`, `pending_confirmed`; `afc_state`/`afc_error` carry the filament system state/error (Bambu: the HMS warning or error); lanes add `status`, `prep`, `load`, `remaining_pct` (lane `weight` as % of the spool's initial weight in Spoolman; null until known), `colors` (Spoolman colours, else the AFC lane or AMS tray colour) and `settings_pending` (Bambu slot settings apply after the print). Bambu lanes are the AMS 3H slots `3H-1`…`3H-9`; `map` is the tool their hotend is (`T1`…`T9`, numbered from 1 as on the H3C), and `nozzle` / `nozzle_detail` describe that hotend's nozzle (`"0.6 HF"` / `"0.6 mm, hardened steel, high flow"`; `"0.4 2.85mm"` for a TPU285 hotend; null without `nozzle_rack` data), `filament_mm` is the filament diameter the tool takes (2.85 for a TPU285 hotend, else 1.75; null when unknown) and `wrong_filament` that the lane's spool has another diameter in Spoolman; `prep` means a spool is in the slot |
 | `health` | `scale_status` |
@@ -280,10 +280,11 @@ Additive fields implemented beyond the example above (all protocol 1):
 | `empty_spool` | `spool_id`, `confirm?` | Stable weight → spool and filament `spool_weight`, archive |
 | `undo` | `activity_id` | Revert an undoable activity |
 | `set_setting` | `key`, `value` | Persist a setting → `settings` event |
+| `set_scan_action` | `action` (`weigh_load`, `weigh`, `load`) | Pick what a scan runs → `scan.action`; in memory only, not logged |
 | `cancel_countdown` | — | Cancel a pending scan-mode countdown |
 | `dismiss_prompt` | — | Clear `scan.prompt` without saving the weight |
 | `clear_spool` | — | Deselect the current spool (`spool` → `null`, scale check reset); keypad Clear / Esc |
-| `sleep` | — | Sent by the UI when the screen goes off: `clear_spool`, dismiss any prompt, and clear the pending next spool on every printer that has one (recorded as `sleep`, undoable) |
+| `sleep` | — | Sent by the UI when the screen goes off: `clear_spool`, dismiss any prompt, reset `scan.action` to `weigh_load`, and clear the pending next spool on every printer that has one (recorded as `sleep`, undoable) |
 | `sim.scale` / `sim.scan` / `sim.printer` / `sim.spoolman` | see `simcontrol.py` | Drive simulated components (`simctl`) |
 
 `load` and `weigh_load` always target every printer (product plan §4.2 #1,
@@ -389,10 +390,14 @@ clients.
   `archived` plus the filament's previous `spool_weight` (empty spool).
   Undo runs the inverse steps newest first. Only
   entries recorded under the current write mode can be undone.
-- Scan handling by `scan_mode`:
-  - `immediate`: today's behaviour — weigh if a qualifying weight is present,
-    then load to both printers.
-  - `countdown`: fill the ID, run `weigh_load` after 5 s unless cancelled.
+- Scan handling by `scan_mode`, running the picked `scan.action`
+  (product plan §5.1, user 2026-11-26):
+  - `immediate`: run it at once. `weigh_load` is today's behaviour — weigh
+    if a qualifying weight is present, then load to every printer (logged
+    as `scan`). `weigh` only weighs (logged as `weigh`; a scale problem is
+    logged as a failed `weigh`, a suspicious weight sets `scan.prompt`).
+    `load` only loads (logged as `load`).
+  - `countdown`: fill the ID, run that action after 5 s unless cancelled.
   - `fill`: fill the ID and look it up only.
 - Audio cues as today: `weigh` when a weight is saved, `success`, `error`.
 
@@ -408,7 +413,7 @@ settings so they can change without code edits:
 | Sanity threshold | 50 g or 10%, whichever is larger |
 | `low_stock_g` | 100 |
 | `undo_depth` | 20 |
-| Idle | dim 120 s, blank 300 s (blank = sleep: deselect, clear next spools) |
+| Idle | dim 120 s, blank 300 s (blank = sleep: deselect, clear next spools, scans back to Weigh + Load) |
 | Empty spool minimum weight | > 10 g stable |
 
 ### 6.6 Bambuddy
@@ -675,6 +680,14 @@ within a phase unless noted. Each task ends with tests/build passing.
   serves a page with the touch UI's content on port 7914 (§5.4).
   *Done 2026-11-21; tests `test_web.py`, `test_config.py`; screenshots of
   desktop, phone, light theme, errors and offline against the simulators.*
+- [x] **F14** Scan action selector (product plan §5.1, user 2026-11-26):
+  Weigh / Load / Weigh + Load on the station screen pick what a scan (and a
+  countdown) runs (`set_scan_action`, `scan.action`), Weigh + Load by
+  default and again after `sleep`; More → "<action> now" runs it on the
+  selected spool; the web view shows "On scan: …".
+  *Done 2026-11-26; tests `test_scanflow.py`, `test_actions.py`,
+  `test_ui_e2e.py` (Load picked, run from More, reset by sleep),
+  `test_model.cpp`; tour and screenshots updated.*
 
 ### P — spoolpi deployment
 

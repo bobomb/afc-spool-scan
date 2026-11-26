@@ -1,4 +1,5 @@
 #include "app.hpp"
+#include "format.hpp"
 #include "ui.hpp"
 
 namespace station {
@@ -25,6 +26,15 @@ lv_obj_t* menu_row(lv_obj_t* menu, Theme& theme, int y, const std::string& title
     return row;
 }
 
+void divider(lv_obj_t* menu, Theme& theme, int y)
+{
+    lv_obj_t* line = ui::container(menu);
+    lv_obj_set_pos(line, 16, y);
+    lv_obj_set_size(line, kMenuW - 32, 1);
+    lv_obj_set_style_bg_color(line, theme.border(), 0);
+    lv_obj_set_style_bg_opa(line, LV_OPA_COVER, 0);
+}
+
 }  // namespace
 
 void MoreMenu::show(int spool_id)
@@ -38,8 +48,8 @@ void MoreMenu::show(int spool_id)
     ui::on_click(catcher_, [this] { close(); });
 
     lv_obj_t* menu = ui::container(catcher_);
-    lv_obj_set_pos(menu, kMenuX, kMenuBottom - 2 * kRowH);
-    lv_obj_set_size(menu, kMenuW, 2 * kRowH);
+    lv_obj_set_pos(menu, kMenuX, kMenuBottom - 3 * kRowH);
+    lv_obj_set_size(menu, kMenuW, 3 * kRowH);
     lv_obj_set_style_radius(menu, 16, 0);
     lv_obj_set_style_bg_color(menu, theme.surface_alt(), 0);
     lv_obj_set_style_bg_opa(menu, LV_OPA_COVER, 0);
@@ -51,17 +61,25 @@ void MoreMenu::show(int spool_id)
     lv_obj_set_clickable(menu, true);
 
     const std::string id = "#" + std::to_string(spool_id);
-    lv_obj_t* assign = menu_row(menu, theme, 0, "Assign to lane...", theme.text(), "Pick a printer lane for " + id);
+    // The selected scan action, for a spool that was typed in or not acted on yet.
+    const std::string& action = app_.state().scan.action;
+    std::string what = "Weigh " + id + ", set it as next spool";
+    if (action == "weigh") what = "Save the weight of " + id;
+    if (action == "load") what = "Set " + id + " as next spool";
+    lv_obj_t* run = menu_row(menu, theme, 0, action_label(action) + " now", theme.text(), what);
+    ui::on_click(run, [this] {
+        close();
+        app_.run_scan_action();
+    });
+    divider(menu, theme, kRowH);
+    lv_obj_t* assign = menu_row(menu, theme, kRowH, "Assign to lane...", theme.text(),
+                                "Pick a printer lane for " + id);
     ui::on_click(assign, [this] {
         close();
         app_.open_assign();
     });
-    lv_obj_t* divider = ui::container(menu);
-    lv_obj_set_pos(divider, 16, kRowH);
-    lv_obj_set_size(divider, kMenuW - 32, 1);
-    lv_obj_set_style_bg_color(divider, theme.border(), 0);
-    lv_obj_set_style_bg_opa(divider, LV_OPA_COVER, 0);
-    lv_obj_t* empty = menu_row(menu, theme, kRowH, "Record empty spool", theme.error(),
+    divider(menu, theme, 2 * kRowH);
+    lv_obj_t* empty = menu_row(menu, theme, 2 * kRowH, "Record empty spool", theme.error(),
                                "Weigh the core, then archive " + id);
     ui::on_click(empty, [this] {
         close();

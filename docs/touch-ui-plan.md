@@ -155,7 +155,8 @@ the web view is a second view for other devices.
   off. On spoolpi it listens on all addresses; on Windows on `127.0.0.1`.
 - **Read-only:** it shows what the touch UI shows and has no buttons. A
   viewer can't load, weigh, assign or undo anything, so it needs no login.
-- Shows the scale and its check, the selected spool, a countdown or prompt,
+- Shows the scale and its check, the selected spool, what a scan does
+  ("On scan: Weigh + Load"), a countdown or prompt,
   each printer card (status, job progress, next spool, lanes or the 3×3
   slot grid), the log and the health summary, in the touch UI's words and
   colours. Live over a WebSocket; it reconnects and keeps the last state
@@ -202,10 +203,10 @@ Rules carried over from the current scanner behaviour:
 | 5 | **Record empty spool** | Weigh the empty core, store it as the spool's `spool_weight` (tare) and as its filament's default `spool_weight`, then archive the spool. |
 | 6 | **Weight sanity check** | Before saving, show gross, tare, net and the delta from Spoolman's expected weight; warn above a threshold (likely wrong spool or missing tare). |
 | 7 | **Undo and recent activity** | Activity list of recent actions; undo restores previous Spoolman values / lane assignment / pending spool. |
-| 8 | **Scan behaviour mode** | Configurable behaviour when a QR is scanned while the UI is running (see §7). |
+| 8 | **Scan behaviour mode** | Configurable behaviour when a QR is scanned while the UI is running (see §7). The action a scan runs (Weigh, Load or Weigh + Load) is picked on the station screen (§5.1, user 2026-11-26). |
 | 9 | **Low-stock highlighting** | Lanes and looked-up spools below a threshold are highlighted. |
 | 10 | **Health / connection status** | Spoolman, Kilo, Yankee, Hotel and scale connection indicators; scale status detail. A Bambu printer that is switched off (Bambuddy up, printer off) is shown as "Off", not as a problem; Bambuddy itself unreachable is "offline" like a Moonraker printer. |
-| 11 | **Screen idle management** | Blank/dim after idle; wake on touch, scan or scale change. Dimming needs a software backlight (verify, §2.1); otherwise blank to a black screen. When the screen goes off the station goes to sleep: the selected spool is deselected and the pending next spool is cleared on both printers (added 2026-10-19; undoable, in the Log). |
+| 11 | **Screen idle management** | Blank/dim after idle; wake on touch, scan or scale change. Dimming needs a software backlight (verify, §2.1); otherwise blank to a black screen. When the screen goes off the station goes to sleep: the selected spool is deselected and the pending next spool is cleared on both printers (added 2026-10-19; undoable, in the Log), and scans go back to Weigh + Load (2026-11-26, §5.1). |
 
 ### 4.3 Explicitly excluded — **Decided**
 
@@ -239,7 +240,7 @@ screen.
 │Log │ │ [888g][612g][74g][ – ]│ │ [950g][321g][ ? ][45g]   │ │
 │    │ │  PLA  PLA PETG Empty  │ │  PLA PETG Untag ABS      │ │
 │ ●  │ │ ↓ Next spool #93      │ │ ↓ Next spool #93          │ │
-│AllOK│ [More] [ Weigh ] [ Load ] [     Weigh + Load      ]    │
+│AllOK│ [More] ON SCAN [ Weigh ] [ Load ] [▣ Weigh + Load ]   │
 │ ⚙  │ ✓ Spool 93: 841 g saved; next spool set on…   [Undo]   │
 └────┴─────────────────────────────────────────────────────────┘
 ```
@@ -293,9 +294,21 @@ screen.
   stock is an amber "LOW" pill next to the spool #, below the ring. The lane
   loaded in the tool has a blue outline. Empty lanes are a hollow outline;
   untagged lanes a grey tile with "?".
-- **Action bar.** **More** (Assign to lane…, Record empty spool), **Weigh**,
-  **Load** and **Weigh + Load** (primary). All four are disabled until a
-  spool is selected.
+- **Action bar.** **More** and the scan action selector.
+- **Scan action selector (user, 2026-11-26).** **Weigh**, **Load** and
+  **Weigh + Load** are no longer buttons that act on the selected spool: they
+  pick what the next scan does, labelled "ON SCAN", with the picked one
+  outlined in blue. **Weigh + Load** is the default. The pick stays for every
+  following scan until the station goes to sleep (§4.2 #11), which resets it
+  to Weigh + Load; a service restart also starts at Weigh + Load. It also
+  applies to a countdown scan (§7). A Weigh scan saves the weight only
+  (nothing is loaded; a missing weight goes to the Log, a suspicious one is
+  asked on screen); a Load scan sets the next spool without weighing. The
+  selector works without a selected spool; picking is not logged.
+- **More.** "<picked action> now" runs the picked action on the selected
+  spool, for a spool typed on the keypad or not acted on yet (fill mode, a
+  cancelled countdown, a weight to retake); then **Assign to lane…** and
+  **Record empty spool**. Disabled until a spool is selected.
 - **Keypad.** A sheet over the screen: digits, backspace, **Clear** (also
   deselects the spool, like Esc), **Look up**; × or a tap outside closes it.
   A digit on a hardware keyboard opens it with that digit typed. A scan
@@ -484,7 +497,7 @@ Status byte values to surface in the UI:
 | Weight acceptance | Decided | Stable reading > 50 g |
 | Display orientation | Proposed | Landscape, not rotated (works as currently placed, verified 2026-10-15); if the final mount requires it, rotate in LVGL (display + touch) |
 | Target printer default | **Decided** 2026-10-19 | Always every printer; no selection (§4.2 #1; Bambu printer included 2026-11-15) |
-| Scan behaviour mode (#8) | Decided: configurable; **Open:** default | Options: *immediate* (current: weigh if possible + load), *fill + countdown* (fill ID, run default action after cancellable countdown), *fill only* |
+| Scan behaviour mode (#8) | Decided: configurable; **Open:** default | Options: *immediate* (current: run the scan action picked on the station screen, §5.1; Weigh + Load by default: weigh if possible + load), *fill + countdown* (fill ID, run that action after cancellable countdown), *fill only* |
 | Sanity-check warning threshold | **Open** | e.g. 50 g or 10% of expected |
 | Low-stock threshold | **Open** | e.g. < 100 g remaining |
 | Undo depth | **Open** | e.g. last 20 actions, in memory + persisted |
@@ -582,3 +595,4 @@ Detailed tasks: dev plan §8.
 | 2026-11-22 | User: the H3C's tools are numbered from 1 (3H-1 = T1 … 3H-9 = T9), not T0–T8 as first chosen without the user's answer. |
 | 2026-11-22 | User (a 1.75 mm spool went into the slot of tool 8, a 2.85 mm TPU hotend): the station knows each H3C tool's filament size and does not assign a spool of another size (Spoolman `diameter`); such a slot is flagged SIZE (§5.2). |
 | 2026-11-21 | User, changes §5.1: taller station tiles; the "PRINTERS · Load sets the next spool…" line is removed and the bottom buttons are lower (46 px). |
+| 2026-11-26 | User, changes §5.1 (action bar): Weigh, Load and Weigh + Load become a selector of what the next scan does, Weigh + Load by default, reset to the default when the station sleeps. Not the user's words (chosen so typed IDs keep working): More gets "<picked action> now" for the selected spool. |

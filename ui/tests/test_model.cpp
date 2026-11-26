@@ -129,6 +129,9 @@ TEST_CASE("events replace subtrees and printer events merge by key")
     CHECK(model.state().scan.countdown->remaining_s == 3);
     REQUIRE(model.state().scan.prompt);
     CHECK(*model.state().scan.prompt->delta_g == doctest::Approx(349.3));
+    CHECK(model.state().scan.action == "weigh_load");
+    model.apply_event("scan", json::parse(R"({"spool_id":97,"action":"load"})"));
+    CHECK(model.state().scan.action == "load");
 
     model.apply_event("settings", json::parse(R"({"theme":"light","undo_depth":5})"));
     CHECK(model.state().settings.theme == "light");

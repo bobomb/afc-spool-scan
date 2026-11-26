@@ -36,7 +36,8 @@
       "spool_id": null,
       "at": null,
       "countdown": null,
-      "prompt": null
+      "prompt": null,
+      "action": "weigh_load"
     },
     "spool": {
       "id": 93,

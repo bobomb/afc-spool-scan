@@ -256,6 +256,9 @@
     renderScale(root);
     renderSpool(root);
     const scan = state.scan || {};
+    const onScan = el("div", "sub on-scan");
+    onScan.append("On scan: ", el("b", null, actionLabel(scan.action || "weigh_load")));
+    root.append(onScan);
     if (scan.countdown) {
       const c = scan.countdown;
       root.append(el("div", "notice info", `${actionLabel(c.action)} spool #${c.spool_id} in ${c.remaining_s} s`));

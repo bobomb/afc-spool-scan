@@ -172,6 +172,7 @@ def main() -> int:
                                   "stable": False, "tare_g": None, "net_g": None, "expected_g": None,
                                   "delta_g": None, "check": None}
     empty["snapshot"]["activity"] = []
+    empty["snapshot"]["scan"]["action"] = "weigh"
     samples["empty"] = empty
 
     low = sample(base, ["main"])

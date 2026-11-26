@@ -44,6 +44,11 @@ class Prompt:
     delta_g: float | None = None
 
 
+# What a scan does, picked on the station screen; back to the default when the station sleeps.
+SCAN_ACTIONS = ("weigh_load", "weigh", "load")
+DEFAULT_SCAN_ACTION = "weigh_load"
+
+
 @dataclass
 class ScanState:
     last_code: str | None = None
@@ -51,6 +56,7 @@ class ScanState:
     at: str | None = None
     countdown: Countdown | None = None
     prompt: Prompt | None = None
+    action: str = DEFAULT_SCAN_ACTION
 
 
 @dataclass

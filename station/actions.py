@@ -25,7 +25,7 @@ from .rules import (
 from .scale.source import ScaleReading, ScaleSource
 from .settings import Settings, SettingsError
 from .spoolman import SpoolmanClient, SpoolmanError, SpoolNotFound, spool_info_from_api
-from .state import Prompt, SpoolInfo, Store
+from .state import DEFAULT_SCAN_ACTION, SCAN_ACTIONS, Prompt, SpoolInfo, Store
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +39,7 @@ UNDO_LABELS = {
     "sleep": "sleep clear",
     "spool_loaded": "automatic load",
 }
+SCAN_ACTION_LABELS = {"weigh_load": "Weigh + Load", "weigh": "Weigh", "load": "Load"}
 
 
 class Cues(Protocol):
@@ -142,6 +143,7 @@ class Actions:
             "empty_spool": self.empty_spool,
             "undo": self.undo,
             "set_setting": self.set_setting,
+            "set_scan_action": self.set_scan_action,
             "cancel_countdown": self.cancel_countdown,
             "dismiss_prompt": self.dismiss_prompt,
             "clear_spool": self.clear_spool,
@@ -346,15 +348,24 @@ class Actions:
         name = " ".join(part for part in (vendor, filament.get("name")) if part)
         return Outcome(True, f"Spool {spool_id}: {name or 'found'}")
 
-    async def weigh(self, args: dict[str, Any]) -> Outcome:
+    async def weigh(self, args: dict[str, Any], *, source: str = "ui") -> Outcome:
+        """Weigh and save. From a scan nobody reads the reply: a suspicious weight is asked on screen and
+        a scale problem goes to the Log."""
         spool_id = _spool_id(args)
         confirm = _bool(args, "confirm")
+        from_scan = source == "scan"
         async with self._lock:
             try:
                 step, _ = await self._weigh_step(spool_id, confirm)
             except ActionError as error:
                 self._fail(error)
-                if error.code == "spoolman_error":
+                if from_scan and error.code == "needs_confirm":
+                    self._set_prompt(spool_id, error)
+                elif from_scan and error.code in SKIPPABLE_SCALE_CODES:
+                    await self._ensure_known_spool(spool_id)
+                    self._record("weigh", spool_id, StepResult(f"weight not saved ({error.message.lower()})",
+                                                               ok=False, code=error.code))
+                elif error.code == "spoolman_error":
                     self._record("weigh", spool_id, StepResult(error.message, ok=False, code=error.code))
                 raise
             self._clear_prompt(spool_id)
@@ -431,6 +442,26 @@ class Actions:
             activity_id = self._record("scan" if from_scan else "weigh_load", spool_id, step)
             return Outcome(ok, f"Spool {spool_id}: {step.message}", code=step.code,
                            activity_id=activity_id, dry_run=step.dry_run)
+
+    async def run_scan(self, spool_id: int, action: str) -> Outcome:
+        """Run the selected scan action for a scanned spool; a failure is returned, not raised."""
+        args: dict[str, Any] = {"spool_id": spool_id}
+        try:
+            if action == "weigh":
+                return await self.weigh(args, source="scan")
+            if action == "load":
+                return await self.load(args)
+            return await self.weigh_load(args, source="scan")
+        except ActionError as error:
+            return Outcome(False, error.message, code=error.code, data=error.data)
+
+    async def set_scan_action(self, args: dict[str, Any]) -> Outcome:
+        """Pick what a scan does (the station screen's selector); not logged, reset when the station sleeps."""
+        action = args.get("action")
+        if action not in SCAN_ACTIONS:
+            raise ActionError("invalid_args", f"action must be one of {', '.join(SCAN_ACTIONS)}")
+        self.store.set_scan(replace(self.store.scan, action=action))
+        return Outcome(True, f"On scan: {SCAN_ACTION_LABELS[action]}")
 
     async def clear_pending(self, args: dict[str, Any]) -> Outcome:
         client = self._client(args.get("printer"))
@@ -678,8 +709,11 @@ class Actions:
         return Outcome(True, "Spool cleared")
 
     async def sleep(self, args: dict[str, Any]) -> Outcome:
-        """The station went to sleep (screen off): deselect the spool and clear every pending next spool."""
+        """The station went to sleep (screen off): deselect the spool, scans go back to Weigh + Load and every
+        pending next spool is cleared."""
         self._clear_prompt()
+        if self.store.scan.action != DEFAULT_SCAN_ACTION:
+            self.store.set_scan(replace(self.store.scan, action=DEFAULT_SCAN_ACTION))
         await self.clear_spool(args)
         async with self._lock:
             clients = [c for c in self.printers.all() if c.state.pending_spool is not None]

@@ -45,7 +45,8 @@
         "net_g": 804.0,
         "expected_g": 634.7,
         "delta_g": 349.3
-      }
+      },
+      "action": "weigh_load"
     },
     "spool": {
       "id": 97,
@@ -61,7 +62,7 @@
       "used_weight_g": 545.3,
       "tare_source": "spool",
       "location": "Dry box A",
-      "last_used": "2026-11-22T17:15:41Z",
+      "last_used": "2026-11-26T06:54:18Z",
       "archived": false,
       "low_stock": false,
       "message": null,

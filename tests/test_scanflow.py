@@ -11,6 +11,10 @@ async def act(station: Station, action: str, **args: Any) -> dict[str, Any]:
     return await station.actions.handle(action, args)  # type: ignore[union-attr]
 
 
+async def pick(station: Station, scan_action: str) -> dict[str, Any]:
+    return await station.actions.handle("set_scan_action", {"action": scan_action})  # type: ignore[union-attr]
+
+
 async def test_immediate_scan_weighs_and_loads(station: Station) -> None:
     await act(station, "sim.scale", grams=640.0)
     await act(station, "sim.scan", code="WEB+SPOOLMAN:S-97")
@@ -95,3 +99,54 @@ async def test_fill_mode_only_looks_up(station: Station) -> None:
     assert station.store.spool.low_stock is True
     assert station.store.activity == []
     assert station.sim_printers.printers["kilo"].next_spool_id is None
+
+
+async def test_weigh_scan_saves_the_weight_only(station: Station) -> None:
+    await pick(station, "weigh")
+    await act(station, "sim.scale", grams=640.0)
+    await act(station, "sim.scan", code="web+spoolman:s-97")
+    await wait_until(lambda: bool(station.store.activity))
+    entry = station.store.activity[0]
+    assert (entry["action"], entry["ok"], entry["message"]) == ("weigh", True, "640 g saved")
+    assert station.cues.played == ["weigh", "success"]
+    assert station.sim_spoolman.spools[97]["remaining_weight"] == 460
+    assert station.sim_printers.printers["kilo"].next_spool_id is None
+    assert station.store.scan.action == "weigh" and station.store.scan.spool_id == 97
+
+
+async def test_weigh_scan_problems_show_on_screen(station: Station) -> None:
+    await pick(station, "weigh")
+    await act(station, "sim.scan", code="web+spoolman:s-84")
+    await wait_until(lambda: bool(station.store.activity))
+    entry = station.store.activity[0]
+    assert (entry["action"], entry["ok"], entry["message"]) == ("weigh", False, "weight not saved (scale is empty)")
+    assert station.store.spool.id == 84 and station.cues.played == ["error"]
+    await act(station, "sim.scale", grams=984.0)
+    await act(station, "sim.scan", code="web+spoolman:s-97")
+    await wait_until(lambda: station.store.scan.prompt is not None)
+    assert station.store.scan.prompt.spool_id == 97 and len(station.store.activity) == 1
+    assert station.sim_spoolman.spools[97]["used_weight"] == 545.3
+
+
+async def test_load_scan_sets_the_next_spool_only(station: Station) -> None:
+    await pick(station, "load")
+    await act(station, "sim.scale", grams=984.0)
+    await act(station, "sim.scan", code="web+spoolman:s-97")
+    await wait_until(lambda: bool(station.store.activity))
+    entry = station.store.activity[0]
+    assert (entry["action"], entry["message"]) == ("load", "next spool set on Kestrel, Yeti")
+    assert station.store.scan.prompt is None and station.cues.played == ["success"]
+    assert station.sim_spoolman.spools[97]["used_weight"] == 545.3
+
+
+async def test_countdown_runs_the_selected_action(station: Station) -> None:
+    await act(station, "set_setting", key="scan_mode", value="countdown")
+    await pick(station, "load")
+    actions: list[str] = []
+    station.store.subscribe(
+        lambda topic, data: actions.append(data["countdown"]["action"])
+        if topic == "scan" and data["countdown"] else None
+    )
+    await act(station, "sim.scan", code="web+spoolman:s-97")
+    await wait_until(lambda: bool(station.store.activity))
+    assert set(actions) == {"load"} and station.store.activity[0]["action"] == "load"

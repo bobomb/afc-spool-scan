@@ -616,6 +616,26 @@ void App::load()
     request("load", {{"spool_id", *id}});
 }
 
+void App::set_scan_action(const std::string& action)
+{
+    if (state().scan.action == action) return;
+    request("set_scan_action", {{"action", action}}, [this](const Result& result) {
+        if (!result.ok) show_result(result);
+    });
+}
+
+void App::run_scan_action()
+{
+    const std::string& action = state().scan.action;
+    if (action == "weigh") {
+        weigh();
+    } else if (action == "load") {
+        load();
+    } else {
+        weigh_load();
+    }
+}
+
 void App::empty_spool()
 {
     const auto id = spool_id();

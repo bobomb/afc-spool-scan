@@ -36,7 +36,9 @@ tap 300 76
 type 97
 key enter
 wait 500
-tap 646 394
+tap 136 394
+wait 300
+tap 224 192
 wait 1200
 shot weighed
 tap 732 452
@@ -56,7 +58,7 @@ async def test_ui_confirmation_applies_to_the_original_spool(station: Station, t
     script.write_text(
         'request sim.scale {"grams": 984}\n'
         "tap 300 76\ntype 97\nkey enter\nwait 500\n"
-        "tap 267 394\nwait 800\nshot confirm\n"
+        "tap 351 394\nwait 300\ntap 136 394\nwait 300\ntap 224 192\nwait 800\nshot confirm\n"
         'request set_setting {"key": "scan_mode", "value": "fill"}\n'
         'request sim.scan {"code": "web+spoolman:s-86"}\nwait 800\n'
         "tap 514 377\nwait 1000\nshot saved\n",
@@ -108,7 +110,7 @@ async def test_ui_numpad_clear_deselects_the_spool(station: Station, tmp_path: P
         'request sim.scale {"grams": 640}\n'
         "tap 300 76\ntype 97\nkey enter\nwait 600\nshot selected\n"
         "tap 300 76\nwait 300\ntap 280 398\nwait 300\ntap 560 52\nwait 600\nshot cleared\n"
-        "tap 267 394\nwait 600\n",
+        "tap 136 394\nwait 300\ntap 224 192\nwait 600\n",
         encoding="utf-8",
     )
     process = await asyncio.create_subprocess_exec(
@@ -127,11 +129,12 @@ async def test_ui_load_goes_to_both_printers_and_sleep_resets(station: Station, 
     exe = find_ui()
     if exe is None:
         pytest.skip("station-ui is not built")
+    # Pick Load on the selector, run it from More; sleep resets the selector to Weigh + Load.
     script = tmp_path / "sleep.script"
     script.write_text(
         "tap 300 76\ntype 93\nkey enter\nwait 500\n"
         "tap 614 200\nwait 300\n"
-        "tap 425 394\nwait 900\nshot loaded\n"
+        "tap 525 394\nwait 300\ntap 136 394\nwait 300\ntap 224 192\nwait 900\nshot loaded\n"
         "idle off\nwait 900\nidle wake\nwait 300\nshot woken\n",
         encoding="utf-8",
     )
@@ -148,6 +151,7 @@ async def test_ui_load_goes_to_both_printers_and_sleep_resets(station: Station, 
     assert station.sim_printers.printers["kilo"].next_spool_id is None
     assert station.sim_printers.printers["yankee"].next_spool_id is None
     assert all(p.pending_spool is None for p in station.store.printers.values())
+    assert station.store.scan.action == "weigh_load"
 
 
 @pytest.mark.e2e
