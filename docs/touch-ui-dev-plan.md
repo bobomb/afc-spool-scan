@@ -320,9 +320,17 @@ and the UI shows "incompatible service".
 | `/` | `webui/index.html` |
 | `/static/…` | `webui/style.css`, `webui/app.js` (no build step, no CDN) |
 | `/api/state` | the §5.2 snapshot as JSON |
+| `/api/spools/<id>` | one spool for the popover: the §5.2 `spool` fields plus `diameter_mm`, `extruder_temp`, `bed_temp`, `lot_nr`, `comment`, `first_used`, `registered` and `spoolman_url` (its Spoolman page); 404 `not_found`, 502 `spoolman_error`, 400 for id 0 |
 | `/ws` | WebSocket: `hello` (`read_only: true`), `snapshot`, then the same `event` messages as IPC |
 
 - No actions: anything a viewer sends on `/ws` is ignored.
+- `/api/spools/<id>` only reads Spoolman (`GET /spool/<id>`). Answers are
+  kept 30 s and viewers asking at once share one request; failures aren't
+  kept. It doesn't select the spool or touch the station's state.
+- `spoolman_url` is `SPOOLMAN_WEB_URL` (default: `SPOOLMAN_URL` without
+  `/api/v1`; none with a simulated Spoolman) + `/spool/show/<id>`, Spoolman's
+  own page for the spool. A Spoolman on 127.0.0.1 is linked through the host
+  name the viewer opened the page with (`http://spoolstation.home:7912/…`).
 - A WebSocket whose `Origin` isn't the page's own host is refused (403), so
   another site's page can't read the state.
 - Pages carry a strict `Content-Security-Policy` (`default-src 'self'`);
@@ -688,6 +696,13 @@ within a phase unless noted. Each task ends with tests/build passing.
   *Done 2026-11-26; tests `test_scanflow.py`, `test_actions.py`,
   `test_ui_e2e.py` (Load picked, run from More, reset by sleep),
   `test_model.cpp`; tour and screenshots updated.*
+- [x] **F15** Web view on a desktop (product plan §3.4, user 2026-11-27):
+  lanes and slots as tiles, the H3C's nine in one row below the Vorons
+  (3×3 on a phone); a spool popover with Spoolman details and an "Open in
+  Spoolman" link from `/api/spools/<id>` (§5.4); `SPOOLMAN_WEB_URL`.
+  *Done 2026-11-27; tests `test_web.py` (details, shared and cached reads,
+  errors, links, no state change), `test_config.py`; screenshots of desktop,
+  laptop (light, pinned), phone and live.*
 
 ### P — spoolpi deployment
 

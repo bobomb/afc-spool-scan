@@ -119,8 +119,10 @@ slot it goes into (product plan §6.4).
 The service also serves a read-only web view of the station: open
 `http://<spoolpi>:7914/` from any browser on the LAN (on Windows
 `http://127.0.0.1:7914/`). It shows the scale, the selected spool, every
-printer's lanes or slots, the log and the health summary, live, but has no
-buttons. `STATION_WEB_PORT="off"` turns it off (dev plan §5.4).
+printer's lanes or slots as tiles, the log and the health summary, live, but
+has no buttons. Hovering (or tapping) a spool shows its Spoolman details and
+an **Open in Spoolman** link. `STATION_WEB_PORT="off"` turns it off (dev
+plan §5.4).
 
 Headless screenshots (no window, no service needed):
 
@@ -222,6 +224,8 @@ include:
 - `MOONRAKER_HOSTS`: comma-separated Moonraker host names or LAN IP addresses;
   use reserved IP addresses if `.local`/mDNS resolution is unreliable
 - `SPOOLMAN_URL`: local Spoolman REST API base URL
+- `SPOOLMAN_WEB_URL` (optional): Spoolman's pages for the web view's links;
+  by default derived from `SPOOLMAN_URL`
 - `SCALE_VENDOR_ID` and comma-separated `SCALE_PRODUCT_IDS`
 - `SCALE_MINIMUM_WEIGHT_GRAMS`: weight must be greater than this value to update
 - `AUDIO_BACKEND` and `BUZZER_GPIO_PIN`

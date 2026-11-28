@@ -12,6 +12,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from urllib.parse import urlsplit
 
 REPO_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_PRINTERS = "Kilo=192.0.2.11:7125,Yankee=192.0.2.12:7125"
@@ -66,6 +67,8 @@ class Config:
     web_port: int | None = None
     printers: tuple[PrinterConfig, ...] = ()
     spoolman_url: str = "http://127.0.0.1:7912/api/v1"
+    # Spoolman's web pages as a browser opens them; "" = derived from spoolman_url (web view links).
+    spoolman_web_url: str = ""
     spoolman_prefix: str = "web+spoolman:s-"
     event_dev: str = "/dev/input/by-id/usb-TMS_HIDKeyBoard_1234567890abcd-event-kbd"
     scale_vendor_id: str = "0922"
@@ -237,6 +240,15 @@ def _number(values: Mapping[str, str], key: str, default: float) -> float:
         raise ConfigError(f"{key} must be a number (got {raw!r})") from error
 
 
+def _web_url(values: Mapping[str, str], key: str) -> str:
+    raw = values.get(key, "").strip().rstrip("/")
+    if raw:
+        parts = urlsplit(raw)
+        if parts.scheme not in ("http", "https") or not parts.netloc:
+            raise ConfigError(f"{key} must be an http:// or https:// address (got {raw!r})")
+    return raw
+
+
 def _port(values: Mapping[str, str], key: str, default: int, *, optional: bool = False) -> int | None:
     raw = values.get(key, "").strip() or str(default)
     if optional and raw.lower() in {"off", "none"}:
@@ -345,6 +357,7 @@ def load_config(
         web_port=web_port,
         printers=printers,
         spoolman_url=values.get("SPOOLMAN_URL", "http://127.0.0.1:7912/api/v1").strip().rstrip("/"),
+        spoolman_web_url=_web_url(values, "SPOOLMAN_WEB_URL"),
         spoolman_prefix=values.get("SPOOLMAN_PREFIX", "web+spoolman:s-"),
         event_dev=values.get("EVENT_DEV", Config.event_dev),
         scale_vendor_id=values.get("SCALE_VENDOR_ID", "0922").strip().lower(),

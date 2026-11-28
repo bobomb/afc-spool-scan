@@ -36,7 +36,7 @@ from .sim.spoolman import SimSpoolman, load_spool_fixtures
 from .simcontrol import SimControl
 from .spoolman import SpoolmanClient
 from .state import ServiceInfo, Store
-from .web import WebServer
+from .web import WebServer, spoolman_pages
 
 log = logging.getLogger(__name__)
 
@@ -255,7 +255,12 @@ class Station:
 
     async def _start_web(self, host: str, port: int) -> None:
         """The web view is optional: the station keeps running without it if its port is taken."""
-        web = WebServer(self.store, host, port)
+        config = self.config
+        pages = config.spoolman_web_url
+        if not pages and config.spoolman_mode == "live":
+            pages = spoolman_pages(config.spoolman_url)
+        assert self.spoolman is not None
+        web = WebServer(self.store, host, port, spool_lookup=self.spoolman.get_spool, spoolman_web=pages or None)
         try:
             await web.start()
         except OSError as error:

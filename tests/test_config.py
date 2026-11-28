@@ -147,6 +147,18 @@ def test_web_view_port_and_off(tmp_path: Path) -> None:
         load([], {"STATION_WEB_PORT": "70000"})
 
 
+def test_spoolman_web_url(tmp_path: Path) -> None:
+    def load(environ: dict[str, str]) -> Config:
+        return load_config([], environ=environ, platform="linux", repo_dir=tmp_path)
+
+    assert load({}).spoolman_web_url == ""
+    configured = load({"SPOOLMAN_WEB_URL": " https://spoolman.example/sm/ "})
+    assert configured.spoolman_web_url == "https://spoolman.example/sm"
+    for bad in ("spoolman.example", "ftp://spoolman.example", "http://"):
+        with pytest.raises(ConfigError, match="SPOOLMAN_WEB_URL must be an http"):
+            load({"SPOOLMAN_WEB_URL": bad})
+
+
 def test_precedence_env_file_then_environment_then_cli(tmp_path: Path) -> None:
     (tmp_path / "config.env").write_text(
         'STATION_WRITES="on"\nSTATION_IPC_PORT="8000"\nPRINTERS="A=10.0.0.1:1"\n'

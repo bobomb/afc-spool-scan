@@ -157,10 +157,27 @@ the web view is a second view for other devices.
   viewer can't load, weigh, assign or undo anything, so it needs no login.
 - Shows the scale and its check, the selected spool, what a scan does
   ("On scan: Weigh + Load"), a countdown or prompt,
-  each printer card (status, job progress, next spool, lanes or the 3×3
-  slot grid), the log and the health summary, in the touch UI's words and
+  each printer card (status, job progress, next spool and its lanes or
+  slots), the log and the health summary, in the touch UI's words and
   colours. Live over a WebSocket; it reconnects and keeps the last state
   greyed out while the station is unreachable.
+- **Lanes as tiles (user, 2026-11-27: "the H3C should have 9 tiles in a
+  single row").** Every lane or AMS slot is a tile filled with the spool's
+  colour, left to right as on the printer: lane or slot and tool, spool #,
+  material, grams left with a bar, status, and the nozzle (and 2.85 mm
+  filament) on the H3C. On a desktop the two Vorons sit side by side and the
+  H3C takes a row of its own with all nine slots in one row; cards side by
+  side line their tiles up. On a phone the cards stack and the H3C's slots
+  wrap to 3×3.
+- **Spool popover (user, 2026-11-27).** Hovering a spool (a tile, the
+  selected spool, a next spool or a spool # in the log), tapping it, or
+  Enter on it shows its Spoolman details: vendor, name, material and
+  diameter, grams left of the initial weight, where it is (lane, next spool
+  on), location, used, empty spool weight, temperatures, lot, first and last
+  used, added, comment, LOW/ARCHIVED, and **Open in Spoolman** (the spool's
+  page, in a new tab). A click pins it; Esc or a click elsewhere closes it.
+  The service reads the spool from Spoolman for it (GET only, kept 30 s);
+  the station's state doesn't change.
 - Fits a phone (one column) and a desktop (station and log left, printers
   right); follows the browser's light or dark setting.
 - Actions from the web view (with some form of login) are out of scope until
@@ -596,3 +613,4 @@ Detailed tasks: dev plan §8.
 | 2026-11-22 | User (a 1.75 mm spool went into the slot of tool 8, a 2.85 mm TPU hotend): the station knows each H3C tool's filament size and does not assign a spool of another size (Spoolman `diameter`); such a slot is flagged SIZE (§5.2). |
 | 2026-11-21 | User, changes §5.1: taller station tiles; the "PRINTERS · Load sets the next spool…" line is removed and the bottom buttons are lower (46 px). |
 | 2026-11-26 | User, changes §5.1 (action bar): Weigh, Load and Weigh + Load become a selector of what the next scan does, Weigh + Load by default, reset to the default when the station sleeps. Not the user's words (chosen so typed IDs keep working): More gets "<picked action> now" for the selected spool. |
+| 2026-11-27 | User (web view on a desktop "looks bad"): the H3C's nine slots in a single row; hovering a spool shows its Spoolman details with a link to it in Spoolman (§3.4). Chosen with it, not the user's words: every printer's lanes become tiles like the H3C's, the Vorons side by side above the H3C. |

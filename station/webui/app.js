@@ -150,6 +150,257 @@
     return [issues[0][1], issues[0][2] + (issues.length > 1 ? ` +${issues.length - 1}` : "")];
   }
 
+  // ---- spool popover ----------------------------------------------------------------------
+  // Hover (or tap, or Enter) on a spool shows its Spoolman details from /api/spools/<id>, with a link to
+  // the spool's page in Spoolman. Clicking pins it open; Esc or a click elsewhere closes it.
+
+  const DETAILS_TTL_MS = 30000;
+  const RETRY_MS = 5000;
+  const details = new Map();
+  const loading = new Set();
+  const pop = el("div", "popover");
+  pop.hidden = true;
+  pop.setAttribute("role", "dialog");
+  document.body.append(pop);
+  let popId = null;
+  let popAnchor = null;
+  let anchorBox = null;
+  let pinned = false;
+  let showTimer = 0;
+  let hideTimer = 0;
+
+  function spoolTrigger(node, id) {
+    node.dataset.spool = String(id);
+    node.tabIndex = 0;
+    node.classList.add("has-spool");
+    node.setAttribute("aria-haspopup", "dialog");
+    node.setAttribute("aria-label", `Spool #${id} details`);
+  }
+
+  const triggerOf = (target) => (target instanceof Element ? target.closest("[data-spool]") : null);
+
+  async function loadDetails(id) {
+    const cached = details.get(id);
+    if ((cached && Date.now() < cached.until) || loading.has(id)) return;
+    loading.add(id);
+    let entry;
+    try {
+      const response = await fetch(`/api/spools/${id}`, { cache: "no-store" });
+      const body = await response.json().catch(() => ({}));
+      entry = response.ok
+        ? { data: body, until: Date.now() + DETAILS_TTL_MS }
+        : { error: body.message || `Spoolman details unavailable (${response.status})`, until: Date.now() + RETRY_MS };
+    } catch {
+      entry = { error: "Can't reach the station", until: Date.now() + RETRY_MS };
+    }
+    loading.delete(id);
+    details.set(id, entry);
+    if (popId === id && !pop.hidden) renderPopover();
+  }
+
+  // What the station already knows about a spool, shown until Spoolman answers.
+  function knownSpool(id) {
+    if (state.spool && state.spool.found && state.spool.id === id) return state.spool;
+    for (const printer of state.printers) {
+      for (const lane of printer.lanes || []) {
+        if (lane.spool_id === id) {
+          return { id, material: lane.material, colors: lane.colors, color: lane.color, remaining_g: lane.remaining_g };
+        }
+      }
+    }
+    return { id };
+  }
+
+  function day(iso) {
+    const date = new Date(iso);
+    if (!iso || Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
+  }
+
+  const TARE_SOURCES = { filament: "filament default", vendor: "vendor default" };
+
+  function renderPopover() {
+    const id = popId;
+    const entry = details.get(id);
+    const spool = entry && entry.data ? entry.data : knownSpool(id);
+    const head = el("div", "pop-head");
+    const swatch = el("span", "pop-swatch");
+    paint(swatch, colorsOf(spool.colors, spool.color));
+    const title = el("div", "pop-title");
+    title.append(el("div", "head", `#${id}${spool.vendor ? ` · ${spool.vendor}` : ""}`));
+    title.append(el("div", "name", spool.name || (entry && entry.data ? "Unnamed filament" : `Spool #${id}`)));
+    const sub = [spool.material, typeof spool.diameter_mm === "number" ? `${spool.diameter_mm} mm` : null];
+    if (sub.some(Boolean)) title.append(el("div", "meta", sub.filter(Boolean).join(" · ")));
+    head.append(swatch, title);
+    const parts = [head];
+
+    if (typeof spool.remaining_g === "number") {
+      const initial = typeof spool.initial_weight_g === "number" && spool.initial_weight_g > 0
+        ? spool.initial_weight_g : null;
+      const pct = initial ? clamp((spool.remaining_g / initial) * 100) : null;
+      const remaining = el("div", "pop-remaining");
+      remaining.append(el("div", spool.low_stock ? "warn" : null,
+        `${grams(spool.remaining_g)} left${initial ? ` of ${grams(initial)}` : ""}${pct !== null ? ` · ${percent(pct)}` : ""}`));
+      if (pct !== null) {
+        const bar = el("div", `bar${spool.low_stock ? " low" : ""}`);
+        const fill = el("span");
+        fill.style.width = `${pct}%`;
+        bar.append(fill);
+        remaining.append(bar);
+      }
+      parts.push(remaining);
+    }
+
+    const places = [];
+    const armed = [];
+    for (const printer of state.printers) {
+      for (const lane of printer.lanes || []) {
+        if (lane.spool_id === id) places.push(`${printerLabel(printer)} ${lane.lane}${lane.map ? ` (${lane.map})` : ""}`);
+      }
+      if (printer.pending_spool === id) armed.push(printerLabel(printer));
+    }
+    const temps = typeof spool.extruder_temp === "number"
+      ? `${num(spool.extruder_temp)} °C${typeof spool.bed_temp === "number" ? ` · bed ${num(spool.bed_temp)} °C` : ""}`
+      : null;
+    const tare = typeof spool.spool_weight_g === "number"
+      ? `${grams(spool.spool_weight_g)}${TARE_SOURCES[spool.tare_source] ? ` (${TARE_SOURCES[spool.tare_source]})` : ""}`
+      : entry && entry.data ? "unknown" : null;
+    const facts = [
+      ["In", places.join(", ")],
+      ["Next spool on", armed.join(", ")],
+      ["Location", spool.location],
+      ["Used", typeof spool.used_weight_g === "number" ? grams(spool.used_weight_g) : null],
+      ["Empty spool", tare],
+      ["Temperatures", temps],
+      ["Lot", spool.lot_nr],
+      ["First used", day(spool.first_used)],
+      ["Last used", spool.last_used ? when(spool.last_used) : null],
+      ["Added", day(spool.registered)],
+    ].filter(([, value]) => value);
+    if (facts.length) {
+      const list = el("dl", "facts");
+      for (const [name, value] of facts) list.append(el("dt", null, name), el("dd", null, value));
+      parts.push(list);
+    }
+    if (spool.comment) parts.push(el("p", "pop-comment", spool.comment));
+    const tags = el("div", "tags");
+    if (spool.low_stock) tags.append(el("span", "tag low", "LOW"));
+    if (spool.archived) tags.append(el("span", "tag", "ARCHIVED"));
+    if (tags.childElementCount) parts.push(tags);
+
+    if (!entry) parts.push(el("div", "pop-note", "Loading from Spoolman…"));
+    else if (entry.error) parts.push(el("div", "pop-note warn", entry.error));
+    const url = entry && entry.data && typeof entry.data.spoolman_url === "string" ? entry.data.spoolman_url : "";
+    if (/^https?:\/\//i.test(url)) {
+      const link = el("a", "pop-link", "Open in Spoolman ↗");
+      link.href = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      parts.push(link);
+    }
+    pop.setAttribute("aria-label", `Spool #${id}`);
+    pop.replaceChildren(...parts);
+    place();
+  }
+
+  // Below the spool, or above it when there's no room; the page may re-render the spool's tile meanwhile,
+  // so its last known box is kept.
+  function place() {
+    if (popAnchor && popAnchor.isConnected) {
+      const r = popAnchor.getBoundingClientRect();
+      anchorBox = { left: r.left + scrollX, right: r.right + scrollX, top: r.top + scrollY, bottom: r.bottom + scrollY };
+    }
+    if (!anchorBox || pop.hidden) return;
+    const width = pop.offsetWidth;
+    const height = pop.offsetHeight;
+    const minLeft = scrollX + 8;
+    const maxLeft = scrollX + document.documentElement.clientWidth - 8 - width;
+    const left = Math.max(minLeft, Math.min((anchorBox.left + anchorBox.right) / 2 - width / 2, maxLeft));
+    let top = anchorBox.bottom + 8;
+    if (top + height > scrollY + innerHeight - 8 && anchorBox.top - height - 8 >= scrollY + 8) {
+      top = anchorBox.top - height - 8;
+    }
+    pop.style.left = `${Math.round(left)}px`;
+    pop.style.top = `${Math.round(top)}px`;
+  }
+
+  function openPopover(anchor, pin) {
+    clearTimeout(showTimer);
+    clearTimeout(hideTimer);
+    popId = Number(anchor.dataset.spool);
+    popAnchor = anchor;
+    pinned = pin;
+    pop.hidden = false;
+    renderPopover();
+    loadDetails(popId);
+  }
+
+  function closePopover() {
+    clearTimeout(showTimer);
+    clearTimeout(hideTimer);
+    pop.hidden = true;
+    popId = null;
+    popAnchor = null;
+    anchorBox = null;
+    pinned = false;
+  }
+
+  document.addEventListener("pointerover", (event) => {
+    if (event.pointerType !== "mouse") return;
+    const trigger = triggerOf(event.target);
+    if (trigger) {
+      clearTimeout(hideTimer);
+      if (!pop.hidden && popId === Number(trigger.dataset.spool)) {
+        popAnchor = trigger;
+        return;
+      }
+      if (pinned) return;
+      clearTimeout(showTimer);
+      showTimer = setTimeout(() => openPopover(trigger, false), pop.hidden ? 250 : 80);
+    } else if (pop.contains(event.target)) {
+      clearTimeout(hideTimer);
+    }
+  });
+
+  document.addEventListener("pointerout", (event) => {
+    if (event.pointerType !== "mouse") return;
+    const from = triggerOf(event.target) || (pop.contains(event.target) ? pop : null);
+    if (!from) return;
+    const to = event.relatedTarget instanceof Node ? event.relatedTarget : null;
+    const toTrigger = triggerOf(to);
+    if (to && (from.contains(to) || pop.contains(to) || (toTrigger && Number(toTrigger.dataset.spool) === popId))) {
+      return;
+    }
+    clearTimeout(showTimer);
+    if (!pinned && !pop.hidden) hideTimer = setTimeout(closePopover, 300);
+  });
+
+  document.addEventListener("click", (event) => {
+    const trigger = triggerOf(event.target);
+    if (trigger) {
+      if (!pop.hidden && pinned && popId === Number(trigger.dataset.spool)) closePopover();
+      else openPopover(trigger, true);
+    } else if (!pop.hidden && !pop.contains(event.target)) {
+      closePopover();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !pop.hidden) {
+      const anchor = popAnchor;
+      closePopover();
+      if (anchor && anchor.isConnected) anchor.focus();
+    } else if ((event.key === "Enter" || event.key === " ") && triggerOf(event.target) === event.target) {
+      event.preventDefault();
+      openPopover(event.target, true);
+    }
+  });
+
+  window.addEventListener("resize", () => { if (!pop.hidden) closePopover(); });
+  byId("activity").addEventListener("scroll", () => {
+    if (popAnchor && popAnchor.closest("#activity")) closePopover();
+  }, { passive: true });
+
   // ---- rendering --------------------------------------------------------------------------
 
   function renderHeader() {
@@ -215,6 +466,7 @@
     const tile = el("div", "tile");
     const info = el("div", "spool-info");
     if (spool && spool.found) {
+      spoolTrigger(box, spool.id);
       paint(tile, colorsOf(spool.colors, spool.color));
       if (spool.remaining_g !== null && spool.remaining_g !== undefined) {
         const [value, unit] = compactWeight(spool.remaining_g);
@@ -283,71 +535,69 @@
     return ["muted", `${head}  |  ${printer.current_load ? `${printer.current_load} loaded` : "nothing loaded"}`];
   }
 
-  function laneRow(lane, loaded) {
-    const row = el("li", `lane${loaded ? " loaded" : ""}`);
-    const hasSpool = lane.spool_id !== null && lane.spool_id !== undefined;
-    const swatch = el("span", `swatch${hasSpool ? "" : " none"}`);
-    if (hasSpool) paint(swatch, colorsOf(lane.colors, lane.color));
-    const main = el("div", "lane-main");
-    main.append(el("div", "lane-name", lane.map ? `${lane.lane}  ${lane.map}` : lane.lane));
-    main.append(hasSpool
-      ? el("div", "lane-spool", `#${lane.spool_id}${lane.material ? `  ${lane.material}` : ""}`)
-      : el("div", "lane-spool none", lane.prep ? "Untagged" : "Empty"));
-    const side = el("div", "lane-side");
-    const hasWeight = lane.remaining_g !== null && lane.remaining_g !== undefined;
-    if (hasWeight) {
-      side.append(el("div", `lane-weight${lane.low_stock ? " low" : ""}`, grams(lane.remaining_g)));
-      const bar = el("div", `bar${lane.low_stock ? " low" : ""}`);
-      const fill = el("span");
-      fill.style.width = `${clamp(lane.remaining_g / 10)}%`;
-      bar.append(fill);
-      side.append(bar);
-    }
-    const pending = hasSpool && lane.settings_pending;
-    const status = pending ? "Settings after print" : lane.filament_status || "";
-    side.append(el("div", `lane-status${pending ? " warn" : lane.tool_loaded ? " info" : ""}`, status));
-    row.append(swatch, main, side);
-    return row;
+  function remainingPct(lane) {
+    if (typeof lane.remaining_pct === "number") return clamp(lane.remaining_pct);
+    return typeof lane.remaining_g === "number" ? clamp(lane.remaining_g / 10) : null;
   }
 
-  function slotTile(lane, loaded) {
+  // One tile per lane or AMS slot, left to right as they sit on the printer.
+  function laneTile(lane, loaded, bambu) {
     const hasSpool = lane.spool_id !== null && lane.spool_id !== undefined;
-    const tile = el("div", `slot${hasSpool ? "" : lane.prep ? " untagged" : " empty"}${loaded ? " loaded" : ""}`);
-    const head = el("div", "slot-name", lane.map ? `${lane.lane}  ${lane.map}` : lane.lane);
+    const tile = el("li", `slot${hasSpool ? "" : lane.prep ? " untagged" : " empty"}${loaded ? " loaded" : ""}`);
+    const head = el("div", "slot-head");
+    head.append(el("span", "slot-name", lane.lane));
+    if (lane.map) head.append(el("span", "slot-tool", lane.map));
     tile.append(head);
-    if (lane.nozzle_detail) tile.title = `${lane.map ? `${lane.map}: ` : ""}${lane.nozzle_detail} nozzle`;
     const wide = typeof lane.filament_mm === "number" && Math.abs(lane.filament_mm - 1.75) > 0.2;
-    const extra = [];
+    const foot = el("div", "slot-foot");
     if (lane.nozzle) {
       const [diameter, ...type] = lane.nozzle.split(" ");
-      extra.push(el("div", "slot-nozzle", `${diameter} nozzle${type.length && !wide ? ` ${type.join(" ")}` : ""}`));
+      const nozzle = el("div", null, `${diameter} nozzle${type.length && !wide ? ` ${type.join(" ")}` : ""}`);
+      if (lane.nozzle_detail) nozzle.title = `${lane.map ? `${lane.map}: ` : ""}${lane.nozzle_detail} nozzle`;
+      foot.append(nozzle);
     }
-    if (wide) extra.push(el("div", "slot-filament", `${lane.filament_mm} mm filament`));
+    if (wide) foot.append(el("div", "slot-filament", `${lane.filament_mm} mm filament`));
     if (!hasSpool) {
-      tile.append(el("div", "slot-empty", lane.prep ? "No tag" : "Empty"), ...extra);
+      tile.append(el("div", "slot-empty", lane.prep ? (bambu ? "No tag" : "Untagged") : "Empty"));
+      if (!bambu && lane.filament_status) tile.append(el("div", "slot-status", lane.filament_status));
+      if (foot.childElementCount) tile.append(foot);
       return tile;
     }
     paint(tile, colorsOf(lane.colors, lane.color));
-    tile.append(el("div", "slot-id", `#${lane.spool_id}`), el("div", null, lane.material || "--"));
-    if (lane.remaining_g !== null && lane.remaining_g !== undefined) tile.append(el("div", null, grams(lane.remaining_g)));
+    spoolTrigger(tile, lane.spool_id);
+    tile.append(el("div", "slot-id", `#${lane.spool_id}`), el("div", "slot-material", lane.material || "--"));
+    if (lane.remaining_g !== null && lane.remaining_g !== undefined) {
+      const weight = el("div", "slot-weight", grams(lane.remaining_g));
+      if (lane.low_stock && !lane.wrong_filament) weight.append(el("span", "tag low", "LOW"));
+      tile.append(weight);
+      const pct = remainingPct(lane);
+      if (pct !== null) {
+        const bar = el("div", "slot-bar");
+        const fill = el("span");
+        fill.style.width = `${pct}%`;
+        bar.append(fill);
+        tile.append(bar);
+      }
+    }
     if (lane.wrong_filament) {
       const flag = el("span", "tag wrong", "WRONG SIZE");
       flag.title = `This tool takes ${lane.filament_mm} mm filament; the spool's diameter in Spoolman differs.`;
       tile.append(flag);
-    } else if (lane.low_stock) {
-      tile.append(el("span", "tag low", "LOW"));
-    } else {
-      tile.append(el("div", null, lane.settings_pending ? "Pending" : lane.filament_status || ""));
     }
+    const status = lane.settings_pending ? "Settings after print" : lane.filament_status || "";
+    if (status) tile.append(el("div", "slot-status", status));
     if (lane.settings_pending) tile.append(el("span", "pending"));
-    tile.append(...extra);
+    if (foot.childElementCount) tile.append(foot);
     return tile;
   }
 
   function printerCard(printer) {
     const up = online && printer.connected;
     const off = online && printer.off;
-    const card = el("article", `panel printer${up ? "" : " down"}`);
+    const lanes = Array.isArray(printer.lanes) ? printer.lanes : [];
+    // As on the touch UI: a printer with more than four lanes (the H3C's nine slots) gets a row to itself.
+    const wide = lanes.length > 4;
+    const card = el("article", `panel printer${wide ? " wide" : ""}${up ? "" : " down"}`);
     const head = el("header", "printer-head");
     const dotLevel = !online || off ? "" : !printer.connected ? "error" : printer.afc_error ? "warn" : "ok";
     head.append(el("span", `dot ${dotLevel}`), el("h3", null, printerLabel(printer)));
@@ -381,30 +631,31 @@
       card.append(job);
     }
 
-    const next = el("div", `next${printer.pending_spool !== null && printer.pending_spool !== undefined ? " set" : ""}`);
-    next.textContent = printer.pending_spool !== null && printer.pending_spool !== undefined
-      ? `Next spool #${printer.pending_spool}${printer.pending_confirmed ? "  ✓" : "  (sent)"}`
-      : "No next spool";
+    const pending = printer.pending_spool !== null && printer.pending_spool !== undefined;
+    const next = el("div", `next${pending ? " set" : ""}`);
+    if (pending) {
+      const ref = el("span", "spool-ref", `#${printer.pending_spool}`);
+      spoolTrigger(ref, printer.pending_spool);
+      next.append("Next spool ", ref, printer.pending_confirmed ? "  ✓" : "  (sent)");
+    } else {
+      next.textContent = "No next spool";
+    }
     card.append(next);
 
-    const lanes = Array.isArray(printer.lanes) ? printer.lanes : [];
     const isLoaded = (lane) => lane.tool_loaded || (printer.current_load && printer.current_load === lane.lane);
-    if (isBambu(printer)) {
-      const grid = el("div", "slots");
-      for (const lane of lanes) grid.append(slotTile(lane, isLoaded(lane)));
-      card.append(grid);
-    } else {
-      const list = el("ul", "lanes");
-      for (const lane of lanes) list.append(laneRow(lane, isLoaded(lane)));
-      card.append(list);
-    }
+    const tiles = el("ol", `tiles${wide ? " many" : ""}`);
+    tiles.style.setProperty("--n", String(Math.max(lanes.length, 1)));
+    for (const lane of lanes) tiles.append(laneTile(lane, isLoaded(lane), isBambu(printer)));
+    card.append(tiles);
     return card;
   }
 
   function renderPrinters() {
     const root = byId("printers");
-    root.replaceChildren(...state.printers.map(printerCard));
-    if (!state.printers.length) root.append(el("div", "panel empty-note", "No printers reported yet."));
+    const grid = el("div", `printer-grid${state.printers.length === 1 ? " single" : ""}`);
+    grid.append(...state.printers.map(printerCard));
+    if (!state.printers.length) grid.append(el("div", "panel empty-note", "No printers reported yet."));
+    root.replaceChildren(grid);
   }
 
   function renderActivity() {
@@ -417,7 +668,11 @@
       const body = el("div");
       const what = el("div");
       what.append(el("span", "what", actionLabel(entry.action)));
-      if (entry.spool_id !== null && entry.spool_id !== undefined) what.append(document.createTextNode(`  #${entry.spool_id}`));
+      if (entry.spool_id !== null && entry.spool_id !== undefined) {
+        const ref = el("span", "spool-ref", `#${entry.spool_id}`);
+        spoolTrigger(ref, entry.spool_id);
+        what.append("  ", ref);
+      }
       if (entry.undone) what.append(el("span", "tag", "UNDONE"));
       if (entry.dry_run) what.append(el("span", "tag", "DRY RUN"));
       body.append(what);
